@@ -1,0 +1,40 @@
+package com.seven7m.kanban.issue.link;
+
+import com.seven7m.kanban.common.domain.R;
+import com.seven7m.kanban.issue.dto.LinkVO;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/v1/issues")
+@RequiredArgsConstructor
+public class IssueLinkController {
+
+    private final IssueLinkService linkService;
+
+    @GetMapping("/{issueId}/links")
+    public R<List<LinkVO>> list(@PathVariable UUID issueId) {
+        return R.ok(linkService.list(issueId));
+    }
+
+    @PostMapping("/{issueId}/links")
+    public R<LinkVO> add(@PathVariable UUID issueId, @RequestBody LinkBody body) {
+        return R.ok(linkService.add(issueId, body.getTargetIssueId(), body.getRelationType()));
+    }
+
+    @DeleteMapping("/{issueId}/links/{linkId}")
+    public R<Void> delete(@PathVariable UUID issueId, @PathVariable UUID linkId) {
+        linkService.delete(issueId, linkId);
+        return R.ok();
+    }
+
+    @Data
+    public static class LinkBody {
+        private UUID targetIssueId;
+        private String relationType;
+    }
+}

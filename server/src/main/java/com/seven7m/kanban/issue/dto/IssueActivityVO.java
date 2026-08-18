@@ -1,0 +1,18 @@
+package com.seven7m.kanban.issue.dto;
+
+import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Data
+public class IssueActivityVO {
+    private UUID id;
+    private String type;       // COMMENT / STATUS_CHANGED / FIELD_CHANGED ...
+    private UUID actorId;
+    private String actorName;
+    private String content;    // 评论内容
+    private String oldValue;   // 活动旧值（JSON 文本）
+    private String newValue;   // 活动新值（JSON 文本）
+    private LocalDateTime createdAt;
+}

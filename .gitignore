@@ -1,0 +1,33 @@
+.codeartsdoer
+.codebuddy
+.test
+
+# 依赖与构建产物
+node_modules/
+dist/
+target/
+build/
+
+# 环境变量（本地私有配置不入库）
+.env.local
+.env.*.local
+*.local
+
+# 凭据与临时文件
+.askpass.tmp.sh
+*.tmp.sh
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 本地截图/验证脚本（不入库）
+.tmp-shot-env/
+Skill.iml  
+/截图/
+*.log

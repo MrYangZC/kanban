@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #1677ff;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #f7f8fa;
+  color: #1f2329;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d0d3d9;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b8bcc4;
+}
+
+/* 看板卡片拖拽时的幽灵样式 */
+.sortable-ghost {
+  opacity: 0.4;
+}
+.sortable-drag {
+  transform: rotate(2deg);
+}
