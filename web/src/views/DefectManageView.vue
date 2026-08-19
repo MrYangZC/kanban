@@ -11,10 +11,16 @@ import type {
   Issue, LabelVO, ProjectMember, UserVO, IssueStatusVO,
   BoardGroupView, GroupColumnView, Project, PageResult, WorkflowTransitionVO
 } from '@/api/types'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
 import TreeNode from '@/components/TreeNode.vue'
+import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
+import {
+  PRIORITY_COLOR as priorityColor, SEVERITY_COLOR as severityColor, PRIORITY_LABEL as priorityLabel
+} from '@/constants/issueDict'
+import { avatarChar, avatarColor } from '@/utils/avatar'
+import { useWorkflowTransition } from '@/composables/useWorkflowTransition'
 import {
   Plus, Search, List, GitBranch, LayoutGrid, ChevronDown,
   AlertTriangle, MoreHorizontal, ArrowLeft, RefreshCw, Save,
@@ -49,30 +55,14 @@ const board = ref<BoardGroupView | null>(null)
 const filteredIds = ref<Set<string>>(new Set())
 const dragOverCol = ref<{ statusId: string; allowed: boolean } | null>(null)
 
-const priorityColor: Record<string, string> = {
-  P0: '#F56C6C', P1: '#E6A23C', P2: '#409EFF', P3: '#909399'
-}
-const severityColor: Record<string, string> = {
-  S1: '#F56C6C', S2: '#FA8C16', S3: '#409EFF', S4: '#909399'
-}
-const priorityLabel: Record<string, string> = {
-  P0: '紧急', P1: '高', P2: '中', P3: '低'
-}
 const severityLabel: Record<string, string> = {
-  S1: '1-致命', S2: '2-严重', S3: '3-一般', S4: '4-轻微'
+  S1: '致命', S2: '严重', S3: '一般', S4: '轻微'
 }
 
 // 工作流流转规则：from statusId → 允许的 to statusId 集合
 // 唯一事实来源为后端 workflow_transition 表，前端不硬编码
-const transitionMap = ref<Record<string, Set<string>>>({})
-function buildTransitionMap(transitions: WorkflowTransitionVO[]): Record<string, Set<string>> {
-  const map: Record<string, Set<string>> = {}
-  for (const t of transitions) {
-    if (!map[t.fromStatusId]) map[t.fromStatusId] = new Set()
-    map[t.fromStatusId].add(t.toStatusId)
-  }
-  return map
-}
+const { transitionMap, build: buildTransitionMap } = useWorkflowTransition()
+
 const statusNameMap = computed(() => {
   const m: Record<string, string> = {}
   if (board.value) {
@@ -220,12 +210,7 @@ function statusColor(id: string) {
 function memberName(id: string | null) { return members.value.find((m) => m.userId === id)?.displayName || '—' }
 function userName(id: string | null) { return users.value.find((u) => u.id === id)?.displayName || '—' }
 function fmtDate(t?: string) { return t ? t.slice(0, 10) : '—' }
-function avatarChar(name: string | null) { return name ? name.charAt(0) : '·' }
-function avatarColor(name: string | null) {
-  if (!name) return '#C0C4CC'
-  const cs = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6']
-  return cs[name.charCodeAt(0) % cs.length]
-}
+
 
 async function patchStatus(issue: Issue, statusId: string) {
   if (!canWrite.value) { ElMessage.warning('无编辑权限'); return }
@@ -243,21 +228,14 @@ function openDetail(issue: Issue) {
   detailDrawer.value?.open(issue.id)
 }
 
+// 新建缺陷：富文本弹窗
+const createOpen = ref(false)
+function onCreated() {
+  load()
+}
+
 async function onNewIssue() {
-  try {
-    const { value } = await ElMessageBox.prompt('缺陷标题', '新建缺陷', {
-      inputPlaceholder: '例如：监测管理--雨量站异常值',
-    })
-    await createIssue({
-      projectId,
-      statusId: statuses.value[0]?.id || '',
-      title: value,
-      priority: 'P2',
-      severity: 'S3',
-    })
-    await load()
-    ElMessage.success('已创建')
-  } catch { /* cancel */ }
+  createOpen.value = true
 }
 
 function onMove(evt: any): boolean {
@@ -580,5 +558,15 @@ onMounted(() => {
 
     <!-- 云效风格缺陷详情：宽抽屉（60% 屏宽），不跳转路由 -->
     <IssueDetailDrawer ref="detailDrawer" :project-id="projectId" @closed="load" />
+
+    <!-- 新建缺陷：富文本弹窗 -->
+    <CreateIssueDialog
+      v-model="createOpen"
+      :project-id="projectId"
+      title="新建缺陷"
+      default-issue-type-code="BUG"
+      :default-status-id="statuses[0]?.id || ''"
+      @created="onCreated"
+    />
   </div>
 </template>

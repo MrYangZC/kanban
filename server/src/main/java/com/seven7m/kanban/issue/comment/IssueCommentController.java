@@ -23,7 +23,7 @@ public class IssueCommentController {
 
     @PostMapping("/{issueId}/comments")
     public R<IssueActivityVO> add(@PathVariable UUID issueId, @RequestBody CommentBody body) {
-        return R.ok(commentService.addComment(issueId, body.getContent()));
+        return R.ok(commentService.addComment(issueId, body.getContent(), body.getParentId()));
     }
 
     @DeleteMapping("/{issueId}/comments/{commentId}")
@@ -35,5 +35,6 @@ public class IssueCommentController {
     @Data
     public static class CommentBody {
         private String content;
+        private UUID parentId;   // 嵌套回复：父评论 id，顶楼评论为 null
     }
 }

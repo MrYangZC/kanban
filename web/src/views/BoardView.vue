@@ -8,9 +8,11 @@ import type { BoardGroupView, Issue, GroupColumnView, LabelVO, ProjectMember, Wo
 import IssueCard from '@/components/IssueCard.vue'
 import BoardFilterBar, { type FilterPayload } from '@/components/BoardFilterBar.vue'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
+import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import { createBoardFilter } from '@/stores/boardFilter'
 import { useUserStore } from '@/stores/user'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { useWorkflowTransition } from '@/composables/useWorkflowTransition'
 
 const route = useRoute()
 const router = useRouter()
@@ -85,16 +87,7 @@ const totalCount = computed(() =>
 
 // 工作流流转规则：from statusId → 允许的 to statusId 集合
 // 数据来源为后端 workflow_transition 表（唯一事实来源），前端不再硬编码
-const transitionMap = ref<Record<string, Set<string>>>({})
-
-function buildTransitionMap(transitions: WorkflowTransitionVO[]): Record<string, Set<string>> {
-  const map: Record<string, Set<string>> = {}
-  for (const t of transitions) {
-    if (!map[t.fromStatusId]) map[t.fromStatusId] = new Set()
-    map[t.fromStatusId].add(t.toStatusId)
-  }
-  return map
-}
+const { transitionMap, build: buildTransitionMap } = useWorkflowTransition()
 
 const dragOverCol = ref<{ statusId: string; allowed: boolean } | null>(null)
 
@@ -153,22 +146,15 @@ function openIssue(issue: Issue) {
 async function onNewIssue(col?: GroupColumnView) {
   // 顶部"新建"未指定列时，取看板第一个状态列作为默认状态，避免 statusId 为空导致创建失败
   const statusId = col?.statusId || board.value?.groups?.[0]?.columns?.[0]?.statusId
-  try {
-    const { value } = await ElMessageBox.prompt('任务标题', `新建 · ${col?.name || '任务'}`, {
-      inputPlaceholder: '例如：优化看板拖拽体验'
-    })
-    await createIssue({
-      projectId,
-      statusId: statusId || '',
-      title: value,
-      priority: 'P2',
-      severity: 'S3'
-    })
-    await load()
-    ElMessage.success('已创建')
-  } catch {
-    /* 取消 */
-  }
+  createPayload.value = { statusId: statusId || '' }
+  createOpen.value = true
+}
+
+const createOpen = ref(false)
+const createPayload = ref<{ statusId: string }>({ statusId: '' })
+
+function onCreated() {
+  load()
 }
 
 function back() {
@@ -267,5 +253,14 @@ onMounted(() => {
 
     <!-- 云效风格缺陷详情：宽抽屉（60% 屏宽），不跳转路由 -->
     <IssueDetailDrawer ref="detailDrawer" :project-id="projectId" @closed="load" />
+
+    <!-- 新建工作项：富文本弹窗 -->
+    <CreateIssueDialog
+      v-model="createOpen"
+      :project-id="projectId"
+      title="新建工作项"
+      :default-status-id="createPayload.statusId"
+      @created="onCreated"
+    />
   </div>
 </template>

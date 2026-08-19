@@ -1,10 +1,14 @@
 package com.seven7m.kanban.user.controller;
 
 import com.seven7m.kanban.common.domain.R;
+import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.common.security.UserContextInterceptor;
+import com.seven7m.kanban.user.dto.ChangePasswordRequest;
 import com.seven7m.kanban.user.dto.CreateUserRequest;
 import com.seven7m.kanban.user.dto.LoginRequest;
 import com.seven7m.kanban.user.dto.LoginVO;
+import com.seven7m.kanban.user.dto.ProfileVO;
+import com.seven7m.kanban.user.dto.UpdateProfileRequest;
 import com.seven7m.kanban.user.dto.UpdateUserRequest;
 import com.seven7m.kanban.user.dto.UserVO;
 import com.seven7m.kanban.user.service.UserService;
@@ -52,6 +56,25 @@ public class UserController {
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable UUID id) {
         userService.delete(id);
+        return R.ok();
+    }
+
+    /** 获取当前登录用户个人资料 */
+    @GetMapping("/me")
+    public R<ProfileVO> me() {
+        return R.ok(userService.getProfile(UserContext.getUserId()));
+    }
+
+    /** 当前用户修改个人资料 */
+    @PutMapping("/me")
+    public R<ProfileVO> updateMe(@RequestBody UpdateProfileRequest req) {
+        return R.ok(userService.updateProfile(UserContext.getUserId(), req));
+    }
+
+    /** 当前用户修改密码 */
+    @PutMapping("/me/password")
+    public R<Void> changePassword(@Valid @RequestBody ChangePasswordRequest req) {
+        userService.changePassword(UserContext.getUserId(), req);
         return R.ok();
     }
 }

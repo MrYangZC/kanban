@@ -5,6 +5,7 @@ import {
   filterIssues, updateIssue, listProjectStatuses,
   listProjectTags, listProjectMembers, listUsers, getProject,
   listActivities, addComment, deleteComment, listAttachments, addAttachment, deleteAttachment,
+  uploadImage, uploadAttachment,
   listLinks, addLink, deleteLink, listIssueTags, addIssueTag, removeIssueTag
 } from '@/api'
 import type {
@@ -14,10 +15,16 @@ import type {
 import { ElMessage } from 'element-plus'
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Plus, X,
-  Paperclip, Link2, Trash2, Edit3, Sparkles,
-  AlertTriangle, Image as ImageIcon, Send, MoreHorizontal,
-  Bold, Italic, List, ListOrdered, Quote, Smile
+  Paperclip, Link2, Trash2,
+  AlertTriangle, Send, MoreHorizontal
 } from 'lucide-vue-next'
+import CommentThread from '@/components/CommentThread.vue'
+import RichTextEditor from '@/components/RichTextEditor.vue'
+import { useUserStore } from '@/stores/user'
+import { avatarChar, avatarColor } from '@/utils/avatar'
+import { fmtTime, fmtDate } from '@/utils/datetime'
+
+type CommentNode = IssueActivity & { children?: CommentNode[] }
 
 const props = withDefaults(defineProps<{
   projectId?: string
@@ -66,10 +73,10 @@ const priorityOptions = [
   { v: 'P3', label: '低' }
 ]
 const severityOptions = [
-  { v: 'S1', label: '1-致命' },
-  { v: 'S2', label: '2-严重' },
-  { v: 'S3', label: '3-一般' },
-  { v: 'S4', label: '4-轻微' }
+  { v: 'S1', label: '致命' },
+  { v: 'S2', label: '严重' },
+  { v: 'S3', label: '一般' },
+  { v: 'S4', label: '轻微' }
 ]
 
 const mainTab = ref<'activity' | 'link' | 'other'>('activity')
@@ -80,7 +87,8 @@ const links = ref<LinkVO[]>([])
 const tags = ref<LabelVO[]>([])
 const commentText = ref('')
 const commenting = ref(false)
-const commentTextareaRef = ref<HTMLTextAreaElement | null>(null)
+const replyTo = ref<IssueActivity | null>(null)   // 当前回复目标评论（嵌套回复）
+const commentEditorRef = ref<InstanceType<typeof RichTextEditor> | null>(null)
 const attachInputRef = ref<HTMLInputElement | null>(null)
 const linkTarget = ref('')
 const linkType = ref('关联')
@@ -114,13 +122,49 @@ const filteredActivities = computed(() => {
 })
 const commentCount = computed(() => activities.value.filter((a) => a.type === 'COMMENT').length)
 
+// 评论树：把 COMMENT 类型按 parentId 组装为嵌套楼层（顶层 parentId 为空），状态活动保持平铺展示
+const commentTree = computed<(IssueActivity | CommentNode)[]>(() => {
+  const base = filteredActivities.value
+  const byId = new Map<string, CommentNode>()
+  const roots: CommentNode[] = []
+  for (const a of base) {
+    if (a.type !== 'COMMENT') continue
+    byId.set(a.id, { ...a, children: [] })
+  }
+  for (const a of base) {
+    if (a.type !== 'COMMENT') continue
+    const node = byId.get(a.id)!
+    const parent = a.parentId ? byId.get(a.parentId) : null
+    if (parent) parent.children!.push(node)
+    else roots.push(node)
+  }
+  roots.sort((x, y) => (x.createdAt || '').localeCompare(y.createdAt || ''))
+  const sortChildren = (n: CommentNode) => {
+    n.children!.sort((x, y) => (x.createdAt || '').localeCompare(y.createdAt || ''))
+    n.children!.forEach(sortChildren)
+  }
+  roots.forEach(sortChildren)
+  // 顶层评论作为「评论树根」，状态活动与之按时间平铺
+  const result: (IssueActivity | CommentNode)[] = []
+  for (const a of base) {
+    if (a.type !== 'COMMENT') result.push(a)
+    else if (!a.parentId) result.push(byId.get(a.id)!)
+  }
+  result.sort((x, y) => (x.createdAt || '').localeCompare(y.createdAt || ''))
+  return result
+})
+const userStore = useUserStore()
+// 当前登录用户真实 id（避免硬编码 admin 导致角色/权限误判）
+const currentUserId = computed(() => userStore.user?.id || '')
+const currentUserName = computed(() => userStore.user?.displayName || userStore.user?.username || '')
+
 async function loadMeta() {
   try { project.value = await getProject(pid.value) } catch { /* ignore */ }
   try { statuses.value = await listProjectStatuses(pid.value) } catch { /* ignore */ }
   try { allTags.value = await listProjectTags(pid.value) } catch { /* ignore */ }
   try { members.value = await listProjectMembers(pid.value) } catch { /* ignore */ }
   try { users.value = await listUsers() } catch { /* ignore */ }
-  const me = members.value.find((m) => m.userId === users.value.find((u) => u.username === 'admin')?.id)
+  const me = members.value.find((m) => m.userId === currentUserId.value)
   canWrite.value = !me || !me.roles.includes('VIEWER')
 }
 
@@ -208,12 +252,21 @@ async function saveTitle() {
 }
 
 function startComment() {
+  replyTo.value = null
   commenting.value = true
-  nextTick(() => commentTextareaRef.value?.focus())
+  commentText.value = ''
+  nextTick(() => commentEditorRef.value?.focus())
+}
+function startReply(node: IssueActivity) {
+  replyTo.value = node
+  commenting.value = true
+  commentText.value = `@${node.actorName} `
+  nextTick(() => commentEditorRef.value?.focus())
 }
 function cancelComment() {
   commenting.value = false
   commentText.value = ''
+  replyTo.value = null
 }
 async function sendComment() {
   if (!currentIssue.value || !commentText.value.trim() || !canWrite.value) {
@@ -221,75 +274,70 @@ async function sendComment() {
     return
   }
   try {
-    await addComment(currentIssue.value.id, commentText.value.trim())
+    await addComment(currentIssue.value.id, commentText.value.trim(), replyTo.value?.id || null)
     commentText.value = ''
     commenting.value = false
+    replyTo.value = null
     activities.value = await listActivities(currentIssue.value.id)
   } catch {
     ElMessage.error('评论发送失败')
   }
 }
-function wrapSelection(prefix: string, suffix: string, placeholder = '') {
-  const ta = commentTextareaRef.value
-  if (!ta) return
-  const start = ta.selectionStart
-  const end = ta.selectionEnd
-  const before = commentText.value.slice(0, start)
-  const selected = commentText.value.slice(start, end) || placeholder
-  const after = commentText.value.slice(end)
-  const inserted = prefix + selected + suffix
-  commentText.value = before + inserted + after
-  nextTick(() => {
-    ta.focus()
-    const cursor = before.length + prefix.length + selected.length
-    ta.setSelectionRange(cursor, cursor)
-  })
-}
-function insertAtCursor(text: string, cursorOffset?: number) {
-  const ta = commentTextareaRef.value
-  if (!ta) return
-  const start = ta.selectionStart
-  const end = ta.selectionEnd
-  const before = commentText.value.slice(0, start)
-  const after = commentText.value.slice(end)
-  commentText.value = before + text + after
-  nextTick(() => {
-    ta.focus()
-    const pos = before.length + (cursorOffset ?? text.length)
-    ta.setSelectionRange(pos, pos)
-  })
-}
-function insertAtLineStart(prefix: string) {
-  const ta = commentTextareaRef.value
-  if (!ta) return
-  const start = ta.selectionStart
-  const before = commentText.value.slice(0, start)
-  const lineStart = before.lastIndexOf('\n') + 1
-  commentText.value =
-    commentText.value.slice(0, lineStart) + prefix + commentText.value.slice(lineStart)
-  nextTick(() => {
-    ta.focus()
-    const pos = start + prefix.length
-    ta.setSelectionRange(pos, pos)
-  })
-}
 function onAttachChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
-  if (file) {
-    insertAtCursor(`![${file.name}](attachment:${file.name})`)
-    if (currentIssue.value) {
-      addAttachment(currentIssue.value.id, file.name, file.type || 'application/octet-stream', file.size || 0)
-        .then(() => listAttachments(currentIssue.value!.id))
-        .then((list) => (attachments.value = list))
-        .catch(() => {/* ignore */})
-    }
+  if (file && currentIssue.value) {
+    uploadAttachment(currentIssue.value.id, file)
+      .then(() => {
+        commentEditorRef.value?.insert(`\n[附件](${file.name})\n`)
+        return listAttachments(currentIssue.value!.id)
+      })
+      .then((list) => (attachments.value = list))
+      .catch(() => ElMessage.error('附件上传失败'))
   }
   input.value = ''
 }
 function triggerAttach() {
   attachInputRef.value?.click()
 }
+
+// 描述只读渲染：把 ![alt](url) 转安全 <img>，其余转义（与评论渲染一致）
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+function renderDescription(content: string | null | undefined): string {
+  if (!content) return '<span style="color:#c0c4cc">暂无描述</span>'
+  const imgRe = /!\[([^\]]*)\]\(([^)\s]+)\)/g
+  let out = ''
+  let last = 0
+  let m: RegExpExecArray | null
+  while ((m = imgRe.exec(content))) {
+    out += escapeHtml(content.slice(last, m.index))
+    const url = m[2]
+    if (/^https?:\/\//.test(url) || url.startsWith('/api/')) {
+      out += `<img src="${url.replace(/"/g, '%22')}" alt="${m[1].replace(/"/g, '')}" style="max-width:100%;border-radius:6px;margin:4px 0" />`
+    } else {
+      out += escapeHtml(m[0])
+    }
+    last = imgRe.lastIndex
+  }
+  out += escapeHtml(content.slice(last))
+  return out
+}
+// 从描述中提取图片列表，用于只读缩略图回显
+const descriptionImages = computed(() => {
+  const desc = currentIssue.value?.description || ''
+  const res: { url: string; name: string }[] = []
+  const imgRe = /!\[([^\]]*)\]\(([^)\s]+)\)/g
+  let m: RegExpExecArray | null
+  while ((m = imgRe.exec(desc))) {
+    const url = m[2]
+    if (/^https?:\/\//.test(url) || url.startsWith('/api/')) {
+      res.push({ url, name: m[1] || '图片' })
+    }
+  }
+  return res
+})
 
 async function removeComment(id: string) {
   if (!currentIssue.value) return
@@ -348,22 +396,6 @@ function goNext() { if (nextIssue.value) selectIssue(nextIssue.value) }
 const statusColor = (id: string) => statuses.value.find((s) => s.id === id)?.color || PRIMARY
 const userName = (id: string | null) => users.value.find((u) => u.id === id)?.displayName || '—'
 
-function fmtTime(t?: string) {
-  if (!t) return ''
-  return t.slice(0, 19).replace('T', ' ')
-}
-function fmtDate(t?: string) {
-  if (!t) return ''
-  return t.slice(0, 10)
-}
-function avatarChar(name: string | null) {
-  return name ? name.charAt(0) : '·'
-}
-function avatarColor(name: string | null) {
-  if (!name) return '#C0C4CC'
-  const colors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#1ABC9C']
-  return colors[name.charCodeAt(0) % colors.length]
-}
 
 onMounted(() => {
   loadMeta().then(loadIssues)
@@ -467,50 +499,33 @@ onMounted(() => {
             </div>
           </section>
 
-          <!-- 描述卡片 -->
+          <!-- 描述卡片（只读展示） -->
           <section class="rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
             <div class="mb-3 flex items-center justify-between">
               <h3 class="text-sm font-medium" style="color:#303133">描述</h3>
-              <div class="flex items-center gap-2">
-                <button class="flex items-center gap-1 rounded px-3 py-1.5 text-xs" style="background:#f5f7fa;color:#909399">
-                  <Sparkles :size="13" /> 智能优化内容
-                </button>
-                <button class="flex items-center gap-1 rounded border bg-white px-3 py-1.5 text-xs" style="border-color:#dcdfe6;color:#606266">
-                  <Edit3 :size="13" /> 编辑
-                </button>
-              </div>
             </div>
-            <textarea
-              v-model="form.description"
-              rows="3"
-              class="w-full resize-none rounded border px-3 py-2 text-sm outline-none"
-              style="border-color:#dcdfe6;color:#606266"
-              placeholder="补充缺陷描述…"
-              @blur="saveField('描述', { description: form.description })"
-            />
-            <!-- 截图占位 -->
-            <div class="mt-4 grid grid-cols-2 gap-3">
-              <div class="group relative overflow-hidden rounded-lg border" style="border-color:#e4e7ed">
-                <div class="flex h-44 items-center justify-center" style="background:#f5f7fa">
-                  <ImageIcon :size="32" style="color:#c0c4cc" />
-                </div>
-                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 py-2 text-xs text-white opacity-0 transition group-hover:opacity-100">
-                  地图界面截图
-                </div>
-              </div>
-              <div class="group relative overflow-hidden rounded-lg border" style="border-color:#e4e7ed">
-                <div class="flex h-44 items-center justify-center" style="background:#f5f7fa">
-                  <ImageIcon :size="32" style="color:#c0c4cc" />
-                </div>
-                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 py-2 text-xs text-white opacity-0 transition group-hover:opacity-100">
-                  报错截图
-                </div>
+            <!-- 描述正文：只读渲染，支持 ![alt](url) 图片语法 -->
+            <div
+              v-if="currentIssue"
+              class="description-content whitespace-pre-wrap rounded px-3 py-2 text-sm"
+              style="background:#f5f7fa;color:#606266"
+              v-html="renderDescription(currentIssue.description)"
+            ></div>
+            <!-- 描述中若含图片，在此以缩略图形式回显（只读） -->
+            <div v-if="descriptionImages.length" class="mt-3 grid grid-cols-2 gap-3">
+              <div
+                v-for="img in descriptionImages"
+                :key="img.url"
+                class="overflow-hidden rounded-lg border"
+                style="border-color:#e4e7ed"
+              >
+                <img :src="img.url" :alt="img.name" class="h-44 w-full object-cover" />
               </div>
             </div>
           </section>
 
-          <!-- 评论区（动态&评论 / 关联项 / 其他）→ 描述卡片下方 -->
-          <section class="mt-4 rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
+          <!-- 评论区（动态&评论 / 关联项 / 其他）→ 描述卡片下方，flex-1 拉伸填满至底部 -->
+          <section class="mt-4 flex-1 rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
             <!-- 主标签页 -->
             <div class="mb-4 flex items-center gap-1 border-b" style="border-color:#e4e7ed">
               <button
@@ -553,43 +568,35 @@ onMounted(() => {
                 >{{ s.label }}</button>
               </div>
 
-              <!-- 评论列表 -->
+              <!-- 评论列表（评论以嵌套楼层展示，状态活动平铺） -->
               <div class="space-y-5">
-                <div v-for="a in filteredActivities" :key="a.id" class="flex gap-3">
-                  <div
-                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium text-white"
-                    :style="{ background: avatarColor(a.actorName) }"
-                  >{{ avatarChar(a.actorName) }}</div>
-                  <div class="min-w-0 flex-1">
-                    <div class="mb-1.5 flex items-center gap-2 text-xs">
-                      <span class="font-medium" style="color:#303133">{{ a.actorName }}</span>
-                      <span style="color:#c0c4cc">{{ fmtTime(a.createdAt) }}</span>
-                      <div class="ml-auto flex items-center gap-3">
-                        <button v-if="a.type === 'COMMENT'" class="hover:underline" :style="{ color: PRIMARY }">回复</button>
-                        <button
-                          v-if="a.type === 'COMMENT'"
-                          class="hover:text-[#F56C6C]"
-                          style="color:#c0c4cc"
-                          @click="removeComment(a.id)"
-                        ><Trash2 :size="13" /></button>
+                <template v-for="a in commentTree" :key="a.id">
+                  <CommentThread
+                    v-if="a.type === 'COMMENT'"
+                    :node="a"
+                    :depth="0"
+                    :can-write="canWrite"
+                    :current-user-name="currentUserName"
+                    @reply="startReply"
+                    @remove="removeComment"
+                  />
+                  <div v-else class="flex gap-3">
+                    <div
+                      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs"
+                      style="background:#f5f7fa;color:#909399"
+                    >·</div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-1 text-xs" style="color:#909399">
+                        <span>{{ a.actorName }}</span>
+                        <span>{{ fmtTime(a.createdAt) }}</span>
+                        <span class="ml-1">{{ a.type === 'STATUS_CHANGED' ? '变更了状态' : '更新了字段' }}</span>
+                        <code class="rounded px-1.5 py-0.5" style="background:#f5f7fa;color:#606266">{{ a.oldValue || '—' }}</code>
+                        <span>→</span>
+                        <code class="rounded px-1.5 py-0.5" :style="{ background: PRIMARY_LIGHT, color: PRIMARY }">{{ a.newValue || '—' }}</code>
                       </div>
-                    </div>
-                    <div v-if="a.type === 'COMMENT'" class="rounded-lg p-3 text-sm" style="background:#f5f7fa;color:#606266">
-                      <div class="mb-2 overflow-hidden rounded border" style="border-color:#e4e7ed">
-                        <div class="flex h-32 items-center justify-center" style="background:#ebeef5">
-                          <ImageIcon :size="24" style="color:#c0c4cc" />
-                        </div>
-                      </div>
-                      {{ a.content }}
-                    </div>
-                    <div v-else class="flex items-center gap-1 text-xs" style="color:#909399">
-                      <span>{{ a.type === 'STATUS_CHANGED' ? '变更了状态' : '更新了字段' }}</span>
-                      <code class="rounded px-1.5 py-0.5" style="background:#f5f7fa;color:#606266">{{ a.oldValue || '—' }}</code>
-                      <span>→</span>
-                      <code class="rounded px-1.5 py-0.5" :style="{ background: PRIMARY_LIGHT, color: PRIMARY }">{{ a.newValue || '—' }}</code>
                     </div>
                   </div>
-                </div>
+                </template>
                 <div v-if="!filteredActivities.length" class="py-8 text-center text-sm" style="color:#c0c4cc">
                   暂无内容
                 </div>
@@ -669,10 +676,7 @@ onMounted(() => {
             </div>
           </section>
 
-          <!-- 弹性占位：内容不足时把评论输入框推至左栏底部 -->
-          <div class="min-h-[1px] flex-1"></div>
-
-          <!-- 评论输入框：始终钉在左侧面板最底部（不滚动时贴底 / 滚动时 sticky 跟随） -->
+          <!-- 评论输入框：始终钉在左侧面板最底部，默认占位，点击展开富文本编辑器 -->
           <section
             class="sticky bottom-0 z-10"
             style="background:#f5f7fa;box-shadow:0 -6px 12px -6px rgba(0,0,0,0.06)"
@@ -697,57 +701,42 @@ onMounted(() => {
               class="rounded-md bg-white p-3"
               style="box-shadow:0 1px 2px rgba(0,0,0,0.04)"
             >
+              <div class="mb-2 flex items-center gap-2 text-xs" style="color:#909399">
+                <span v-if="replyTo">正在回复 <b style="color:#409EFF">@{{ replyTo.actorName }}</b></span>
+                <span v-else>发表评论</span>
+                <button v-if="replyTo" class="hover:underline" style="color:#c0c4cc" @click="cancelComment">取消回复</button>
+              </div>
               <div class="flex items-start gap-3">
                 <div
                   class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium text-white"
                   :style="{ background: avatarColor(userName(currentIssue.reporterId)) }"
                 >{{ avatarChar(userName(currentIssue.reporterId)) }}</div>
                 <div class="flex-1">
-                  <!-- 工具栏 -->
-                  <div
-                    class="mb-2 flex items-center gap-1 rounded border px-1.5 py-1"
-                    style="border-color:#e4e7ed;background:#fafbfc"
-                  >
-                    <button
-                      v-for="t in [
-                        { tip: '粗体', icon: Bold, fn: () => wrapSelection('**', '**', '粗体文字') },
-                        { tip: '斜体', icon: Italic, fn: () => wrapSelection('*', '*', '斜体文字') },
-                        { tip: '无序列表', icon: List, fn: () => insertAtLineStart('- ') },
-                        { tip: '有序列表', icon: ListOrdered, fn: () => insertAtLineStart('1. ') },
-                        { tip: '链接', icon: Link2, fn: () => insertAtCursor('[文字](https://)', 1) },
-                        { tip: '引用', icon: Quote, fn: () => insertAtLineStart('> ') },
-                        { tip: '附件', icon: Paperclip, fn: triggerAttach },
-                        { tip: '表情', icon: Smile, fn: () => insertAtCursor('😊') }
-                      ]"
-                      :key="t.tip"
-                      :title="t.tip"
-                      class="flex h-7 w-7 items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                      @click="t.fn"
-                    >
-                      <component :is="t.icon" :size="14" />
-                    </button>
-                    <span class="mx-1 text-gray-300">|</span>
-                    <span class="px-1 text-xs" style="color:#909399">Markdown</span>
-                  </div>
-
-                  <!-- 隐藏的文件 input（附件按钮触发） -->
-                  <input
-                    ref="attachInputRef"
-                    type="file"
-                    class="hidden"
-                    @change="onAttachChange"
-                  />
-
-                  <!-- 编辑区 -->
-                  <textarea
-                    ref="commentTextareaRef"
+                  <!-- 富文本编辑器（含 Markdown 工具栏 / 图片上传 / Ctrl+V 粘贴） -->
+                  <RichTextEditor
+                    ref="commentEditorRef"
                     v-model="commentText"
-                    rows="4"
-                    placeholder="Ctrl+V直接上传截图（仅在Chrome浏览器生效），支持Markdown"
-                    class="w-full resize-none border-none text-sm leading-6 outline-none"
-                    style="color:#303133;background:transparent"
-                    @keyup.ctrl.enter="sendComment"
+                    :rows="4"
+                    :disabled="!canWrite"
+                    placeholder="Ctrl+V 直接上传截图，支持 Markdown"
                   />
+
+                  <!-- 附件按钮（组件不含附件，独立触发） -->
+                  <div class="mt-1 flex items-center gap-2">
+                    <button
+                      type="button"
+                      class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100"
+                      @click="triggerAttach"
+                    >
+                      <Paperclip :size="13" /> 附件
+                    </button>
+                    <input
+                      ref="attachInputRef"
+                      type="file"
+                      class="hidden"
+                      @change="onAttachChange"
+                    />
+                  </div>
 
                   <!-- 底部操作 -->
                   <div class="mt-2 flex items-center justify-between">
@@ -773,8 +762,8 @@ onMounted(() => {
         </main>
 
         <!-- ======== 右侧信息栏 ======== -->
-        <aside class="flex w-[320px] shrink-0 flex-col">
-          <div class="flex-1 rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
+        <aside class="flex w-[380px] shrink-0 flex-col self-start">
+          <div class="rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
             <h3 class="mb-4 text-sm font-medium" style="color:#303133">基础字段</h3>
             <div class="space-y-4">
               <!-- 工作项类型 -->

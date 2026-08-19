@@ -244,11 +244,16 @@ CREATE TABLE issue_comment (
     id         UUID PRIMARY KEY,
     issue_id   UUID NOT NULL,
     user_id    UUID NOT NULL,
+    parent_id  UUID,
     content    TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted    INTEGER NOT NULL DEFAULT 0
+    deleted    INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT fk_issue_comment_parent
+        FOREIGN KEY (parent_id) REFERENCES issue_comment (id)
+        ON DELETE RESTRICT
 );
+CREATE INDEX IF NOT EXISTS idx_issue_comment_parent ON issue_comment (parent_id);
 
 -- 16. attachment（含 V10 新增 url 字段，承载可访问地址） ----------------------
 CREATE TABLE attachment (

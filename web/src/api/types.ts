@@ -14,6 +14,33 @@ export interface Project {
   leadUserId: string
   createdAt: string
   stats?: ProjectStats
+  favorited?: boolean
+  canEdit?: boolean
+}
+
+/** 项目分类筛选键 */
+export type ProjectCategoryKey = 'all' | 'managed' | 'participated' | 'favorited' | 'archived'
+
+/** 项目分类计数 */
+export interface ProjectCategoryCounts {
+  all: number
+  managed: number
+  participated: number
+  favorited: number
+  archived: number
+}
+
+/** 项目列表视图模式 */
+export type ViewMode = 'card' | 'list'
+
+/** 项目列表分页查询参数 */
+export interface ProjectFilterRequest {
+  category?: ProjectCategoryKey
+  keyword?: string
+  page?: number
+  size?: number
+  sortField?: string
+  sortOrder?: string
 }
 
 export interface LabelVO {
@@ -96,6 +123,8 @@ export interface IssueActivity {
   type: string
   actorId: string
   actorName: string
+  parentId?: string | null   // 嵌套回复父评论 id，顶楼评论为 null/undefined
+  deleted?: number | null    // 1=已逻辑删除（显示「已删除」占位），0/undefined=正常
   content: string | null
   oldValue: string | null
   newValue: string | null
@@ -184,6 +213,30 @@ export interface LoginVO {
   username: string
   displayName: string
   token: string
+}
+
+/** 当前登录用户个人资料 */
+export interface ProfileVO {
+  id: string
+  username: string
+  displayName: string
+  email: string | null
+  avatarUrl: string | null
+  enabled: boolean
+  createdAt: string | null
+}
+
+/** 修改个人资料请求 */
+export interface UpdateProfileRequest {
+  displayName?: string
+  email?: string
+  avatarUrl?: string
+}
+
+/** 修改密码请求 */
+export interface ChangePasswordRequest {
+  oldPassword: string
+  newPassword: string
 }
 
 export interface ProjectMember {

@@ -416,10 +416,10 @@ const fmtTime = (t?: string) => (t ? new Date(t).toLocaleString('zh-CN') : '')
         <div>
           <label class="mb-1 block text-xs text-ink-400">严重程度</label>
           <select v-model="severity" class="w-full rounded-lg border border-surface-muted px-3 py-2 text-sm outline-none focus:border-brand">
-            <option value="S1">1-致命</option>
-            <option value="S2">2-严重</option>
-            <option value="S3">3-一般</option>
-            <option value="S4">4-轻微</option>
+            <option value="S1">致命</option>
+            <option value="S2">严重</option>
+            <option value="S3">一般</option>
+            <option value="S4">轻微</option>
           </select>
         </div>
         <div>

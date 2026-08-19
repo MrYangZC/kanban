@@ -1,5 +1,5 @@
 import http, { req, type R } from './request'
-import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO } from './types'
+import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest } from './types'
 
 // ---- user ----
 export function login(username: string, password: string) {
@@ -30,9 +30,26 @@ export function deleteUser(id: string) {
   return req<void>(http.delete(`/v1/users/${id}`))
 }
 
+// ---- profile（当前登录用户个人中心） ----
+export function getMyProfile() {
+  return req<ProfileVO>(http.get('/v1/users/me'))
+}
+export function updateMyProfile(payload: UpdateProfileRequest) {
+  return req<ProfileVO>(http.put('/v1/users/me', payload))
+}
+export function changeMyPassword(payload: ChangePasswordRequest) {
+  return req<void>(http.put('/v1/users/me/password', payload))
+}
+
 // ---- project ----
-export function listProjects() {
-  return req<Project[]>(http.get('/v1/projects'))
+export function listProjects(category?: ProjectCategoryKey) {
+  return req<Project[]>(http.get('/v1/projects', { params: { category } }))
+}
+export function filterProjects(params: ProjectFilterRequest) {
+  return req<PageResult<Project>>(http.post('/v1/projects/filter', params))
+}
+export function getProjectCategoryCounts() {
+  return req<ProjectCategoryCounts>(http.get('/v1/projects/categories'))
 }
 export function createProject(projectKey: string, name: string, description = '') {
   return req<Project>(http.post('/v1/projects', { projectKey, name, description }))
@@ -48,6 +65,18 @@ export function updateProject(id: string, payload: {
   leadUserId?: string
 }) {
   return req<Project>(http.put(`/v1/projects/${id}`, payload))
+}
+export function favoriteProject(id: string) {
+  return req<void>(http.post(`/v1/projects/${id}/favorite`))
+}
+export function unfavoriteProject(id: string) {
+  return req<void>(http.delete(`/v1/projects/${id}/favorite`))
+}
+export function archiveProject(id: string) {
+  return req<void>(http.put(`/v1/projects/${id}/archive`))
+}
+export function unarchiveProject(id: string) {
+  return req<void>(http.put(`/v1/projects/${id}/unarchive`))
 }
 
 // ---- project members ----
@@ -157,8 +186,8 @@ export function uploadImage(file: File) {
 export function listActivities(issueId: string) {
   return req<IssueActivity[]>(http.get(`/v1/issues/${issueId}/activities`))
 }
-export function addComment(issueId: string, content: string) {
-  return req<IssueActivity>(http.post(`/v1/issues/${issueId}/comments`, { content }))
+export function addComment(issueId: string, content: string, parentId?: string | null) {
+  return req<IssueActivity>(http.post(`/v1/issues/${issueId}/comments`, { content, parentId: parentId ?? null }))
 }
 export function deleteComment(issueId: string, commentId: string) {
   return req<void>(http.delete(`/v1/issues/${issueId}/comments/${commentId}`))

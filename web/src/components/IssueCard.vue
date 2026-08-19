@@ -1,27 +1,10 @@
 <script setup lang="ts">
 import type { Issue } from '@/api/types'
 import { MessageSquare, CalendarClock } from 'lucide-vue-next'
+import { PRIORITY_LABEL, PRIORITY_COLOR, SEVERITY_LABEL, SEVERITY_COLOR } from '@/constants/issueDict'
 
 const props = defineProps<{ issue: Issue }>()
 
-const priorityColor: Record<string, string> = {
-  P0: '#FF4D4F',
-  P1: '#FAAD14',
-  P2: '#1677FF',
-  P3: '#8F959E'
-}
-const severityColor: Record<string, string> = {
-  S1: '#FF4D4F',
-  S2: '#FA8C16',
-  S3: '#1677FF',
-  S4: '#8F959E'
-}
-const priorityLabel: Record<string, string> = {
-  P0: '紧急', P1: '高', P2: '中', P3: '低'
-}
-const severityLabel: Record<string, string> = {
-  S1: '1-致命', S2: '2-严重', S3: '3-一般', S4: '4-轻微'
-}
 function dueText(due?: string) {
   if (!due) return ''
   const date = new Date(due)
@@ -36,13 +19,13 @@ function dueText(due?: string) {
 <template>
   <div class="group cursor-pointer rounded-lg bg-white p-3 shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md">
     <div class="mb-1.5 flex items-center gap-2">
-      <span class="h-1.5 w-1.5 rounded-full" :style="{ background: priorityColor[props.issue.priority] || '#8F959E' }" />
+      <span class="h-1.5 w-1.5 rounded-full" :style="{ background: PRIORITY_COLOR[props.issue.priority] || '#8F959E' }" />
       <span class="text-xs font-medium text-ink-400">{{ props.issue.issueKey }}</span>
       <span
         v-if="props.issue.severity"
         class="rounded px-1 py-0.5 text-[10px] font-medium text-white"
-        :style="{ background: severityColor[props.issue.severity] || '#8F959E' }"
-      >{{ severityLabel[props.issue.severity] || props.issue.severity }}</span>
+        :style="{ background: SEVERITY_COLOR[props.issue.severity] || '#8F959E' }"
+      >{{ SEVERITY_LABEL[props.issue.severity] || props.issue.severity }}</span>
       <span class="ml-auto text-sm" :title="props.issue.issueTypeName">{{ props.issue.issueTypeIcon || '📋' }}</span>
     </div>
 
@@ -59,7 +42,7 @@ function dueText(due?: string) {
 
     <div class="mt-2.5 flex items-center justify-between">
       <div class="flex items-center gap-1.5 text-ink-400">
-        <span class="rounded bg-surface-muted px-1.5 py-0.5 text-[11px] text-ink-600">{{ priorityLabel[props.issue.priority] || props.issue.priority }}</span>
+        <span class="rounded bg-surface-muted px-1.5 py-0.5 text-[11px] text-ink-600">{{ PRIORITY_LABEL[props.issue.priority] || props.issue.priority }}</span>
         <span v-if="props.issue.module" class="truncate text-[11px] text-ink-400">#{{ props.issue.module }}</span>
         <span v-if="props.issue.commentCount" class="flex items-center gap-0.5 text-[11px]">
           <MessageSquare :size="12" />{{ props.issue.commentCount }}

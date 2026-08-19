@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { AlertTriangle } from 'lucide-vue-next'
+import { PRIORITY_LABEL } from '@/constants/issueDict'
 
 defineOptions({ name: 'TreeNode' })
 
@@ -11,10 +12,6 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{ (e: 'open', issue: any): void }>()
-
-const priorityLabel: Record<string, string> = {
-  P0: '紧急', P1: '高', P2: '中', P3: '低'
-}
 </script>
 
 <template>
@@ -33,7 +30,7 @@ const priorityLabel: Record<string, string> = {
       <span
         class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
         :style="{ background: priorityColor[node.priority] || '#909399' }"
-      >{{ priorityLabel[node.priority] || node.priority }}</span>
+      >{{ PRIORITY_LABEL[node.priority] || node.priority }}</span>
     </div>
     <div v-if="node.children?.length" class="ml-6 border-l pl-2" style="border-color:#e4e7ed">
       <TreeNode

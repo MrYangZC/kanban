@@ -2,6 +2,9 @@
 import { ref } from 'vue'
 import { Plus, Target, Calendar, CheckCircle2 } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
+import ProgressBar from '@/components/ProgressBar.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import type { StatusStyle } from '@/components/StatusBadge.vue'
 
 interface Milestone {
   id: string
@@ -19,7 +22,7 @@ const milestones = ref<Milestone[]>([
   { id: '3', name: 'V0.9 Beta', dueDate: '2026-08-15', progress: 100, status: 'done', taskCount: 30, doneCount: 30 }
 ])
 
-const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+const STATUS_STYLE: Record<string, StatusStyle> = {
   open: { label: '进行中', color: '#1677FF', bg: 'rgba(22,119,255,0.1)' },
   done: { label: '已完成', color: '#28A745', bg: 'rgba(40,167,69,0.1)' },
   overdue: { label: '已逾期', color: '#DC3545', bg: 'rgba(220,53,69,0.1)' }
@@ -57,18 +60,14 @@ function onCreate() {
               </div>
             </div>
           </div>
-          <span class="rounded px-2 py-0.5 text-xs" :style="{ color: STATUS_STYLE[m.status].color, backgroundColor: STATUS_STYLE[m.status].bg }">
-            {{ STATUS_STYLE[m.status].label }}
-          </span>
+          <StatusBadge :status="m.status" :dict="STATUS_STYLE" />
         </div>
         <div class="mt-4">
           <div class="mb-1 flex items-center justify-between text-xs text-ink-400">
             <span>完成进度</span>
             <span>{{ m.progress }}%</span>
           </div>
-          <div class="h-2 overflow-hidden rounded-full bg-surface-muted">
-            <div class="h-full rounded-full bg-brand" :style="{ width: m.progress + '%' }" />
-          </div>
+          <ProgressBar :value="m.progress" :max="100" />
         </div>
       </div>
     </div>

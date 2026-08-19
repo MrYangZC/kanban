@@ -1,21 +1,27 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { listProjects, createProject, updateProject, listProjectMembers } from '@/api'
-import type { Project, ProjectMember } from '@/api/types'
-import { useUserStore } from '@/stores/user'
+import { storeToRefs } from 'pinia'
+import { createProject, updateProject } from '@/api'
+import type { Project } from '@/api/types'
+import { useProjectCategoryStore } from '@/stores/projectCategory'
+import ProjectCategorySidebar from '@/components/project/ProjectCategorySidebar.vue'
+import ViewModeSwitch from '@/components/project/ViewModeSwitch.vue'
+import ProjectSearchBar from '@/components/project/ProjectSearchBar.vue'
+import ProjectCard from '@/components/project/ProjectCard.vue'
+import ProjectTableList from '@/components/project/ProjectTableList.vue'
+import EmptyState from '@/components/project/EmptyState.vue'
+import ErrorRetry from '@/components/project/ErrorRetry.vue'
+import Pagination from '@/components/project/Pagination.vue'
 import ProjectMemberDialog from '@/components/ProjectMemberDialog.vue'
-import { Plus, FolderKanban, Users, Star, Pencil, FileText, Paperclip } from 'lucide-vue-next'
+import { Plus, Menu, FolderKanban, Sparkles } from 'lucide-vue-next'
 import { ElMessageBox, ElMessage } from 'element-plus'
 
 const router = useRouter()
-const userStore = useUserStore()
+const store = useProjectCategoryStore()
+const { projects, total, totalPages, currentPage, pageSize, loading, error, viewMode, selectedCategory, categories } = storeToRefs(store)
 
-const projects = ref<Project[]>([])
-const loading = ref(false)
-const myRoles = ref<Record<string, string[]>>({})
-
-const MEMBER_ROLES = ['OWNER', 'ADMIN', 'PM', 'DEV', 'QA', 'MEMBER']
+const sidebarOpen = ref(false)
 
 const memberDialogVisible = ref(false)
 const memberProjectId = ref<string>('')
@@ -24,31 +30,23 @@ const editDialogVisible = ref(false)
 const editing = ref(false)
 const editForm = ref({ id: '', name: '', description: '' })
 
-async function loadProjects() {
-  loading.value = true
-  try {
-    const list = await listProjects()
-    projects.value = list
-    const roles: Record<string, string[]> = {}
-    await Promise.all(list.map(async (p) => {
-      try {
-        const members: ProjectMember[] = await listProjectMembers(p.id)
-        const me = members.find(m => m.userId === userStore.user?.id)
-        roles[p.id] = me?.roles ?? ['VIEWER']
-      } catch {
-        roles[p.id] = ['VIEWER']
-      }
-    }))
-    myRoles.value = roles
-  } finally {
-    loading.value = false
-  }
-}
+const currentCategoryLabel = computed(() => {
+  const cat = categories.value.find((c) => c.key === selectedCategory.value)
+  return cat?.label || '全部项目'
+})
 
-function canEdit(p: Project): boolean {
-  const rs = myRoles.value[p.id] ?? ['VIEWER']
-  return MEMBER_ROLES.some((r) => rs.includes(r))
-}
+const currentCategoryCount = computed(() => {
+  const cat = categories.value.find((c) => c.key === selectedCategory.value)
+  return cat?.count || 0
+})
+
+const totalMembers = computed(() =>
+  projects.value.reduce((sum, p) => sum + (p.stats?.memberCount || 0), 0)
+)
+
+const totalIssues = computed(() =>
+  projects.value.reduce((sum, p) => sum + (p.stats?.issueCount || 0), 0)
+)
 
 async function onNewProject() {
   try {
@@ -57,7 +55,8 @@ async function onNewProject() {
     })
     const key = name.replace(/\s/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'PROJ'
     await createProject(key, name)
-    await loadProjects()
+    await store.loadCategoryCounts()
+    await store.loadProjects()
     ElMessage.success('项目已创建，默认看板已就绪')
   } catch {
     /* 取消 */
@@ -76,7 +75,7 @@ function openMembers(p: Project) {
 }
 
 function openEdit(p: Project) {
-  if (!canEdit(p)) {
+  if (!p.canEdit) {
     ElMessage.warning('只有项目成员才能编辑')
     return
   }
@@ -97,7 +96,7 @@ async function submitEdit() {
     })
     editDialogVisible.value = false
     ElMessage.success('项目已更新')
-    await loadProjects()
+    await store.loadProjects()
   } catch (e: any) {
     ElMessage.error(e?.message || '更新失败')
   } finally {
@@ -105,69 +104,186 @@ async function submitEdit() {
   }
 }
 
-onMounted(loadProjects)
+async function onRetry() {
+  await store.loadCategoryCounts()
+  await store.loadProjects()
+}
+
+onMounted(async () => {
+  await store.loadCategoryCounts()
+  await store.selectCategory(store.selectedCategory)
+})
 </script>
 
 <template>
-  <div class="page-container">
-    <div class="mb-6 flex items-center justify-between">
-      <div>
-        <h1 class="page-title">项目</h1>
-        <p class="page-subtitle">创建研发项目，创建即自动初始化看板</p>
-      </div>
-      <button class="btn-primary" @click="onNewProject"><Plus :size="16" /> 新建项目</button>
-    </div>
+  <div class="flex h-full overflow-hidden">
+    <div
+      v-if="sidebarOpen"
+      class="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm transition-opacity md:hidden"
+      @click="sidebarOpen = false"
+    />
 
-    <div v-if="loading" class="text-sm text-ink-secondary">加载中…</div>
-    <div v-else-if="!projects.length" class="rounded-lg border border-dashed border-line p-12 text-center text-sm text-ink-secondary">
-      暂无项目，点击右上角「新建项目」开始
-    </div>
-    <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <div v-for="p in projects" :key="p.id" class="group relative flex flex-col card p-5 transition hover:shadow-card-hover">
-        <div class="absolute right-3 top-3 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-          <button class="rounded-md p-1.5 text-ink-secondary transition hover:bg-surface-hover" title="收藏" @click.stop="ElMessage.info('收藏功能开发中')">
-            <Star :size="14" />
-          </button>
-          <button class="rounded-md p-1.5 text-ink-secondary transition hover:bg-surface-hover" :class="{ 'cursor-not-allowed opacity-50': !canEdit(p) }" title="编辑项目" @click.stop="openEdit(p)">
-            <Pencil :size="14" />
-          </button>
-        </div>
-
-        <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-light text-ink-regular">
-          <FolderKanban :size="20" />
-        </div>
-        <div class="text-xs font-medium text-primary">{{ p.projectKey }}</div>
-        <div class="mt-0.5 cursor-pointer text-base font-semibold text-ink transition hover:text-primary" @click="openBoard(p)">{{ p.name }}</div>
-        <div class="mt-2 line-clamp-2 text-sm text-ink-secondary">{{ p.description || '暂无描述' }}</div>
-
-        <div class="mt-4 flex items-center gap-4 border-t border-line-light pt-3 text-xs text-ink-secondary">
-          <span class="flex items-center gap-1" :title="`${p.stats?.memberCount || 0} 名成员`"><Users :size="13" />{{ p.stats?.memberCount || 0 }}</span>
-          <span class="flex items-center gap-1" :title="`${p.stats?.issueCount || 0} 个任务`"><FileText :size="13" />{{ p.stats?.issueCount || 0 }}</span>
-          <span class="flex items-center gap-1" :title="`${p.stats?.attachmentCount || 0} 个附件`"><Paperclip :size="13" />{{ p.stats?.attachmentCount || 0 }}</span>
-          <button class="ml-auto rounded-md border border-line-light px-2 py-1 text-ink-secondary transition hover:border-primary hover:text-primary" @click.stop="openMembers(p)">管理成员</button>
-        </div>
-      </div>
-    </div>
-
-    <el-dialog v-model="editDialogVisible" title="编辑项目" width="420px">
-      <div class="space-y-4">
-        <div>
-          <label class="label-base">项目名称</label>
-          <input v-model="editForm.name" class="input-base" placeholder="项目名称" />
+    <aside
+      class="flex shrink-0 flex-col border-r border-line-light bg-gradient-sidebar w-64 transition-all duration-300 ease-out-expo"
+      :class="sidebarOpen
+        ? 'fixed inset-y-0 left-0 z-40 shadow-xl md:static md:translate-x-0 md:shadow-none'
+        : 'fixed inset-y-0 left-0 z-40 -translate-x-full md:static md:translate-x-0 md:shadow-none'"
+    >
+      <div class="flex items-center gap-3 border-b border-line-light px-5 py-5">
+        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-sm">
+          <FolderKanban :size="18" class="text-white" />
         </div>
         <div>
-          <label class="label-base">项目描述</label>
-          <textarea v-model="editForm.description" rows="3" class="input-base resize-none" placeholder="项目描述（可选）"></textarea>
+          <div class="text-sm font-semibold tracking-tight text-ink">项目协作</div>
+          <div class="text-xs text-ink-secondary">Kanban Pro</div>
         </div>
       </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <button class="rounded-lg px-3.5 py-2 text-sm text-ink-secondary transition hover:bg-surface-hover" @click="editDialogVisible = false">取消</button>
-          <button class="btn-primary disabled:opacity-50" :disabled="editing" @click="submitEdit">{{ editing ? '保存中…' : '保存' }}</button>
+      <div class="px-5 pt-4 pb-1">
+        <span class="text-xs font-semibold uppercase tracking-wider text-ink-secondary">项目分类</span>
+      </div>
+      <ProjectCategorySidebar />
+      <div class="border-t border-line-light px-5 py-4">
+        <div class="flex items-center gap-2 rounded-lg bg-primary-50/60 px-3 py-2.5">
+          <Sparkles :size="16" class="text-primary-500" />
+          <div class="flex-1">
+            <div class="text-xs font-medium text-primary-700">快速入门</div>
+            <div class="text-[11px] text-ink-secondary">查看使用指南</div>
+          </div>
         </div>
-      </template>
-    </el-dialog>
+      </div>
+    </aside>
 
-    <ProjectMemberDialog v-model:visible="memberDialogVisible" :project-id="memberProjectId" />
+    <main class="flex-1 overflow-auto bg-gradient-page">
+      <div class="px-8 py-7">
+        <div class="mb-7 flex items-start justify-between gap-4">
+          <div class="flex items-start gap-3">
+            <button
+              class="rounded-lg p-2 text-ink-secondary transition hover:bg-surface-hover hover:text-ink md:hidden"
+              title="分类导航"
+              @click="sidebarOpen = true"
+            >
+              <Menu :size="20" />
+            </button>
+            <div>
+              <div class="flex items-center gap-2.5">
+                <h1 class="page-title">{{ currentCategoryLabel }}</h1>
+                <span class="inline-flex items-center justify-center rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-600">
+                  {{ currentCategoryCount }}
+                </span>
+              </div>
+              <p class="page-subtitle">创建研发项目，创建即自动初始化看板</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <ProjectSearchBar />
+            <ViewModeSwitch />
+            <button class="btn-primary" @click="onNewProject">
+              <Plus :size="16" />
+              <span>新建项目</span>
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-if="!loading && !error && projects.length"
+          class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4"
+        >
+          <div class="card flex items-center gap-3 p-4">
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary-500">
+              <FolderKanban :size="20" />
+            </div>
+            <div>
+              <div class="text-xl font-semibold text-ink">{{ total }}</div>
+              <div class="text-xs text-ink-secondary">总项目数</div>
+            </div>
+          </div>
+          <div class="card flex items-center gap-3 p-4">
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-success-light text-success">
+              <Sparkles :size="20" />
+            </div>
+            <div>
+              <div class="text-xl font-semibold text-ink">{{ totalIssues }}</div>
+              <div class="text-xs text-ink-secondary">本页任务</div>
+            </div>
+          </div>
+          <div class="card flex items-center gap-3 p-4">
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-light text-warning">
+              <FolderKanban :size="20" />
+            </div>
+            <div>
+              <div class="text-xl font-semibold text-ink">{{ totalMembers }}</div>
+              <div class="text-xs text-ink-secondary">本页成员</div>
+            </div>
+          </div>
+          <div class="card flex items-center gap-3 p-4">
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100 text-primary-600">
+              <Plus :size="20" />
+            </div>
+            <div>
+              <div class="text-xl font-semibold text-ink">{{ categories[0]?.count || 0 }}</div>
+              <div class="text-xs text-ink-secondary">全部项目</div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="loading" class="flex items-center gap-3 py-20 text-sm text-ink-secondary">
+          <div class="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-500"></div>
+          <span>加载中…</span>
+        </div>
+        <ErrorRetry v-else-if="error" :message="error" @retry="onRetry" />
+        <EmptyState v-else-if="!projects.length" :category="selectedCategory" />
+        <div
+          v-else-if="viewMode === 'card'"
+          class="grid animate-fade-in-up grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
+        >
+          <ProjectCard
+            v-for="p in projects"
+            :key="p.id"
+            :project="p"
+            @open-board="openBoard"
+            @open-members="openMembers"
+            @open-edit="openEdit"
+          />
+        </div>
+        <ProjectTableList
+          v-else
+          :projects="projects"
+          @open-board="openBoard"
+          @open-members="openMembers"
+          @open-edit="openEdit"
+        />
+
+        <Pagination
+          v-if="!loading && !error && projects.length"
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total="total"
+          :page-size="pageSize"
+          @update:page="store.setPage"
+          @update:page-size="store.setPageSize"
+        />
+
+        <el-dialog v-model="editDialogVisible" title="编辑项目" width="460px">
+          <div class="space-y-4">
+            <div>
+              <label class="label-base">项目名称</label>
+              <input v-model="editForm.name" class="input-base" placeholder="项目名称" />
+            </div>
+            <div>
+              <label class="label-base">项目描述</label>
+              <textarea v-model="editForm.description" rows="3" class="input-base resize-none" placeholder="项目描述（可选）"></textarea>
+            </div>
+          </div>
+          <template #footer>
+            <div class="flex justify-end gap-2">
+              <button class="btn-default" @click="editDialogVisible = false">取消</button>
+              <button class="btn-primary disabled:opacity-50" :disabled="editing" @click="submitEdit">{{ editing ? '保存中…' : '保存' }}</button>
+            </div>
+          </template>
+        </el-dialog>
+
+        <ProjectMemberDialog v-model:visible="memberDialogVisible" :project-id="memberProjectId" />
+      </div>
+    </main>
   </div>
 </template>

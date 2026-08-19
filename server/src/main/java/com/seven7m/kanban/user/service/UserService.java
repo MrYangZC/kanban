@@ -3,9 +3,12 @@ package com.seven7m.kanban.user.service;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.UserContext;
+import com.seven7m.kanban.user.dto.ChangePasswordRequest;
 import com.seven7m.kanban.user.dto.CreateUserRequest;
 import com.seven7m.kanban.user.dto.LoginRequest;
 import com.seven7m.kanban.user.dto.LoginVO;
+import com.seven7m.kanban.user.dto.ProfileVO;
+import com.seven7m.kanban.user.dto.UpdateProfileRequest;
 import com.seven7m.kanban.user.dto.UpdateUserRequest;
 import com.seven7m.kanban.user.dto.UserVO;
 import com.seven7m.kanban.user.entity.SysUser;
@@ -124,5 +127,64 @@ public class UserService {
         vo.setAvatarUrl(u.getAvatarUrl());
         vo.setEnabled(u.getEnabled());
         return vo;
+    }
+
+    private ProfileVO toProfileVO(SysUser u) {
+        ProfileVO vo = new ProfileVO();
+        vo.setId(u.getId());
+        vo.setUsername(u.getUsername());
+        vo.setDisplayName(u.getDisplayName());
+        vo.setEmail(u.getEmail());
+        vo.setAvatarUrl(u.getAvatarUrl());
+        vo.setEnabled(u.getEnabled());
+        vo.setCreatedAt(u.getCreatedAt());
+        return vo;
+    }
+
+    /** 查询当前登录用户个人资料 */
+    public ProfileVO getProfile(UUID id) {
+        SysUser u = userMapper.selectById(id);
+        if (u == null || Boolean.TRUE.equals(u.getDeleted())) {
+            throw new ServiceException(404, "用户不存在");
+        }
+        return toProfileVO(u);
+    }
+
+    /** 当前用户修改个人资料（不允许改 username/enabled） */
+    @Transactional
+    public ProfileVO updateProfile(UUID id, UpdateProfileRequest req) {
+        SysUser u = userMapper.selectById(id);
+        if (u == null || Boolean.TRUE.equals(u.getDeleted())) {
+            throw new ServiceException(404, "用户不存在");
+        }
+        if (req.getDisplayName() != null && !req.getDisplayName().isBlank()) {
+            u.setDisplayName(req.getDisplayName());
+        }
+        if (req.getEmail() != null) {
+            u.setEmail(req.getEmail());
+        }
+        if (req.getAvatarUrl() != null) {
+            u.setAvatarUrl(req.getAvatarUrl());
+        }
+        userMapper.updateById(u);
+        return toProfileVO(u);
+    }
+
+    /** 当前用户修改密码：需校验旧密码 */
+    @Transactional
+    public void changePassword(UUID id, ChangePasswordRequest req) {
+        SysUser u = userMapper.selectById(id);
+        if (u == null || Boolean.TRUE.equals(u.getDeleted())) {
+            throw new ServiceException(404, "用户不存在");
+        }
+        if (u.getPasswordHash() == null
+                || !passwordEncoder.matches(req.getOldPassword(), u.getPasswordHash())) {
+            throw new ServiceException(400, "原密码不正确");
+        }
+        if (req.getNewPassword().length() < 6) {
+            throw new ServiceException(400, "新密码长度不能少于 6 位");
+        }
+        u.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
+        userMapper.updateById(u);
     }
 }

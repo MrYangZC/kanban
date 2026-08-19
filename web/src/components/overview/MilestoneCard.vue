@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Target, Plus, Calendar } from 'lucide-vue-next'
 import type { MilestoneVO } from '@/api/types'
+import ProgressBar from '@/components/ProgressBar.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import type { StatusStyle } from '@/components/StatusBadge.vue'
 
 interface Props {
   milestones?: MilestoneVO[]
@@ -10,14 +13,10 @@ const props = withDefaults(defineProps<Props>(), {
   milestones: () => []
 })
 
-const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+const STATUS_STYLE: Record<string, StatusStyle> = {
   OPEN: { label: '进行中', color: '#1677FF', bg: 'rgba(22,119,255,0.1)' },
   DONE: { label: '已完成', color: '#28A745', bg: 'rgba(40,167,69,0.1)' },
   OVERDUE: { label: '已逾期', color: '#DC3545', bg: 'rgba(220,53,69,0.1)' }
-}
-
-function statusStyle(status: string) {
-  return STATUS_STYLE[status] || STATUS_STYLE.OPEN
 }
 
 function onAdd() {
@@ -41,15 +40,10 @@ function onAdd() {
         <div v-for="m in props.milestones" :key="m.id" class="rounded-md border border-[#E9ECEF] p-3 transition hover:bg-surface-muted/50">
           <div class="flex items-center justify-between">
             <span class="text-sm font-medium text-ink-900">{{ m.name }}</span>
-            <span
-              class="rounded px-2 py-0.5 text-xs"
-              :style="{ color: statusStyle(m.status).color, backgroundColor: statusStyle(m.status).bg }"
-            >{{ statusStyle(m.status).label }}</span>
+            <StatusBadge :status="m.status" :dict="STATUS_STYLE" />
           </div>
           <div class="mt-2 flex items-center gap-3">
-            <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-muted">
-              <div class="h-full rounded-full bg-brand" :style="{ width: m.progress + '%' }" />
-            </div>
+            <ProgressBar class="flex-1" :value="m.progress" :max="100" height="sm" />
             <span class="text-xs text-ink-400">{{ m.progress }}%</span>
             <span v-if="m.dueDate" class="flex items-center gap-1 text-xs text-ink-400">
               <Calendar :size="11" /> {{ m.dueDate }}

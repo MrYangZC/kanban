@@ -2,6 +2,9 @@
 import { ref } from 'vue'
 import { Plus, Repeat, Calendar, MoreHorizontal } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
+import ProgressBar from '@/components/ProgressBar.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import type { StatusStyle } from '@/components/StatusBadge.vue'
 
 interface Iteration {
   id: string
@@ -19,7 +22,7 @@ const iterations = ref<Iteration[]>([
   { id: '3', name: 'Sprint 3', startDate: '2026-08-29', endDate: '2026-09-11', status: 'planning', taskCount: 0, doneCount: 0 }
 ])
 
-const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+const STATUS_STYLE: Record<string, StatusStyle> = {
   planning: { label: '计划中', color: '#8F959E', bg: 'rgba(143,149,158,0.1)' },
   active: { label: '进行中', color: '#1677FF', bg: 'rgba(22,119,255,0.1)' },
   closed: { label: '已关闭', color: '#28A745', bg: 'rgba(40,167,69,0.1)' }
@@ -46,22 +49,20 @@ function onCreate() {
       <div v-for="it in iterations" :key="it.id" class="rounded-lg border border-[#E9ECEF] bg-white p-4 shadow-sm transition hover:shadow-md">
         <div class="flex items-center justify-between">
           <span class="text-base font-medium text-ink-900">{{ it.name }}</span>
-          <span class="rounded px-2 py-0.5 text-xs" :style="{ color: STATUS_STYLE[it.status].color, backgroundColor: STATUS_STYLE[it.status].bg }">
-            {{ STATUS_STYLE[it.status].label }}
-          </span>
+          <StatusBadge :status="it.status" :dict="STATUS_STYLE" />
         </div>
         <div class="mt-2 flex items-center gap-2 text-xs text-ink-400">
           <Calendar :size="12" />
           <span>{{ it.startDate }} ~ {{ it.endDate }}</span>
         </div>
         <div class="mt-3">
-          <div class="mb-1 flex items-center justify-between text-xs text-ink-400">
-            <span>任务进度</span>
-            <span>{{ it.doneCount }}/{{ it.taskCount }}</span>
-          </div>
-          <div class="h-1.5 overflow-hidden rounded-full bg-surface-muted">
-            <div class="h-full rounded-full bg-brand" :style="{ width: (it.taskCount ? (it.doneCount / it.taskCount) * 100 : 0) + '%' }" />
-          </div>
+          <ProgressBar
+            :value="it.doneCount"
+            :max="it.taskCount"
+            height="sm"
+            show-label
+            label="任务进度"
+          />
         </div>
         <div class="mt-3 flex justify-end">
           <button class="text-ink-400 transition hover:text-ink-900" @click="ElMessage.info('查看迭代详情功能开发中')">

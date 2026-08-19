@@ -43,10 +43,10 @@ const priorityOptions = [
   { k: 'P3', label: '低' }
 ]
 const severityOptions = [
-  { k: 'S1', label: '1-致命' },
-  { k: 'S2', label: '2-严重' },
-  { k: 'S3', label: '3-一般' },
-  { k: 'S4', label: '4-轻微' }
+  { k: 'S1', label: '致命' },
+  { k: 'S2', label: '严重' },
+  { k: 'S3', label: '一般' },
+  { k: 'S4', label: '轻微' }
 ]
 
 function setScope(k: string) {

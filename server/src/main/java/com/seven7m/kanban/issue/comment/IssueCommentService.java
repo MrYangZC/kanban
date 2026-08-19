@@ -27,10 +27,9 @@ public class IssueCommentService {
 
     /** 评论列表（动态&评论 Tab 用，含评论 + 状态变更等活动） */
     public List<IssueActivityVO> listActivities(UUID issueId) {
-        // 评论
+        // 评论（保留已逻辑删除的父评论，供前端渲染「已删除」占位；子回复不受影响）
         List<IssueActivityVO> comments = commentMapper.selectList(Wrappers.<IssueComment>lambdaQuery()
                         .eq(IssueComment::getIssueId, issueId)
-                        .eq(IssueComment::getDeleted, 0)
                         .orderByAsc(IssueComment::getCreatedAt))
                 .stream().map(c -> {
                     IssueActivityVO vo = new IssueActivityVO();
@@ -39,7 +38,9 @@ public class IssueCommentService {
                     vo.setType("COMMENT");
                     vo.setActorId(c.getUserId());
                     vo.setActorName(u == null ? "未知" : u.getDisplayName());
-                    vo.setContent(c.getContent());
+                    vo.setParentId(c.getParentId());
+                    vo.setDeleted(c.getDeleted());
+                    vo.setContent(c.getContent() == null ? "" : c.getContent());
                     vo.setCreatedAt(c.getCreatedAt());
                     return vo;
                 }).collect(Collectors.toList());
@@ -71,11 +72,12 @@ public class IssueCommentService {
     }
 
     @Transactional
-    public IssueActivityVO addComment(UUID issueId, String content) {
+    public IssueActivityVO addComment(UUID issueId, String content, UUID parentId) {
         IssueComment c = new IssueComment();
         c.setId(UUID.randomUUID());
         c.setIssueId(issueId);
         c.setUserId(UserContext.getUserId());
+        c.setParentId(parentId);   // 嵌套回复：顶层评论为 null
         c.setContent(content);
         c.setCreatedAt(LocalDateTime.now());
         c.setUpdatedAt(LocalDateTime.now());
@@ -88,6 +90,8 @@ public class IssueCommentService {
         vo.setType("COMMENT");
         vo.setActorId(c.getUserId());
         vo.setActorName(u == null ? "未知" : u.getDisplayName());
+        vo.setParentId(c.getParentId());
+        vo.setDeleted(0);
         vo.setContent(c.getContent());
         vo.setCreatedAt(c.getCreatedAt());
         return vo;

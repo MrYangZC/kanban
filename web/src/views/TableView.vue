@@ -48,7 +48,7 @@ const priorityLabel: Record<string, string> = {
   P0: '紧急', P1: '高', P2: '中', P3: '低'
 }
 const severityLabel: Record<string, string> = {
-  S1: '1-致命', S2: '2-严重', S3: '3-一般', S4: '4-轻微'
+  S1: '致命', S2: '严重', S3: '一般', S4: '轻微'
 }
 
 async function loadMeta() {

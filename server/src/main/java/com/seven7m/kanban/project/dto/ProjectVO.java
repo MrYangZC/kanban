@@ -19,4 +19,10 @@ public class ProjectVO {
     private LocalDateTime createdAt;
 
     private ProjectStats stats;
+
+    /** 当前用户是否已收藏该项目（用于前端卡片展示收藏标记） */
+    private boolean favorited;
+
+    /** 当前用户是否可编辑该项目（基于角色判定，OWNER/ADMIN/PM/DEV/QA/MEMBER 可编辑） */
+    private boolean canEdit;
 }

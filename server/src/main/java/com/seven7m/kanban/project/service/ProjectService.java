@@ -1,16 +1,24 @@
 package com.seven7m.kanban.project.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.UserContext;
+import com.seven7m.kanban.project.ProjectCategoryKey;
 import com.seven7m.kanban.project.ProjectInitializer;
 import com.seven7m.kanban.project.ProjectRole;
+import com.seven7m.kanban.project.ProjectStatus;
 import com.seven7m.kanban.project.dto.CreateProjectRequest;
+import com.seven7m.kanban.project.dto.ProjectCategoryCountsVO;
+import com.seven7m.kanban.project.dto.ProjectFilterRequest;
 import com.seven7m.kanban.project.dto.ProjectStats;
 import com.seven7m.kanban.project.dto.ProjectVO;
 import com.seven7m.kanban.project.dto.UpdateProjectRequest;
 import com.seven7m.kanban.project.entity.Project;
+import com.seven7m.kanban.project.entity.ProjectFavorite;
 import com.seven7m.kanban.project.entity.ProjectMember;
+import com.seven7m.kanban.project.mapper.ProjectFavoriteMapper;
 import com.seven7m.kanban.project.mapper.ProjectMapper;
 import com.seven7m.kanban.project.mapper.ProjectMemberMapper;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +27,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -29,12 +40,12 @@ public class ProjectService {
 
     private final ProjectMapper projectMapper;
     private final ProjectMemberMapper projectMemberMapper;
+    private final ProjectFavoriteMapper projectFavoriteMapper;
     private final ProjectMemberService projectMemberService;
     private final ProjectInitializer projectInitializer;
 
     @Transactional
     public ProjectVO create(CreateProjectRequest req) {
-        // project_key 全局唯一（已去掉 workspace 维度）
         long dup = projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
                 .eq(Project::getProjectKey, req.getProjectKey()));
         if (dup > 0) {
@@ -45,22 +56,20 @@ public class ProjectService {
         Project project = new Project();
         BeanUtils.copyProperties(req, project);
         project.setId(UUID.randomUUID());
-        project.setStatus("ACTIVE");
+        project.setStatus(ProjectStatus.ACTIVE.name());
         project.setCreatedBy(currentUser);
         project.setCreatedAt(LocalDateTime.now());
         project.setUpdatedAt(LocalDateTime.now());
         projectMapper.insert(project);
 
-        // 创建人自动成为项目成员 + OWNER 角色（RBAC：user_role）
         ProjectMember owner = new ProjectMember();
         owner.setId(UUID.randomUUID());
         owner.setProjectId(project.getId());
         owner.setUserId(currentUser);
         owner.setCreatedAt(LocalDateTime.now());
         projectMemberMapper.insert(owner);
-        projectMemberService.grantRoles(project.getId(), currentUser, java.util.List.of(ProjectRole.OWNER));
+        projectMemberService.grantRoles(project.getId(), currentUser, List.of(ProjectRole.OWNER));
 
-        // 事务内初始化默认数据（类型/状态/工作流/流转/看板）
         projectInitializer.initDefaults(project.getId(), currentUser);
 
         return toVO(project);
@@ -68,17 +77,14 @@ public class ProjectService {
 
     @Transactional
     public ProjectVO update(UUID id, UpdateProjectRequest req) {
-        // 1. 校验项目存在且未删除
         Project p = projectMapper.selectById(id);
         if (p == null || p.getDeleted() != null && p.getDeleted() == 1) {
             throw new ServiceException(404, "项目不存在");
         }
-        // 2. 权限校验：至少 MEMBER 可编辑（OWNER 自动满足）
         if (!isMember(id, UserContext.getUserId())) {
             throw new ServiceException(403, "无项目访问权限");
         }
 
-        // 3. 仅覆盖非空字段（不改动 projectKey / createdBy 等不可变字段）
         if (req.getName() != null) {
             p.setName(req.getName());
         }
@@ -99,27 +105,183 @@ public class ProjectService {
         return toVO(p);
     }
 
+    /**
+     * 查询当前用户可见的全部项目（向后兼容入口，等价于 listAll(ALL)）。
+     */
     public List<ProjectVO> listAll() {
-        UUID currentUser = UserContext.getUserId();
-        List<Project> projects = projectMapper.selectList(Wrappers.<Project>lambdaQuery()
-                        .eq(Project::getDeleted, 0)
-                        // 数据权限：仅返回当前用户为成员的项目
-                        .inSql(Project::getId,
-                                "SELECT project_id FROM project_member WHERE user_id = '" + currentUser + "'")
-                        .orderByDesc(Project::getCreatedAt));
-        if (projects.isEmpty()) {
-            return java.util.Collections.emptyList();
+        return listAll(ProjectCategoryKey.ALL);
+    }
+
+    /**
+     * 按分类查询当前用户的项目列表。
+     * - ALL/PARTICIPATED：项目成员且 status=ACTIVE
+     * - MANAGED：角色含 OWNER/ADMIN/PM 且 status=ACTIVE
+     * - FAVORITED：project_favorite 含当前用户且 status=ACTIVE
+     * - ARCHIVED：项目成员且 status=ARCHIVED
+     * 查询后填充 favorited 与 canEdit 字段。
+     */
+    public List<ProjectVO> listAll(ProjectCategoryKey category) {
+        if (category == null) {
+            category = ProjectCategoryKey.ALL;
         }
-        // 单次聚合统计，避免 N+1
-        List<ProjectStats> stats = projectMapper.selectStatsByProjectIds(
-                projects.stream().map(Project::getId).collect(Collectors.toList()));
-        java.util.Map<UUID, ProjectStats> statsMap = stats.stream()
+        UUID currentUser = UserContext.getUserId();
+        String memberSubSql = "SELECT project_id FROM project_member WHERE user_id = '" + currentUser + "'";
+        String statusFilter = ProjectCategoryKey.ARCHIVED == category
+                ? ProjectStatus.ARCHIVED.name()
+                : ProjectStatus.ACTIVE.name();
+
+        var query = Wrappers.<Project>lambdaQuery()
+                .eq(Project::getDeleted, 0)
+                .eq(Project::getStatus, statusFilter)
+                .orderByDesc(Project::getCreatedAt);
+
+        switch (category) {
+            case MANAGED -> query.inSql(Project::getId,
+                    "SELECT ur.project_id FROM user_role ur " +
+                    "JOIN role r ON r.id = ur.role_id " +
+                    "WHERE ur.user_id = '" + currentUser + "' " +
+                    "AND r.code IN ('" + ProjectRole.OWNER + "','" + ProjectRole.ADMIN + "','" + ProjectRole.PM + "')");
+            case FAVORITED -> query.inSql(Project::getId,
+                    "SELECT project_id FROM project_favorite WHERE user_id = '" + currentUser + "'");
+            default -> query.inSql(Project::getId, memberSubSql);
+        }
+
+        List<Project> projects = projectMapper.selectList(query);
+        if (projects.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<UUID> projectIds = projects.stream().map(Project::getId).collect(Collectors.toList());
+        List<ProjectStats> stats = projectMapper.selectStatsByProjectIds(projectIds);
+        Map<UUID, ProjectStats> statsMap = stats.stream()
                 .collect(Collectors.toMap(ProjectStats::getProjectId, s -> s));
+
+        Set<UUID> favoritedIds = listFavoritedProjectIds(currentUser, projectIds);
+
         return projects.stream().map(p -> {
             ProjectVO vo = toVO(p);
             vo.setStats(statsMap.getOrDefault(p.getId(), new ProjectStats()));
+            vo.setFavorited(favoritedIds.contains(p.getId()));
+            vo.setCanEdit(canWrite(p.getId(), currentUser));
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * 分页查询当前用户的项目列表，支持分类筛选、关键词模糊匹配与排序。
+     * 分页模式：先 selectCount（不带 ORDER BY），再加排序与 LIMIT/OFFSET，最后 selectList。
+     */
+    public PageResult<ProjectVO> listByFilter(ProjectFilterRequest req) {
+        ProjectCategoryKey category = ProjectCategoryKey.of(req.getCategory());
+        UUID currentUser = UserContext.getUserId();
+        String memberSubSql = "SELECT project_id FROM project_member WHERE user_id = '" + currentUser + "'";
+        String statusFilter = ProjectCategoryKey.ARCHIVED == category
+                ? ProjectStatus.ARCHIVED.name()
+                : ProjectStatus.ACTIVE.name();
+
+        var query = Wrappers.<Project>lambdaQuery()
+                .eq(Project::getDeleted, 0)
+                .eq(Project::getStatus, statusFilter);
+
+        switch (category) {
+            case MANAGED -> query.inSql(Project::getId,
+                    "SELECT ur.project_id FROM user_role ur " +
+                    "JOIN role r ON r.id = ur.role_id " +
+                    "WHERE ur.user_id = '" + currentUser + "' " +
+                    "AND r.code IN ('" + ProjectRole.OWNER + "','" + ProjectRole.ADMIN + "','" + ProjectRole.PM + "')");
+            case FAVORITED -> query.inSql(Project::getId,
+                    "SELECT project_id FROM project_favorite WHERE user_id = '" + currentUser + "'");
+            default -> query.inSql(Project::getId, memberSubSql);
+        }
+
+        if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
+            String kw = req.getKeyword().trim();
+            query.and(w -> w.like(Project::getName, kw).or().like(Project::getProjectKey, kw));
+        }
+
+        int page = req.getPage() == null || req.getPage() < 1 ? 1 : req.getPage();
+        int size = req.getSize() == null || req.getSize() < 1 ? 10 : Math.min(req.getSize(), 100);
+
+        long total = projectMapper.selectCount(query);
+
+        applyProjectSort(query, req.getSortField(), req.getSortOrder());
+        query.last("LIMIT " + size + " OFFSET " + ((long) (page - 1) * size));
+
+        List<Project> projects = projectMapper.selectList(query);
+        if (projects.isEmpty()) {
+            return new PageResult<>(total, page, size, Collections.emptyList());
+        }
+
+        List<UUID> projectIds = projects.stream().map(Project::getId).collect(Collectors.toList());
+        List<ProjectStats> stats = projectMapper.selectStatsByProjectIds(projectIds);
+        Map<UUID, ProjectStats> statsMap = stats.stream()
+                .collect(Collectors.toMap(ProjectStats::getProjectId, s -> s));
+        Set<UUID> favoritedIds = listFavoritedProjectIds(currentUser, projectIds);
+
+        List<ProjectVO> voList = projects.stream().map(p -> {
+            ProjectVO vo = toVO(p);
+            vo.setStats(statsMap.getOrDefault(p.getId(), new ProjectStats()));
+            vo.setFavorited(favoritedIds.contains(p.getId()));
+            vo.setCanEdit(canWrite(p.getId(), currentUser));
+            return vo;
+        }).collect(Collectors.toList());
+
+        return new PageResult<>(total, page, size, voList);
+    }
+
+    /** 排序字段白名单，防止 SQL 注入 */
+    private void applyProjectSort(LambdaQueryWrapper<Project> q, String sortField, String sortOrder) {
+        if (sortField == null || sortField.isBlank()) {
+            q.orderByDesc(Project::getCreatedAt);
+            return;
+        }
+        boolean asc = !"desc".equalsIgnoreCase(sortOrder);
+        switch (sortField) {
+            case "createdAt" -> { if (asc) q.orderByAsc(Project::getCreatedAt); else q.orderByDesc(Project::getCreatedAt); }
+            case "updatedAt" -> { if (asc) q.orderByAsc(Project::getUpdatedAt); else q.orderByDesc(Project::getUpdatedAt); }
+            case "name" -> { if (asc) q.orderByAsc(Project::getName); else q.orderByDesc(Project::getName); }
+            case "projectKey" -> { if (asc) q.orderByAsc(Project::getProjectKey); else q.orderByDesc(Project::getProjectKey); }
+            default -> q.orderByDesc(Project::getCreatedAt);
+        }
+    }
+
+    /**
+     * 查询当前用户五个分类的项目计数，满足包含关系：managed ≤ participated ≤ all。
+     */
+    public ProjectCategoryCountsVO getCategoryCounts() {
+        UUID currentUser = UserContext.getUserId();
+        ProjectCategoryCountsVO vo = new ProjectCategoryCountsVO();
+
+        vo.setAll(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
+                .eq(Project::getDeleted, 0)
+                .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
+                .inSql(Project::getId,
+                        "SELECT project_id FROM project_member WHERE user_id = '" + currentUser + "'")));
+
+        vo.setManaged(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
+                .eq(Project::getDeleted, 0)
+                .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
+                .inSql(Project::getId,
+                        "SELECT ur.project_id FROM user_role ur " +
+                        "JOIN role r ON r.id = ur.role_id " +
+                        "WHERE ur.user_id = '" + currentUser + "' " +
+                        "AND r.code IN ('" + ProjectRole.OWNER + "','" + ProjectRole.ADMIN + "','" + ProjectRole.PM + "')")));
+
+        vo.setParticipated(vo.getAll());
+
+        vo.setFavorited(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
+                .eq(Project::getDeleted, 0)
+                .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
+                .inSql(Project::getId,
+                        "SELECT project_id FROM project_favorite WHERE user_id = '" + currentUser + "'")));
+
+        vo.setArchived(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
+                .eq(Project::getDeleted, 0)
+                .eq(Project::getStatus, ProjectStatus.ARCHIVED.name())
+                .inSql(Project::getId,
+                        "SELECT project_id FROM project_member WHERE user_id = '" + currentUser + "'")));
+
+        return vo;
     }
 
     public ProjectVO get(UUID id) {
@@ -127,32 +289,75 @@ public class ProjectService {
         if (p == null || p.getDeleted() != null && p.getDeleted() == 1) {
             throw new ServiceException(404, "项目不存在");
         }
-        // 数据权限：非项目成员拒绝访问
         if (!isMember(id, UserContext.getUserId())) {
             throw new ServiceException(403, "无项目访问权限");
         }
         ProjectVO vo = toVO(p);
-        List<ProjectStats> stats = projectMapper.selectStatsByProjectIds(java.util.List.of(id));
+        List<ProjectStats> stats = projectMapper.selectStatsByProjectIds(List.of(id));
         vo.setStats(stats.isEmpty() ? new ProjectStats() : stats.get(0));
+        UUID currentUser = UserContext.getUserId();
+        vo.setFavorited(projectFavoriteMapper.selectCount(Wrappers.<ProjectFavorite>lambdaQuery()
+                .eq(ProjectFavorite::getProjectId, id)
+                .eq(ProjectFavorite::getUserId, currentUser)) > 0);
+        vo.setCanEdit(canWrite(id, currentUser));
         return vo;
     }
 
-    /** 判断项目 Key 是否已存在（全局唯一） */
+    /**
+     * 归档项目：仅 OWNER/ADMIN 可操作，项目须为 ACTIVE 状态。
+     */
+    @Transactional
+    public void archive(UUID projectId, UUID userId) {
+        Project p = requireProject(projectId);
+        if (!isAdmin(projectId, userId)) {
+            throw new ServiceException(403, "仅项目管理员可归档");
+        }
+        if (ProjectStatus.ARCHIVED == ProjectStatus.of(p.getStatus())) {
+            throw new ServiceException(400, "项目已归档");
+        }
+        p.setStatus(ProjectStatus.ARCHIVED.name());
+        p.setUpdatedAt(LocalDateTime.now());
+        projectMapper.updateById(p);
+        projectMemberService.evictRoleCache(projectId, null);
+    }
+
+    /**
+     * 取消归档：仅 OWNER/ADMIN 可操作，项目须为 ARCHIVED 状态。
+     */
+    @Transactional
+    public void unarchive(UUID projectId, UUID userId) {
+        Project p = requireProject(projectId);
+        if (!isAdmin(projectId, userId)) {
+            throw new ServiceException(403, "仅项目管理员可操作");
+        }
+        if (ProjectStatus.ACTIVE == ProjectStatus.of(p.getStatus())) {
+            throw new ServiceException(400, "项目未归档");
+        }
+        p.setStatus(ProjectStatus.ACTIVE.name());
+        p.setUpdatedAt(LocalDateTime.now());
+        projectMapper.updateById(p);
+        projectMemberService.evictRoleCache(projectId, null);
+    }
+
     public boolean existsByKey(String projectKey) {
         return projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
                 .eq(Project::getProjectKey, projectKey)) > 0;
     }
 
-    /** 判断某用户是否为项目成员（含任意角色） */
     public boolean isMember(UUID projectId, UUID userId) {
         return projectMemberMapper.selectCount(Wrappers.<ProjectMember>lambdaQuery()
                 .eq(ProjectMember::getProjectId, projectId)
                 .eq(ProjectMember::getUserId, userId)) > 0;
     }
 
-    /** 判断某用户是否为项目 OWNER（RBAC：user_role 含 OWNER 即视为所有者） */
     public boolean isOwner(UUID projectId, UUID userId) {
         return projectMemberService.getRoles(projectId, userId).contains(ProjectRole.OWNER);
+    }
+
+    /** 判断当前用户是否为项目管理员（OWNER 或 ADMIN） */
+    public boolean isAdmin(UUID projectId, UUID userId) {
+        Set<String> roles = projectMemberService.getRoles(projectId, userId);
+        return roles.contains(ProjectRole.OWNER) || roles.contains(ProjectRole.ADMIN);
     }
 
     private ProjectVO toVO(Project p) {
@@ -161,9 +366,27 @@ public class ProjectService {
         return vo;
     }
 
-    /** 根据角色集合判断当前用户是否可写（OWNER/ADMIN/PM/DEV/QA/MEMBER 均可写，VIEWER 只读）。 */
     public boolean canWrite(UUID projectId, UUID userId) {
         return projectMemberService.getRoles(projectId, userId).stream()
                 .anyMatch(ProjectRole::isMember);
+    }
+
+    /** 查询当前用户在指定项目集合中已收藏的项目 ID 集合 */
+    private Set<UUID> listFavoritedProjectIds(UUID userId, List<UUID> projectIds) {
+        if (projectIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return projectFavoriteMapper.selectList(Wrappers.<ProjectFavorite>lambdaQuery()
+                        .eq(ProjectFavorite::getUserId, userId)
+                        .in(ProjectFavorite::getProjectId, projectIds))
+                .stream().map(ProjectFavorite::getProjectId).collect(Collectors.toSet());
+    }
+
+    private Project requireProject(UUID projectId) {
+        Project p = projectMapper.selectById(projectId);
+        if (p == null || p.getDeleted() != null && p.getDeleted() == 1) {
+            throw new ServiceException(404, "项目不存在");
+        }
+        return p;
     }
 }

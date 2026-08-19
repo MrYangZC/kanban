@@ -204,7 +204,7 @@ onBeforeUnmount(() => {
             <div class="text-sm font-medium text-ink">{{ userStore.user?.displayName }}</div>
             <div class="text-xs text-ink-secondary">{{ userStore.user?.username }}</div>
           </div>
-          <button class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink-regular transition hover:bg-surface-hover" @click="showUserDropdown = false; ElMessage.info('个人信息功能开发中')">
+          <button class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink-regular transition hover:bg-surface-hover" @click="showUserDropdown = false; router.push('/profile')">
             <User :size="14" /> 个人信息
           </button>
           <button class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink-regular transition hover:bg-surface-hover" @click="logout">

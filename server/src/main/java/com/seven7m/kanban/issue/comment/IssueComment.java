@@ -19,6 +19,7 @@ public class IssueComment {
 
     private UUID issueId;
     private UUID userId;
+    private UUID parentId;   // 父评论 id；顶楼评论为 null（嵌套回复）
     private String content;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

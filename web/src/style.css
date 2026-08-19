@@ -29,11 +29,21 @@ body {
   background: #f5f7fa;
   color: #303133;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer components {
   .card {
-    @apply rounded-lg bg-white shadow-card;
+    @apply rounded-xl bg-white shadow-card;
+  }
+
+  .card-interactive {
+    @apply rounded-xl bg-white shadow-card transition-all duration-300 ease-out-expo;
+  }
+
+  .card-interactive:hover {
+    @apply shadow-card-hover-lg -translate-y-0.5;
+    background-image: linear-gradient(135deg, rgba(64,158,255,0.04) 0%, rgba(24,144,255,0.02) 100%);
   }
 
   .page-container {
@@ -41,7 +51,7 @@ body {
   }
 
   .page-title {
-    @apply text-xl font-semibold text-ink;
+    @apply text-2xl font-semibold tracking-tight text-ink;
   }
 
   .page-subtitle {
@@ -49,31 +59,45 @@ body {
   }
 
   .btn-primary {
-    @apply inline-flex items-center gap-1.5 rounded bg-primary px-3.5 py-2 text-sm font-medium text-white transition hover:opacity-90;
+    @apply inline-flex items-center gap-1.5 rounded-lg bg-gradient-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 ease-out-expo;
+  }
+
+  .btn-primary:hover {
+    @apply shadow-md -translate-y-0.5;
+    filter: brightness(1.05);
+  }
+
+  .btn-primary:active {
+    @apply translate-y-0;
+    filter: brightness(0.98);
   }
 
   .btn-default {
-    @apply inline-flex items-center gap-1.5 rounded border border-line bg-white px-3 py-1.5 text-sm text-ink-regular transition hover:bg-surface-hover;
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-3.5 py-2 text-sm text-ink-regular transition-all duration-200 hover:bg-surface-hover hover:border-primary-300;
   }
 
   .btn-text {
-    @apply rounded px-2 py-1 text-sm text-ink-secondary transition hover:text-primary;
+    @apply rounded-md px-2 py-1 text-sm text-ink-secondary transition hover:text-primary;
   }
 
   .input-base {
-    @apply w-full rounded border border-line px-3 py-2 text-sm text-ink outline-none transition focus:border-primary;
+    @apply w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none transition-all duration-200 focus:border-primary focus:ring-2 focus:ring-primary-100;
   }
 
   .label-base {
-    @apply mb-1 block text-sm text-ink-secondary;
+    @apply mb-1.5 block text-sm font-medium text-ink-regular;
   }
 
   .nav-item {
-    @apply mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink-regular transition hover:bg-surface-hover;
+    @apply mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-ink-regular transition-all duration-200;
+  }
+
+  .nav-item:hover {
+    @apply bg-surface-hover text-ink;
   }
 
   .nav-item-active {
-    @apply bg-primary-light text-primary;
+    @apply bg-primary-50 text-primary-600 font-medium;
   }
 
   .sidebar {
@@ -89,15 +113,15 @@ body {
   }
 
   .table-wrapper {
-    @apply overflow-hidden rounded-lg bg-white shadow-card;
+    @apply overflow-hidden rounded-xl bg-white shadow-card;
   }
 
   .table-head th {
-    @apply border-b border-line-light bg-surface-hover px-5 py-3 text-left text-xs font-medium text-ink-secondary;
+    @apply border-b border-line-light bg-surface-light px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-secondary;
   }
 
   .table-row {
-    @apply border-b border-line-lighter transition last:border-0 hover:bg-surface-hover;
+    @apply border-b border-line-lighter transition last:border-0 hover:bg-primary-50/40;
   }
 
   .tag-status {
@@ -111,15 +135,23 @@ body {
   .avatar-primary {
     @apply bg-primary-light text-primary;
   }
+
+  .stat-pill {
+    @apply inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors;
+  }
 }
 
 ::-webkit-scrollbar {
-  height: 10px;
-  width: 10px;
+  height: 8px;
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: #d0d3d9;
-  border-radius: 6px;
+  border-radius: 4px;
+  transition: background 0.2s;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #b8bcc4;

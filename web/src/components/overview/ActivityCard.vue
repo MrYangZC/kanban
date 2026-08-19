@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Activity } from 'lucide-vue-next'
 import type { ProjectActivityVO } from '@/api/types'
+import { fmtDate, fmtHM } from '@/utils/datetime'
 
 interface Props {
   activities?: ProjectActivityVO[]
@@ -9,14 +10,6 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   activities: () => []
 })
-
-function formatDate(dateStr: string): string {
-  return dateStr?.slice(0, 10) || ''
-}
-
-function formatTime(dateStr: string): string {
-  return dateStr?.slice(11, 16) || ''
-}
 
 const ACTION_LABEL: Record<string, string> = {
   CREATED: '创建了',
@@ -53,7 +46,7 @@ function actionLabel(action: string): string {
               <span class="font-medium text-brand">#{{ item.issueNumber }} {{ item.issueTitle }}</span>
             </div>
             <div class="mt-0.5 text-xs text-ink-400">
-              {{ formatDate(item.createdAt) }} {{ formatTime(item.createdAt) }}
+              {{ fmtDate(item.createdAt) }} {{ fmtHM(item.createdAt) }}
             </div>
           </div>
         </div>
