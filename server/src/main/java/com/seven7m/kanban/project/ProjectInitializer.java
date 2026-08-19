@@ -111,7 +111,6 @@ public class ProjectInitializer {
         addTransition(wf.getId(), statuses.get(1).getId(), statuses.get(2).getId(), "重新处理");
         addTransition(wf.getId(), statuses.get(0).getId(), statuses.get(1).getId(), "再次打开");
         addTransition(wf.getId(), statuses.get(5).getId(), statuses.get(1).getId(), "重新打开");
-        addTransition(wf.getId(), statuses.get(4).getId(), statuses.get(5).getId(), "关闭");
 
         // 默认看板 + 列（status 到列的映射）
         Board board = new Board();

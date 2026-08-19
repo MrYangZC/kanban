@@ -16,6 +16,12 @@ const severityColor: Record<string, string> = {
   S3: '#1677FF',
   S4: '#8F959E'
 }
+const priorityLabel: Record<string, string> = {
+  P0: '紧急', P1: '高', P2: '中', P3: '低'
+}
+const severityLabel: Record<string, string> = {
+  S1: '1-致命', S2: '2-严重', S3: '3-一般', S4: '4-轻微'
+}
 function dueText(due?: string) {
   if (!due) return ''
   const date = new Date(due)
@@ -36,7 +42,7 @@ function dueText(due?: string) {
         v-if="props.issue.severity"
         class="rounded px-1 py-0.5 text-[10px] font-medium text-white"
         :style="{ background: severityColor[props.issue.severity] || '#8F959E' }"
-      >{{ props.issue.severity }}</span>
+      >{{ severityLabel[props.issue.severity] || props.issue.severity }}</span>
       <span class="ml-auto text-sm" :title="props.issue.issueTypeName">{{ props.issue.issueTypeIcon || '📋' }}</span>
     </div>
 
@@ -53,7 +59,7 @@ function dueText(due?: string) {
 
     <div class="mt-2.5 flex items-center justify-between">
       <div class="flex items-center gap-1.5 text-ink-400">
-        <span class="rounded bg-surface-muted px-1.5 py-0.5 text-[11px] text-ink-600">{{ props.issue.priority }}</span>
+        <span class="rounded bg-surface-muted px-1.5 py-0.5 text-[11px] text-ink-600">{{ priorityLabel[props.issue.priority] || props.issue.priority }}</span>
         <span v-if="props.issue.module" class="truncate text-[11px] text-ink-400">#{{ props.issue.module }}</span>
         <span v-if="props.issue.commentCount" class="flex items-center gap-0.5 text-[11px]">
           <MessageSquare :size="12" />{{ props.issue.commentCount }}
@@ -62,11 +68,17 @@ function dueText(due?: string) {
           <CalendarClock :size="12" />{{ dueText(props.issue.dueDate) }}
         </span>
       </div>
-      <div
-        class="flex h-6 w-6 items-center justify-center rounded-full bg-brand/10 text-[11px] font-medium text-brand"
-        :title="props.issue.assigneeName || '未指派'"
-      >
-        {{ props.issue.assigneeName ? props.issue.assigneeName.charAt(0) : '·' }}
+      <div class="flex items-center gap-1.5">
+        <span
+          v-if="props.issue.assigneeName"
+          class="flex h-6 w-6 items-center justify-center rounded-full bg-brand/10 text-[11px] font-medium text-brand"
+        >{{ props.issue.assigneeName.charAt(0) }}</span>
+        <span
+          v-if="props.issue.assigneeName"
+          class="max-w-[110px] truncate text-[11px] text-ink-600"
+          :title="props.issue.assigneeName"
+        >{{ props.issue.assigneeName }}</span>
+        <span v-else class="text-[11px] text-ink-400">未指派</span>
       </div>
     </div>
   </div>

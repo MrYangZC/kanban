@@ -26,6 +26,10 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
     validate-on-migrate: false
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
 
 mybatis-plus:
   type-handlers-package: com.seven7m.kanban.common.config.handler

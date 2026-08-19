@@ -34,8 +34,8 @@ public class ProjectService {
 
     @Transactional
     public ProjectVO create(CreateProjectRequest req) {
+        // project_key 全局唯一（已去掉 workspace 维度）
         long dup = projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
-                .eq(Project::getWorkspaceId, req.getWorkspaceId())
                 .eq(Project::getProjectKey, req.getProjectKey()));
         if (dup > 0) {
             throw new ServiceException(400, "项目 Key 已存在：" + req.getProjectKey());
@@ -51,14 +51,14 @@ public class ProjectService {
         project.setUpdatedAt(LocalDateTime.now());
         projectMapper.insert(project);
 
-        // 创建人自动成为项目 OWNER，数据权限据此隔离
+        // 创建人自动成为项目成员 + OWNER 角色（RBAC：user_role）
         ProjectMember owner = new ProjectMember();
         owner.setId(UUID.randomUUID());
         owner.setProjectId(project.getId());
         owner.setUserId(currentUser);
-        owner.setRole(ProjectRole.OWNER);
         owner.setCreatedAt(LocalDateTime.now());
         projectMemberMapper.insert(owner);
+        projectMemberService.grantRoles(project.getId(), currentUser, java.util.List.of(ProjectRole.OWNER));
 
         // 事务内初始化默认数据（类型/状态/工作流/流转/看板）
         projectInitializer.initDefaults(project.getId(), currentUser);
@@ -78,7 +78,7 @@ public class ProjectService {
             throw new ServiceException(403, "无项目访问权限");
         }
 
-        // 3. 仅覆盖非空字段（不改动 projectKey / workspaceId / createdBy 等不可变字段）
+        // 3. 仅覆盖非空字段（不改动 projectKey / createdBy 等不可变字段）
         if (req.getName() != null) {
             p.setName(req.getName());
         }
@@ -99,10 +99,9 @@ public class ProjectService {
         return toVO(p);
     }
 
-    public List<ProjectVO> listByWorkspace(UUID workspaceId) {
+    public List<ProjectVO> listAll() {
         UUID currentUser = UserContext.getUserId();
         List<Project> projects = projectMapper.selectList(Wrappers.<Project>lambdaQuery()
-                        .eq(Project::getWorkspaceId, workspaceId)
                         .eq(Project::getDeleted, 0)
                         // 数据权限：仅返回当前用户为成员的项目
                         .inSql(Project::getId,
@@ -138,7 +137,7 @@ public class ProjectService {
         return vo;
     }
 
-    /** 判断项目 Key 是否已存在（跨 workspace 唯一约束） */
+    /** 判断项目 Key 是否已存在（全局唯一） */
     public boolean existsByKey(String projectKey) {
         return projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
                 .eq(Project::getProjectKey, projectKey)) > 0;
@@ -151,12 +150,9 @@ public class ProjectService {
                 .eq(ProjectMember::getUserId, userId)) > 0;
     }
 
-    /** 判断某用户是否为项目 OWNER */
+    /** 判断某用户是否为项目 OWNER（RBAC：user_role 含 OWNER 即视为所有者） */
     public boolean isOwner(UUID projectId, UUID userId) {
-        return projectMemberMapper.selectCount(Wrappers.<ProjectMember>lambdaQuery()
-                .eq(ProjectMember::getProjectId, projectId)
-                .eq(ProjectMember::getUserId, userId)
-                .eq(ProjectMember::getRole, ProjectRole.OWNER)) > 0;
+        return projectMemberService.getRoles(projectId, userId).contains(ProjectRole.OWNER);
     }
 
     private ProjectVO toVO(Project p) {
@@ -165,9 +161,9 @@ public class ProjectService {
         return vo;
     }
 
-    /** 根据角色判断当前用户是否可写（OWNER 或 MEMBER）。 */
+    /** 根据角色集合判断当前用户是否可写（OWNER/ADMIN/PM/DEV/QA/MEMBER 均可写，VIEWER 只读）。 */
     public boolean canWrite(UUID projectId, UUID userId) {
-        String role = projectMemberService.getRole(projectId, userId);
-        return ProjectRole.OWNER.equals(role) || ProjectRole.MEMBER.equals(role);
+        return projectMemberService.getRoles(projectId, userId).stream()
+                .anyMatch(ProjectRole::isMember);
     }
 }

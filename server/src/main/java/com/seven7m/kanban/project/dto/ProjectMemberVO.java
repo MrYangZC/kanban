@@ -3,6 +3,7 @@ package com.seven7m.kanban.project.dto;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -17,8 +18,8 @@ public class ProjectMemberVO {
     private String displayName;
     private String avatarUrl;
 
-    /** 角色：OWNER / MEMBER */
-    private String role;
+    /** 角色集合（RBAC：一人可多角色） */
+    private List<String> roles;
 
     private LocalDateTime createdAt;
 }

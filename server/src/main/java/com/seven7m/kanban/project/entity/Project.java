@@ -17,7 +17,6 @@ public class Project extends BaseEntity {
     @TableId(type = IdType.ASSIGN_UUID)
     private UUID id;
 
-    private UUID workspaceId;
     private String projectKey;
     private String name;
     private String description;

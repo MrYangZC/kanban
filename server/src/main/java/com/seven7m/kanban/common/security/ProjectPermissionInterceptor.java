@@ -50,23 +50,15 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        String role = projectMemberService.getRole(projectId, UserContext.getUserId());
+        java.util.Set<String> roles = projectMemberService.getRoles(projectId, UserContext.getUserId());
         String[] required = annotation.required();
-        boolean allowed = role != null;
-        if (allowed) {
-            allowed = false;
-            for (String r : required) {
-                if (r.equals(role)) {
-                    allowed = true;
-                    break;
-                }
-            }
-        }
+        // RBAC：用户任一角色命中 required 即通过
+        boolean allowed = roles.stream().anyMatch(r -> java.util.Arrays.asList(required).contains(r));
         if (!allowed) {
-            ProjectRoleContext.set(role);
+            ProjectRoleContext.setRoles(roles);
             throw new ServiceException(403, "无权限执行该操作，需要角色：" + String.join("/", required));
         }
-        ProjectRoleContext.set(role);
+        ProjectRoleContext.setRoles(roles);
         return true;
     }
 

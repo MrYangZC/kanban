@@ -19,6 +19,5 @@ public class ProjectMember {
 
     private UUID projectId;
     private UUID userId;
-    private String role;
     private LocalDateTime createdAt;
 }

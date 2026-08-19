@@ -1,5 +1,5 @@
 import http, { req, type R } from './request'
-import type { Workspace, Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO } from './types'
+import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO } from './types'
 
 // ---- user ----
 export function login(username: string, password: string) {
@@ -30,20 +30,12 @@ export function deleteUser(id: string) {
   return req<void>(http.delete(`/v1/users/${id}`))
 }
 
-// ---- workspace ----
-export function listWorkspaces() {
-  return req<Workspace[]>(http.get('/v1/workspaces'))
-}
-export function createWorkspace(name: string, key: string, description = '') {
-  return req<Workspace>(http.post('/v1/workspaces', { name, workspaceKey: key, description }))
-}
-
 // ---- project ----
-export function listProjects(workspaceId: string) {
-  return req<Project[]>(http.get(`/v1/projects/workspace/${workspaceId}`))
+export function listProjects() {
+  return req<Project[]>(http.get('/v1/projects'))
 }
-export function createProject(workspaceId: string, projectKey: string, name: string, description = '') {
-  return req<Project>(http.post('/v1/projects', { workspaceId, projectKey, name, description }))
+export function createProject(projectKey: string, name: string, description = '') {
+  return req<Project>(http.post('/v1/projects', { projectKey, name, description }))
 }
 export function getProject(id: string) {
   return req<Project>(http.get(`/v1/projects/${id}`))
@@ -62,14 +54,14 @@ export function updateProject(id: string, payload: {
 export function listProjectMembers(projectId: string) {
   return req<ProjectMember[]>(http.get(`/v1/projects/${projectId}/members`))
 }
-export function addProjectMember(projectId: string, userId: string, role = 'MEMBER') {
-  return req<ProjectMember>(http.post(`/v1/projects/${projectId}/members`, { userId, role }))
+export function addProjectMember(projectId: string, userId: string, roles: string[] = ['MEMBER']) {
+  return req<ProjectMember>(http.post(`/v1/projects/${projectId}/members`, { userId, roles }))
 }
 export function removeProjectMember(projectId: string, userId: string) {
   return req<void>(http.delete(`/v1/projects/${projectId}/members/${userId}`))
 }
-export function updateProjectMemberRole(projectId: string, userId: string, role: string) {
-  return req<ProjectMember>(http.put(`/v1/projects/${projectId}/members/${userId}/role`, null, { params: { role } }))
+export function updateProjectMemberRoles(projectId: string, userId: string, roles: string[]) {
+  return req<ProjectMember>(http.put(`/v1/projects/${projectId}/members/${userId}/roles`, roles))
 }
 
 // ---- board ----
@@ -97,6 +89,11 @@ export function createIssue(payload: {
   verifierId?: string
   fixVersion?: string
   source?: string
+  iteration?: string
+  participants?: string
+  ccUsers?: string
+  planStart?: string
+  noFixReason?: string
 }) {
   return req<Issue>(http.post('/v1/issues', payload))
 }
@@ -120,6 +117,13 @@ export interface UpdateIssuePayload {
   fixVersion?: string
   source?: string
   archived?: number
+  iteration?: string
+  participants?: string
+  ccUsers?: string
+  planStart?: string
+  noFixReason?: string
+  /** 需要显式置空的字段名集合（配合 assigneeId: null 等使用） */
+  clearFields?: string[]
 }
 export function updateIssue(id: string, payload: UpdateIssuePayload) {
   return req<Issue>(http.put(`/v1/issues/${id}`, payload))
@@ -142,6 +146,13 @@ export function filterIssues(payload: {
   return req<PageResult<Issue>>(http.post('/v1/issues/filter', payload))
 }
 
+// ---- upload ----
+export function uploadImage(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return req<UploadImageVO>(http.post('/v1/upload/image', form))
+}
+
 // ---- activities / comments ----
 export function listActivities(issueId: string) {
   return req<IssueActivity[]>(http.get(`/v1/issues/${issueId}/activities`))
@@ -156,6 +167,12 @@ export function deleteComment(issueId: string, commentId: string) {
 // ---- attachments ----
 export function listAttachments(issueId: string) {
   return req<AttachmentVO[]>(http.get(`/v1/issues/${issueId}/attachments`))
+}
+/** 真实文件上传（multipart），返回含 url 的附件记录 */
+export function uploadAttachment(issueId: string, file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return req<AttachmentVO>(http.post(`/v1/issues/${issueId}/attachments/upload`, form))
 }
 export function addAttachment(issueId: string, fileName: string, contentType?: string, fileSize?: number) {
   return req<AttachmentVO>(http.post(`/v1/issues/${issueId}/attachments`, { fileName, contentType, fileSize }))
@@ -180,6 +197,11 @@ export function listProjectStatuses(projectId: string) {
   return req<IssueStatusVO[]>(http.get(`/v1/projects/${projectId}/statuses`))
 }
 
+// ---- workflow ----
+export function listTransitions(projectId: string) {
+  return req<WorkflowTransitionVO[]>(http.get(`/v1/projects/${projectId}/transitions`))
+}
+
 // ---- tags ----
 export function listProjectTags(projectId: string) {
   return req<LabelVO[]>(http.get(`/v1/projects/${projectId}/tags`))
@@ -192,4 +214,37 @@ export function addIssueTag(issueId: string, projectId: string, name: string, co
 }
 export function removeIssueTag(issueId: string, labelId: string) {
   return req<void>(http.delete(`/v1/issues/${issueId}/tags/${labelId}`))
+}
+
+// ---- milestones ----
+export function listMilestones(projectId: string) {
+  return req<MilestoneVO[]>(http.get(`/v1/projects/${projectId}/milestones`))
+}
+export function createMilestone(projectId: string, payload: { name: string; description?: string; dueDate?: string }) {
+  return req<MilestoneVO>(http.post(`/v1/projects/${projectId}/milestones`, payload))
+}
+export function updateMilestone(projectId: string, id: string, payload: { name?: string; description?: string; dueDate?: string; status?: string; progress?: number }) {
+  return req<MilestoneVO>(http.put(`/v1/projects/${projectId}/milestones/${id}`, payload))
+}
+export function deleteMilestone(projectId: string, id: string) {
+  return req<void>(http.delete(`/v1/projects/${projectId}/milestones/${id}`))
+}
+
+// ---- announcements ----
+export function listAnnouncements(projectId: string) {
+  return req<AnnouncementVO[]>(http.get(`/v1/projects/${projectId}/announcements`))
+}
+export function createAnnouncement(projectId: string, payload: { title: string; content?: string; pinned?: number }) {
+  return req<AnnouncementVO>(http.post(`/v1/projects/${projectId}/announcements`, payload))
+}
+export function updateAnnouncement(projectId: string, id: string, payload: { title?: string; content?: string; pinned?: number }) {
+  return req<AnnouncementVO>(http.put(`/v1/projects/${projectId}/announcements/${id}`, payload))
+}
+export function deleteAnnouncement(projectId: string, id: string) {
+  return req<void>(http.delete(`/v1/projects/${projectId}/announcements/${id}`))
+}
+
+// ---- project activities ----
+export function listProjectActivities(projectId: string, limit = 20) {
+  return req<ProjectActivityVO[]>(http.get(`/v1/projects/${projectId}/activities`, { params: { limit } }))
 }

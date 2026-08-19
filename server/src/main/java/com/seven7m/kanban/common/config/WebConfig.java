@@ -5,10 +5,12 @@ import com.seven7m.kanban.common.security.UserContextInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Web 配置：注册操作人上下文拦截器。排除 actuator/静态资源等无需操作人的路径。
+ * Web 配置：注册操作人上下文拦截器与静态资源映射。
+ * 排除 actuator/静态资源/上传接口等无需操作人（或无需项目鉴权）的路径。
  */
 @Configuration
 @RequiredArgsConstructor
@@ -22,20 +24,29 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(userContextInterceptor)
                 .addPathPatterns("/**")
                 .excludePathPatterns(
-                        "/api/swagger-ui.html",
-                        "/api/swagger-ui/**",
-                        "/api/v3/api-docs/**",
-                        "/api/doc.html",
+                        // 注意：context-path=/api 时，拦截器匹配的是 servletPath，此处不带 /api 前缀
+                        "/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**",
+                        "/doc.html",
                         "/actuator/**",
                         "/error",
                         "/favicon.ico");
         // 项目级角色鉴权：在 UserContextInterceptor 之后执行（靠后注册，顺序靠后）
+        // 上传接口不绑定具体项目，仅需登录态（UserContextInterceptor 仍生效），因此放行；
+        // /uploads/** 不再从登录拦截器排除，保证附件文件访问需要登录态
         registry.addInterceptor(projectPermissionInterceptor)
                 .addPathPatterns("/v1/**")
                 .excludePathPatterns(
                         "/v1/auth/**",
                         "/v1/users/**",
-                        "/v1/workspaces/**",
-                        "/v1/projects");
+                        "/v1/projects",
+                        "/v1/upload/**");
+    }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/uploads/**")
+                .addResourceLocations("file:./uploads/");
     }
 }

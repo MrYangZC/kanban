@@ -29,6 +29,15 @@ public class IssueVO {
     private Integer archived;
     private LocalDateTime dueDate;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    // 缺陷详情页（云效风格）扩展字段
+    private UUID verifierId;
+    private String iteration;
+    private String participants;
+    private String ccUsers;
+    private LocalDateTime planStart;
+    private String noFixReason;
 
     // 关联展示字段（看板/卡片用）
     private String issueTypeCode;

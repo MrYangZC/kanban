@@ -20,4 +20,8 @@ public class IssueTag {
     private String name;
     private String color;
     private LocalDateTime createdAt;
+
+    /** 非表字段：批量查询时承载关联的 issue_id，便于前端按 Issue 分组。 */
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    private UUID issueId;
 }

@@ -11,7 +11,6 @@ import com.seven7m.kanban.project.dto.ProjectStats;
 public class ProjectVO {
 
     private UUID id;
-    private UUID workspaceId;
     private String projectKey;
     private String name;
     private String description;

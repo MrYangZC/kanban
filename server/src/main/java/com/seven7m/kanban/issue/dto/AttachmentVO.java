@@ -13,6 +13,7 @@ public class AttachmentVO {
     private String storageKey;
     private String contentType;
     private Long fileSize;
+    private String url;
     private UUID uploadedBy;
     private String uploaderName;
     private LocalDateTime createdAt;

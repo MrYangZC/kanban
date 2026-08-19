@@ -20,7 +20,6 @@ import com.seven7m.kanban.user.dto.CreateUserRequest;
 import com.seven7m.kanban.user.entity.SysUser;
 import com.seven7m.kanban.user.mapper.SysUserMapper;
 import com.seven7m.kanban.user.service.UserService;
-import com.seven7m.kanban.workspace.service.WorkspaceService;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
@@ -60,7 +59,6 @@ public class ExcelImportService {
     private final IssueMapper issueMapper;
     private final UserService userService;
     private final SysUserMapper sysUserMapper;
-    private final WorkspaceService workspaceService;
     private final ProjectMapper projectMapper;
 
     public ExcelImportService(ProjectService projectService,
@@ -70,7 +68,6 @@ public class ExcelImportService {
                               IssueMapper issueMapper,
                               UserService userService,
                               SysUserMapper sysUserMapper,
-                              WorkspaceService workspaceService,
                               ProjectMapper projectMapper) {
         this.projectService = projectService;
         this.projectMemberService = projectMemberService;
@@ -79,14 +76,12 @@ public class ExcelImportService {
         this.issueMapper = issueMapper;
         this.userService = userService;
         this.sysUserMapper = sysUserMapper;
-        this.workspaceService = workspaceService;
         this.projectMapper = projectMapper;
     }
 
     public ExcelImportResult run(String filePath) {
         ExcelImportResult result = new ExcelImportResult();
         UUID adminId = UserContext.getUserId();
-        UUID workspaceId = workspaceService.listAll().get(0).getId();
 
         try (FileInputStream fis = new FileInputStream(Path.of(filePath).toFile());
              XSSFWorkbook wb = new XSSFWorkbook(fis)) {
@@ -95,7 +90,7 @@ public class ExcelImportService {
                 Sheet sheet = wb.getSheetAt(si);
                 String sheetName = sheet.getSheetName();
                 try {
-                    SheetResult sr = importSheet(sheet, sheetName, adminId, workspaceId);
+                    SheetResult sr = importSheet(sheet, sheetName, adminId);
                     result.addSheet(sr);
                     log.info("[import] sheet='{}' 项目建='{}' 任务={} 失败={}",
                             sheetName, sr.projectCreated(), sr.issueCount(), sr.failCount());
@@ -112,7 +107,7 @@ public class ExcelImportService {
     }
 
     @Transactional
-    protected SheetResult importSheet(Sheet sheet, String sheetName, UUID adminId, UUID workspaceId) {
+    protected SheetResult importSheet(Sheet sheet, String sheetName, UUID adminId) {
         SheetResult sr = new SheetResult(sheetName);
 
         // 跳过汇总统计 sheet（非任务列表）
@@ -124,8 +119,7 @@ public class ExcelImportService {
         // 幂等：项目名已存在则视为已导入，跳过本 sheet（避免重复导入）
         long existing = projectMapper.selectCount(
                 Wrappers.<Project>lambdaQuery()
-                        .eq(Project::getName, sheetName)
-                        .eq(Project::getWorkspaceId, workspaceId));
+                        .eq(Project::getName, sheetName));
         if (existing > 0) {
             log.info("[import] sheet='{}' 项目已存在，跳过", sheetName);
             return sr;
@@ -140,7 +134,7 @@ public class ExcelImportService {
         // 2. 建项目
         String baseKey = ImportMapper.toProjectKeyBase(sheetName);
         String projectKey = uniqueProjectKey(baseKey);
-        ProjectVO project = projectService.create(buildProjectReq(sheetName, projectKey, adminId, workspaceId));
+        ProjectVO project = projectService.create(buildProjectReq(sheetName, projectKey, adminId));
         sr.setProjectCreated(true);
         sr.setProjectKey(projectKey);
 
@@ -297,11 +291,10 @@ public class ExcelImportService {
         TITLE, ISSUE_NO, PARENT, CATEGORY, ASSIGNEE, PRIORITY, DUE_DATE, ACTUAL_DATE, STATUS, REMARK
     }
 
-    private CreateProjectRequest buildProjectReq(String name, String key, UUID adminId, UUID workspaceId) {
+    private CreateProjectRequest buildProjectReq(String name, String key, UUID adminId) {
         CreateProjectRequest req = new CreateProjectRequest();
         req.setName(name);
         req.setProjectKey(key);
-        req.setWorkspaceId(workspaceId);
         req.setLeadUserId(adminId);
         return req;
     }
@@ -333,7 +326,6 @@ public class ExcelImportService {
         try {
             AddMemberRequest req = new AddMemberRequest();
             req.setUserId(userId);
-            req.setRole(ProjectRole.MEMBER);
             projectMemberService.add(projectId, req);
         } catch (com.seven7m.kanban.common.exception.ServiceException e) {
             // 已是成员（如 admin 是 OWNER）则忽略

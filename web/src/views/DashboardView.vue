@@ -21,6 +21,9 @@ const priorityEl = ref<HTMLElement | null>(null)
 const burndownEl = ref<HTMLElement | null>(null)
 const charts = shallowRef<echarts.ECharts[]>([])
 const BRAND = ['#1677FF', '#4096FF', '#69B1FF', '#95DEFF', '#0958D9', '#8F959E', '#52C41A', '#FAAD14', '#FF4D4F']
+const priorityLabel: Record<string, string> = {
+  P0: '紧急', P1: '高', P2: '中', P3: '低'
+}
 
 function renderCharts() {
   charts.value.forEach((c) => c.dispose())
@@ -44,7 +47,7 @@ function renderCharts() {
   priorityChart.setOption({
     tooltip: { trigger: 'axis' },
     grid: { top: 16, left: 8, right: 8, bottom: 8, containLabel: true },
-    xAxis: { type: 'category', data: data.value.priorityDist.map((p) => p.name), axisLine: { lineStyle: { color: '#E5E6EB' } } },
+    xAxis: { type: 'category', data: data.value.priorityDist.map((p) => priorityLabel[p.name] || p.name), axisLine: { lineStyle: { color: '#E5E6EB' } } },
     yAxis: { type: 'value', splitLine: { lineStyle: { color: '#F0F2F5' } } },
     series: [{
       type: 'bar', barWidth: '52%', itemStyle: { color: '#1677FF', borderRadius: [6, 6, 0, 0] },

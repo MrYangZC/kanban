@@ -20,8 +20,8 @@ public interface DashboardMapper extends BaseMapper<Object> {
             FROM issue i
             JOIN issue_status s ON s.id = i.status_id
             WHERE i.project_id = #{projectId} AND i.deleted = 0
-            GROUP BY s.name, s."order"
-            ORDER BY s."order"
+            GROUP BY s.name, s.sort_order
+            ORDER BY s.sort_order
             """)
     List<DashboardVO.NameCount> statusDist(@Param("projectId") java.util.UUID projectId);
 
@@ -46,12 +46,12 @@ public interface DashboardMapper extends BaseMapper<Object> {
             """)
     List<DashboardVO.NameCount> assigneeDist(@Param("projectId") java.util.UUID projectId);
 
-    /** 概览：总数 / 已完成(category=DONE) / 逾期(due_at < now 且未完成) */
+    /** 概览：总数 / 已完成(category=DONE) / 逾期(due_date < now 且未完成) */
     @Select("""
             SELECT
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE s.category = 'DONE') AS done,
-                COUNT(*) FILTER (WHERE i.due_at IS NOT NULL AND i.due_at < now() AND s.category <> 'DONE') AS overdue
+                COUNT(*) FILTER (WHERE i.due_date IS NOT NULL AND i.due_date < now() AND s.category <> 'DONE') AS overdue
             FROM issue i
             JOIN issue_status s ON s.id = i.status_id
             WHERE i.project_id = #{projectId} AND i.deleted = 0

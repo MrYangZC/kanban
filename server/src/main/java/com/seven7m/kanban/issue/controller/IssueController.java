@@ -29,6 +29,9 @@ public class IssueController {
         return R.ok(issueService.create(req));
     }
 
+    @ProjectRole(required = {com.seven7m.kanban.project.ProjectRole.OWNER,
+            com.seven7m.kanban.project.ProjectRole.MEMBER,
+            com.seven7m.kanban.project.ProjectRole.VIEWER})
     @GetMapping("/{id}")
     public R<IssueVO> get(@PathVariable UUID id) {
         return R.ok(issueService.get(id));
@@ -54,13 +57,19 @@ public class IssueController {
         return R.ok();
     }
 
-    /** 列表过滤：左侧过滤器 + 顶部筛选，返回分页 IssueVO（只读接口，无需角色注解） */
+    /** 列表过滤：左侧过滤器 + 顶部筛选，返回分页 IssueVO（只读，项目成员含 VIEWER 可读） */
+    @ProjectRole(required = {com.seven7m.kanban.project.ProjectRole.OWNER,
+            com.seven7m.kanban.project.ProjectRole.MEMBER,
+            com.seven7m.kanban.project.ProjectRole.VIEWER})
     @PostMapping("/filter")
     public R<PageResult<IssueVO>> filter(@Valid @RequestBody IssueFilterRequest req) {
         return R.ok(issueService.listByFilter(req));
     }
 
     /** 获取某任务的子任务列表（只读） */
+    @ProjectRole(required = {com.seven7m.kanban.project.ProjectRole.OWNER,
+            com.seven7m.kanban.project.ProjectRole.MEMBER,
+            com.seven7m.kanban.project.ProjectRole.VIEWER})
     @GetMapping("/{id}/children")
     public R<List<IssueVO>> children(@PathVariable UUID id) {
         return R.ok(issueService.listChildren(id));

@@ -16,8 +16,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
         "com.seven7m.kanban.user.mapper",
         "com.seven7m.kanban.issuestatus.mapper",
         "com.seven7m.kanban.project.mapper",
-        "com.seven7m.kanban.workspace.mapper",
-        "com.seven7m.kanban.dashboard.mapper"
+        "com.seven7m.kanban.rbac.mapper",
+        "com.seven7m.kanban.dashboard.mapper",
+        "com.seven7m.kanban.milestone.mapper",
+        "com.seven7m.kanban.announcement.mapper"
 })
 public class PmServerApplication {
 

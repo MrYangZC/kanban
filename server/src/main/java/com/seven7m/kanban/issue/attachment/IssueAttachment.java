@@ -21,6 +21,8 @@ public class IssueAttachment {
     private String storageKey;
     private String contentType;
     private Long fileSize;
+    /** 附件可访问地址（/api/uploads/...），存量数据为 NULL */
+    private String url;
     private UUID uploadedBy;
     private LocalDateTime createdAt;
 }

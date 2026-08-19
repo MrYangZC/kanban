@@ -1,12 +1,3 @@
-export interface Workspace {
-  id: string
-  name: string
-  workspaceKey: string
-  description: string
-  avatarUrl: string
-  createdAt: string
-}
-
 export interface ProjectStats {
   projectId: string
   memberCount: number
@@ -16,7 +7,6 @@ export interface ProjectStats {
 
 export interface Project {
   id: string
-  workspaceId: string
   projectKey: string
   name: string
   description: string
@@ -68,6 +58,11 @@ export interface Issue {
   verifierName: string | null
   fixVersion: string | null
   source: string | null
+  iteration: string | null
+  participants: string | null
+  ccUsers: string | null
+  planStart: string | null
+  noFixReason: string | null
   labels: LabelVO[]
   commentCount: number
   sortKey: string
@@ -113,9 +108,22 @@ export interface AttachmentVO {
   fileName: string
   contentType: string
   fileSize: number
+  url?: string
   uploadedBy: string
   uploaderName: string
   createdAt: string
+}
+
+/** 图片上传结果 */
+export interface UploadImageVO {
+  url: string
+}
+
+/** 工作流流转规则：fromStatus → toStatus 是否允许（看板拖拽蓝/红提示依据） */
+export interface WorkflowTransitionVO {
+  fromStatusId: string
+  toStatusId: string
+  name: string
 }
 
 export interface LinkVO {
@@ -185,6 +193,43 @@ export interface ProjectMember {
   username: string
   displayName: string
   avatarUrl: string | null
-  role: 'OWNER' | 'MEMBER' | 'VIEWER'
+  roles: string[]
+  createdAt: string
+}
+
+export interface MilestoneVO {
+  id: string
+  projectId: string
+  name: string
+  description: string | null
+  dueDate: string | null
+  status: string
+  progress: number
+  creatorName: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AnnouncementVO {
+  id: string
+  projectId: string
+  title: string
+  content: string | null
+  pinned: number
+  authorName: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProjectActivityVO {
+  id: string
+  actorId: string
+  actorName: string | null
+  action: string
+  issueId: string
+  issueNumber: number
+  issueTitle: string
+  oldValue: string | null
+  newValue: string | null
   createdAt: string
 }

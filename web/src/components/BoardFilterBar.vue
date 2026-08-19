@@ -36,8 +36,18 @@ const scopes = [
   { k: 'VERIFIED', label: '我验证的' },
   { k: 'ARCHIVED', label: '已归档' }
 ]
-const priorityOptions = ['P0', 'P1', 'P2', 'P3']
-const severityOptions = ['S1', 'S2', 'S3', 'S4']
+const priorityOptions = [
+  { k: 'P0', label: '紧急' },
+  { k: 'P1', label: '高' },
+  { k: 'P2', label: '中' },
+  { k: 'P3', label: '低' }
+]
+const severityOptions = [
+  { k: 'S1', label: '1-致命' },
+  { k: 'S2', label: '2-严重' },
+  { k: 'S3', label: '3-一般' },
+  { k: 'S4', label: '4-轻微' }
+]
 
 function setScope(k: string) {
   filter.value.scope = k
@@ -71,7 +81,7 @@ function setScope(k: string) {
       @change="emit('change')"
     >
       <option value="">优先级</option>
-      <option v-for="p in priorityOptions" :key="p" :value="p">{{ p }}</option>
+      <option v-for="p in priorityOptions" :key="p.k" :value="p.k">{{ p.label }}</option>
     </select>
     <select
       v-model="filter.severity"
@@ -79,7 +89,7 @@ function setScope(k: string) {
       @change="emit('change')"
     >
       <option value="">严重度</option>
-      <option v-for="s in severityOptions" :key="s" :value="s">{{ s }}</option>
+      <option v-for="s in severityOptions" :key="s.k" :value="s.k">{{ s.label }}</option>
     </select>
     <select
       v-model="filter.labelId"

@@ -1,6 +1,7 @@
 package com.seven7m.kanban.issue.link;
 
 import com.seven7m.kanban.common.domain.R;
+import com.seven7m.kanban.common.security.annotation.ProjectRole;
 import com.seven7m.kanban.issue.dto.LinkVO;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -16,16 +17,21 @@ public class IssueLinkController {
 
     private final IssueLinkService linkService;
 
+    @ProjectRole(required = {com.seven7m.kanban.project.ProjectRole.OWNER,
+            com.seven7m.kanban.project.ProjectRole.MEMBER,
+            com.seven7m.kanban.project.ProjectRole.VIEWER})
     @GetMapping("/{issueId}/links")
     public R<List<LinkVO>> list(@PathVariable UUID issueId) {
         return R.ok(linkService.list(issueId));
     }
 
+    @ProjectRole
     @PostMapping("/{issueId}/links")
     public R<LinkVO> add(@PathVariable UUID issueId, @RequestBody LinkBody body) {
         return R.ok(linkService.add(issueId, body.getTargetIssueId(), body.getRelationType()));
     }
 
+    @ProjectRole
     @DeleteMapping("/{issueId}/links/{linkId}")
     public R<Void> delete(@PathVariable UUID issueId, @PathVariable UUID linkId) {
         linkService.delete(issueId, linkId);

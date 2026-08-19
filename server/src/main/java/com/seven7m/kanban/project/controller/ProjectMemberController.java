@@ -39,10 +39,10 @@ public class ProjectMemberController {
     }
 
     @ProjectRole(required = {com.seven7m.kanban.project.ProjectRole.OWNER})
-    @PutMapping("/{userId}/role")
-    public R<ProjectMemberVO> updateRole(@PathVariable UUID projectId,
-                                         @PathVariable UUID userId,
-                                         @RequestParam String role) {
-        return R.ok(projectMemberService.updateRole(projectId, userId, role));
+    @PutMapping("/{userId}/roles")
+    public R<ProjectMemberVO> updateRoles(@PathVariable UUID projectId,
+                                          @PathVariable UUID userId,
+                                          @RequestBody List<String> roles) {
+        return R.ok(projectMemberService.updateRoles(projectId, userId, roles));
     }
 }

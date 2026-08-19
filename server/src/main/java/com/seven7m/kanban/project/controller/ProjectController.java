@@ -25,9 +25,9 @@ public class ProjectController {
         return R.ok(projectService.create(req));
     }
 
-    @GetMapping("/workspace/{workspaceId}")
-    public R<List<ProjectVO>> listByWorkspace(@PathVariable UUID workspaceId) {
-        return R.ok(projectService.listByWorkspace(workspaceId));
+    @GetMapping
+    public R<List<ProjectVO>> listAll() {
+        return R.ok(projectService.listAll());
     }
 
     @GetMapping("/{id}")

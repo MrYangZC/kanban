@@ -6,7 +6,7 @@ import {
   listProjectTags, listProjectMembers, createIssue, listUsers
 } from '@/api'
 import type { Issue, LabelVO, ProjectMember, UserVO } from '@/api/types'
-import IssueDrawer from '@/components/IssueDrawer.vue'
+import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
 import BoardFilterBar, { type FilterPayload } from '@/components/BoardFilterBar.vue'
 import { createBoardFilter } from '@/stores/boardFilter'
 import { useUserStore } from '@/stores/user'
@@ -35,8 +35,7 @@ const statusOptions = ref<{ id: string; name: string; color: string }[]>([])
 const sortField = ref('')
 const sortOrder = ref<'asc' | 'desc'>('asc')
 
-const drawerOpen = ref(false)
-const selectedIssue = ref<Issue | null>(null)
+const detailDrawer = ref<InstanceType<typeof IssueDetailDrawer> | null>(null)
 const expandChildren = reactive<Record<string, Issue[]>>({})
 
 const priorityColor: Record<string, string> = {
@@ -44,6 +43,12 @@ const priorityColor: Record<string, string> = {
 }
 const severityColor: Record<string, string> = {
   S1: '#E34D59', S2: '#E37318', S3: '#2BA471', S4: '#8592A6'
+}
+const priorityLabel: Record<string, string> = {
+  P0: '紧急', P1: '高', P2: '中', P3: '低'
+}
+const severityLabel: Record<string, string> = {
+  S1: '1-致命', S2: '2-严重', S3: '3-一般', S4: '4-轻微'
 }
 
 async function loadMeta() {
@@ -56,7 +61,7 @@ async function loadMeta() {
   members.value = await listProjectMembers(projectId).catch(() => [])
   users.value = await listUsers().catch(() => [])
   const me = members.value.find((m) => m.userId === userStore.user?.id)
-  canWrite.value = !me || me.role !== 'VIEWER'
+  canWrite.value = !me || ['OWNER', 'ADMIN', 'PM', 'DEV', 'QA', 'MEMBER'].some((r) => me.roles.includes(r))
 }
 
 async function load() {
@@ -122,7 +127,7 @@ const statusColor = (id: string) => statusOptions.value.find((s) => s.id === id)
 const memberName = (id: string | null) => members.value.find((m) => m.userId === id)?.displayName || '—'
 
 function openIssue(issue: Issue) {
-  router.push(`/projects/${projectId}/defects/${issue.id}`)
+  detailDrawer.value?.open(issue.id)
 }
 
 async function onNewIssue() {
@@ -147,9 +152,15 @@ function back() {
   router.push('/projects')
 }
 function toDashboard() {
-  router.push(`/projects/${projectId}/dashboard`)
+  router.push(`/projects/${projectId}/metrics`)
 }
 function switchView(v: 'board' | 'table' | 'defects') {
+  // 记忆视图选择：从项目列表再次进入时恢复
+  localStorage.setItem(`kanban:lastView:${projectId}`, v)
+  if (v === 'defects') {
+    router.push(`/projects/${projectId}/defects`)
+    return
+  }
   router.push(`/projects/${projectId}/${v}`)
 }
 
@@ -198,7 +209,7 @@ onMounted(() => {
                   >
                     <span class="font-mono text-xs text-ink-400">{{ c.issueKey }}</span>
                     <span class="text-ink-900">{{ c.title }}</span>
-                    <span class="ml-auto rounded px-1.5 py-0.5 text-xs" :style="{ background: priorityColor[c.priority] + '22', color: priorityColor[c.priority] }">{{ c.priority }}</span>
+                    <span class="ml-auto rounded px-1.5 py-0.5 text-xs" :style="{ background: priorityColor[c.priority] + '22', color: priorityColor[c.priority] }">{{ priorityLabel[c.priority] || c.priority }}</span>
                   </div>
                   <div v-if="!expandChildren[row.id].length" class="text-xs text-ink-400">暂无子任务</div>
                 </div>
@@ -244,14 +255,14 @@ onMounted(() => {
                 :disabled="!canWrite"
                 @change="(v: string) => patchIssue(row, { priority: v }, '优先级')"
               >
-                <el-option v-for="p in ['P0','P1','P2','P3']" :key="p" :value="p" :label="p" />
+                <el-option v-for="p in ['P0','P1','P2','P3']" :key="p" :value="p" :label="priorityLabel[p]" />
               </el-select>
             </template>
           </el-table-column>
 
           <el-table-column prop="severity" label="严重度" width="100" sortable="custom">
             <template #default="{ row }">
-              <span class="rounded px-1.5 py-0.5 text-xs font-medium" :style="{ background: severityColor[row.severity] + '22', color: severityColor[row.severity] }">{{ row.severity }}</span>
+              <span class="rounded px-1.5 py-0.5 text-xs font-medium" :style="{ background: severityColor[row.severity] + '22', color: severityColor[row.severity] }">{{ severityLabel[row.severity] || row.severity }}</span>
             </template>
           </el-table-column>
 
@@ -309,12 +320,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <IssueDrawer
-      :issue="selectedIssue"
-      :open="drawerOpen"
-      :projectId="projectId"
-      @close="drawerOpen = false"
-      @updated="(i: Issue) => { selectedIssue = i; load() }"
-    />
+    <!-- 云效风格缺陷详情：宽抽屉（60% 屏宽），不跳转路由 -->
+    <IssueDetailDrawer ref="detailDrawer" :project-id="projectId" @closed="load" />
   </div>
 </template>
