@@ -16,6 +16,7 @@ public class IssueVO {
     private String issueKey;
     private UUID issueTypeId;
     private UUID statusId;
+    private UUID sprintId;
     private String title;
     private String description;
     private String priority;

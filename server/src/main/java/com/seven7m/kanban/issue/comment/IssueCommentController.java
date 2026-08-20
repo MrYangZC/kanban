@@ -1,6 +1,7 @@
 package com.seven7m.kanban.issue.comment;
 
 import com.seven7m.kanban.common.domain.R;
+import com.seven7m.kanban.common.security.annotation.ProjectRole;
 import com.seven7m.kanban.issue.dto.IssueActivityVO;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -21,11 +22,13 @@ public class IssueCommentController {
         return R.ok(commentService.listActivities(issueId));
     }
 
+    @ProjectRole(required = {com.seven7m.kanban.project.ProjectRole.OWNER, com.seven7m.kanban.project.ProjectRole.ADMIN, com.seven7m.kanban.project.ProjectRole.PM, com.seven7m.kanban.project.ProjectRole.DEV, com.seven7m.kanban.project.ProjectRole.QA, com.seven7m.kanban.project.ProjectRole.MEMBER})
     @PostMapping("/{issueId}/comments")
     public R<IssueActivityVO> add(@PathVariable UUID issueId, @RequestBody CommentBody body) {
         return R.ok(commentService.addComment(issueId, body.getContent(), body.getParentId()));
     }
 
+    @ProjectRole(required = {com.seven7m.kanban.project.ProjectRole.OWNER, com.seven7m.kanban.project.ProjectRole.ADMIN, com.seven7m.kanban.project.ProjectRole.PM, com.seven7m.kanban.project.ProjectRole.DEV, com.seven7m.kanban.project.ProjectRole.QA, com.seven7m.kanban.project.ProjectRole.MEMBER})
     @DeleteMapping("/{issueId}/comments/{commentId}")
     public R<Void> delete(@PathVariable UUID issueId, @PathVariable UUID commentId) {
         commentService.deleteComment(issueId, commentId);

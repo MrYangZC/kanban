@@ -30,6 +30,14 @@ http.interceptors.response.use(
     return Promise.reject(new Error(msg))
   },
   (error) => {
+    if (error.response?.status === 401) {
+      // 登录态失效：清理本地凭证并跳转登录页
+      localStorage.removeItem('kanban_user')
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+      return Promise.reject(error)
+    }
     const msg = error.response?.data?.msg || error.message || '网络错误'
     ElMessage.error(msg)
     return Promise.reject(error)

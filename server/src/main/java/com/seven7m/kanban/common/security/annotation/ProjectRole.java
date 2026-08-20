@@ -13,6 +13,13 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProjectRole {
 
-    /** 允许访问的角色，默认 OWNER + MEMBER（可写）。 */
-    String[] required() default {com.seven7m.kanban.project.ProjectRole.OWNER, com.seven7m.kanban.project.ProjectRole.MEMBER};
+    /** 允许访问的角色，默认全部可写角色，与 ProjectRole.isMember 对齐。 */
+    String[] required() default {
+            com.seven7m.kanban.project.ProjectRole.OWNER,
+            com.seven7m.kanban.project.ProjectRole.ADMIN,
+            com.seven7m.kanban.project.ProjectRole.PM,
+            com.seven7m.kanban.project.ProjectRole.DEV,
+            com.seven7m.kanban.project.ProjectRole.QA,
+            com.seven7m.kanban.project.ProjectRole.MEMBER
+    };
 }

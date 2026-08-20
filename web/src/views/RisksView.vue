@@ -1,84 +1,193 @@
+<template>
+  <div class="risks">
+    <div class="header">
+      <h2>风险管理</h2>
+      <el-button type="primary" @click="openCreate" :disabled="!canManage">新建风险</el-button>
+    </div>
+
+    <el-table :data="risks" v-loading="loading" border stripe style="width: 100%">
+      <el-table-column prop="title" label="风险" min-width="200" />
+      <el-table-column prop="description" label="描述" min-width="220" show-overflow-tooltip />
+      <el-table-column label="级别" width="110">
+        <template #default="{ row }">
+          <el-tag :type="levelType(row.level)">{{ levelLabel(row.level) }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="状态" width="110">
+        <template #default="{ row }">
+          <el-tag :type="statusType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="ownerName" label="负责人" width="120" />
+      <el-table-column label="截止日" width="130">
+        <template #default="{ row }">{{ row.dueDate || '-' }}</template>
+      </el-table-column>
+      <el-table-column label="操作" width="160" fixed="right">
+        <template #default="{ row }">
+          <el-button size="small" @click="openEdit(row)">编辑</el-button>
+          <el-button size="small" type="danger" :disabled="!canAdmin" @click="doDelete(row)">删除</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-dialog v-model="dialogVisible" :title="editing ? '编辑风险' : '新建风险'" width="520px">
+      <el-form :model="form" label-width="80px">
+        <el-form-item label="标题" required>
+          <el-input v-model="form.title" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="form.description" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="级别">
+          <el-select v-model="form.level">
+            <el-option label="低" value="LOW" />
+            <el-option label="中" value="MEDIUM" />
+            <el-option label="高" value="HIGH" />
+            <el-option label="严重" value="CRITICAL" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="form.status">
+            <el-option label="待处理" value="OPEN" />
+            <el-option label="缓解中" value="MITIGATING" />
+            <el-option label="已关闭" value="CLOSED" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="负责人">
+          <el-select v-model="form.ownerId" filterable clearable placeholder="选择成员">
+            <el-option v-for="m in members" :key="m.userId" :label="m.displayName || m.username" :value="m.userId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="截止日">
+          <el-date-picker v-model="form.dueDate" type="date" value-format="YYYY-MM-DD" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submit">确定</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
 <script setup lang="ts">
-import { ref } from 'vue'
-import { ShieldAlert } from 'lucide-vue-next'
-import { ElMessage } from 'element-plus'
-import SimpleListView from '@/components/SimpleListView.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
-import type { StatusStyle } from '@/components/StatusBadge.vue'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  listRisks,
+  createRisk,
+  updateRisk,
+  deleteRisk,
+  listProjectMembers
+} from '@/api'
+import type { RiskVO, ProjectMember } from '@/api/types'
+import { useProjectPermission } from '@/composables/useProjectPermission'
 
-interface Risk {
-  id: string
+const route = useRoute()
+const projectId = route.params.projectId as string
+
+const risks = ref<RiskVO[]>([])
+const members = ref<ProjectMember[]>([])
+const loading = ref(false)
+const dialogVisible = ref(false)
+const editing = ref<RiskVO | null>(null)
+const form = ref<{
   title: string
-  level: 'high' | 'medium' | 'low'
-  status: 'open' | 'mitigating' | 'closed'
-  owner: string
+  description: string
+  level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  status: 'OPEN' | 'MITIGATING' | 'CLOSED'
+  ownerId: string
   dueDate: string
+}>({ title: '', description: '', level: 'MEDIUM', status: 'OPEN', ownerId: '', dueDate: '' })
+
+const { canWrite, canAdmin, refresh } = useProjectPermission(() => projectId)
+const canManage = computed(() => canWrite.value)
+
+async function load() {
+  loading.value = true
+  try {
+    risks.value = await listRisks(projectId)
+  } catch (e: any) {
+    ElMessage.error(e?.msg || '加载风险失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-const keyword = ref('')
-const risks = ref<Risk[]>([
-  { id: '1', title: '第三方接口稳定性风险', level: 'high', status: 'open', owner: '张三', dueDate: '2026-09-01' },
-  { id: '2', title: '数据库性能瓶颈', level: 'medium', status: 'mitigating', owner: '李四', dueDate: '2026-09-15' },
-  { id: '3', title: '人员流失知识转移', level: 'low', status: 'closed', owner: '王五', dueDate: '2026-08-10' }
-])
-
-const LEVEL_STYLE: Record<string, StatusStyle> = {
-  high: { label: '高', color: '#DC3545', bg: 'rgba(220,53,69,0.1)' },
-  medium: { label: '中', color: '#FFC107', bg: 'rgba(255,193,7,0.1)' },
-  low: { label: '低', color: '#28A745', bg: 'rgba(40,167,69,0.1)' }
+function levelType(l: string) {
+  return l === 'CRITICAL' ? 'danger' : l === 'HIGH' ? 'warning' : l === 'MEDIUM' ? 'primary' : 'info'
+}
+function levelLabel(l: string) {
+  return l === 'CRITICAL' ? '严重' : l === 'HIGH' ? '高' : l === 'MEDIUM' ? '中' : '低'
+}
+function statusType(s: string) {
+  return s === 'CLOSED' ? 'info' : s === 'MITIGATING' ? 'warning' : 'danger'
+}
+function statusLabel(s: string) {
+  return s === 'CLOSED' ? '已关闭' : s === 'MITIGATING' ? '缓解中' : '待处理'
 }
 
-const STATUS_STYLE: Record<string, StatusStyle> = {
-  open: { label: '待处理', color: '#DC3545', bg: 'rgba(220,53,69,0.1)' },
-  mitigating: { label: '处理中', color: '#1677FF', bg: 'rgba(22,119,255,0.1)' },
-  closed: { label: '已关闭', color: '#28A745', bg: 'rgba(40,167,69,0.1)' }
+function openCreate() {
+  editing.value = null
+  form.value = { title: '', description: '', level: 'MEDIUM', status: 'OPEN', ownerId: '', dueDate: '' }
+  dialogVisible.value = true
+}
+function openEdit(row: RiskVO) {
+  editing.value = row
+  form.value = {
+    title: row.title,
+    description: row.description || '',
+    level: row.level,
+    status: row.status,
+    ownerId: row.ownerId || '',
+    dueDate: row.dueDate || ''
+  }
+  dialogVisible.value = true
+}
+async function submit() {
+  if (!form.value.title.trim()) {
+    ElMessage.warning('请输入风险标题')
+    return
+  }
+  try {
+    const payload = { ...form.value }
+    if (editing.value) {
+      await updateRisk(projectId, editing.value.id, payload)
+      ElMessage.success('已更新')
+    } else {
+      await createRisk(projectId, payload)
+      ElMessage.success('已创建')
+    }
+    dialogVisible.value = false
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.msg || '保存失败')
+  }
+}
+async function doDelete(row: RiskVO) {
+  try {
+    await ElMessageBox.confirm(`确认删除风险「${row.title}」？`, '提示', { type: 'warning' })
+    await deleteRisk(projectId, row.id)
+    ElMessage.success('已删除')
+    await load()
+  } catch (e: any) {
+    if (e !== 'cancel') ElMessage.error(e?.msg || '删除失败')
+  }
 }
 
-const filteredRisks = ref(risks.value)
-
-function onSearch() {
-  filteredRisks.value = risks.value.filter((r) =>
-    !keyword.value || r.title.includes(keyword.value)
-  )
-}
-
-function onCreate() {
-  ElMessage.info('新建风险功能开发中')
-}
+onMounted(async () => {
+  await refresh()
+  try {
+    members.value = await listProjectMembers(projectId)
+  } catch {
+    members.value = []
+  }
+  await load()
+})
 </script>
 
-<template>
-  <SimpleListView
-    title="风险"
-    :icon="ShieldAlert"
-    search-placeholder="搜索风险…"
-    empty-text="暂无风险"
-    create-label="新建风险"
-    :show-refresh="false"
-    v-model:keyword="keyword"
-    @search="onSearch"
-    @create="onCreate"
-  >
-    <table v-if="filteredRisks.length" class="w-full text-sm">
-      <thead class="border-b border-[#E9ECEF] text-xs text-ink-400">
-        <tr>
-          <th class="px-4 py-3 text-left font-medium">风险描述</th>
-          <th class="px-4 py-3 text-left font-medium">风险等级</th>
-          <th class="px-4 py-3 text-left font-medium">状态</th>
-          <th class="px-4 py-3 text-left font-medium">负责人</th>
-          <th class="px-4 py-3 text-left font-medium">截止日期</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="r in filteredRisks" :key="r.id" class="border-b border-[#E9ECEF] last:border-0 transition hover:bg-surface-muted/50">
-          <td class="px-4 py-3 text-ink-900">{{ r.title }}</td>
-          <td class="px-4 py-3"><StatusBadge :status="r.level" :dict="LEVEL_STYLE" /></td>
-          <td class="px-4 py-3"><StatusBadge :status="r.status" :dict="STATUS_STYLE" /></td>
-          <td class="px-4 py-3 text-ink-600">{{ r.owner }}</td>
-          <td class="px-4 py-3 text-ink-400">{{ r.dueDate }}</td>
-        </tr>
-      </tbody>
-    </table>
-    <div v-else class="py-20 text-center text-sm text-ink-400">暂无风险</div>
-  </SimpleListView>
-</template>
+<style scoped>
+.risks { padding: 20px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+</style>

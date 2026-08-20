@@ -1,5 +1,5 @@
 import http, { req, type R } from './request'
-import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest } from './types'
+import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest, SprintVO, RiskVO, RbacRole, RbacMenu } from './types'
 
 // ---- user ----
 export function login(username: string, password: string) {
@@ -109,6 +109,7 @@ export function createIssue(payload: {
   projectId: string
   issueTypeId?: string
   statusId: string
+  sprintId?: string
   title: string
   description?: string
   priority?: string
@@ -138,6 +139,7 @@ export interface UpdateIssuePayload {
   priority?: string
   issueTypeId?: string
   statusId?: string
+  sprintId?: string
   assigneeId?: string
   verifierId?: string
   dueDate?: string
@@ -276,4 +278,82 @@ export function deleteAnnouncement(projectId: string, id: string) {
 // ---- project activities ----
 export function listProjectActivities(projectId: string, limit = 20) {
   return req<ProjectActivityVO[]>(http.get(`/v1/projects/${projectId}/activities`, { params: { limit } }))
+}
+
+// ---- sprints (迭代) ----
+export function listSprints(projectId: string) {
+  return req<SprintVO[]>(http.get(`/v1/projects/${projectId}/sprints`))
+}
+export function getSprint(projectId: string, id: string) {
+  return req<SprintVO>(http.get(`/v1/projects/${projectId}/sprints/${id}`))
+}
+export function createSprint(projectId: string, payload: { name: string; goal?: string; startDate?: string; endDate?: string }) {
+  return req<SprintVO>(http.post(`/v1/projects/${projectId}/sprints`, payload))
+}
+export function updateSprint(projectId: string, id: string, payload: { name?: string; goal?: string; startDate?: string; endDate?: string }) {
+  return req<SprintVO>(http.put(`/v1/projects/${projectId}/sprints/${id}`, payload))
+}
+export function deleteSprint(projectId: string, id: string) {
+  return req<void>(http.delete(`/v1/projects/${projectId}/sprints/${id}`))
+}
+export function startSprint(projectId: string, id: string) {
+  return req<SprintVO>(http.post(`/v1/projects/${projectId}/sprints/${id}/start`))
+}
+export function completeSprint(projectId: string, id: string) {
+  return req<SprintVO>(http.post(`/v1/projects/${projectId}/sprints/${id}/complete`))
+}
+
+// ---- risks (风险) ----
+export function listRisks(projectId: string) {
+  return req<RiskVO[]>(http.get(`/v1/projects/${projectId}/risks`))
+}
+export function getRisk(projectId: string, id: string) {
+  return req<RiskVO>(http.get(`/v1/projects/${projectId}/risks/${id}`))
+}
+export function createRisk(projectId: string, payload: { title: string; description?: string; level?: string; status?: string; ownerId?: string; dueDate?: string }) {
+  return req<RiskVO>(http.post(`/v1/projects/${projectId}/risks`, payload))
+}
+export function updateRisk(projectId: string, id: string, payload: { title?: string; description?: string; level?: string; status?: string; ownerId?: string; dueDate?: string }) {
+  return req<RiskVO>(http.put(`/v1/projects/${projectId}/risks/${id}`, payload))
+}
+export function deleteRisk(projectId: string, id: string) {
+  return req<void>(http.delete(`/v1/projects/${projectId}/risks/${id}`))
+}
+
+// ---- RBAC 全局管理 (系统管理员) ----
+export function listRoles() {
+  return req<RbacRole[]>(http.get(`/v1/admin/roles`))
+}
+export function createRole(payload: { code: string; name: string; description?: string; sortOrder?: number }) {
+  return req<RbacRole>(http.post(`/v1/admin/roles`, payload))
+}
+export function updateRole(id: string, payload: { code?: string; name?: string; description?: string; sortOrder?: number }) {
+  return req<RbacRole>(http.put(`/v1/admin/roles/${id}`, payload))
+}
+export function deleteRole(id: string) {
+  return req<void>(http.delete(`/v1/admin/roles/${id}`))
+}
+export function listMenus() {
+  return req<RbacMenu[]>(http.get(`/v1/admin/menus`))
+}
+export function createMenu(payload: { code: string; name: string; parentId?: string; type?: string; sortOrder?: number }) {
+  return req<RbacMenu>(http.post(`/v1/admin/menus`, payload))
+}
+export function updateMenu(id: string, payload: { code?: string; name?: string; parentId?: string; type?: string; sortOrder?: number }) {
+  return req<RbacMenu>(http.put(`/v1/admin/menus/${id}`, payload))
+}
+export function deleteMenu(id: string) {
+  return req<void>(http.delete(`/v1/admin/menus/${id}`))
+}
+export function listRoleMenus(roleId: string) {
+  return req<string[]>(http.get(`/v1/admin/roles/${roleId}/menus`))
+}
+export function assignRoleMenus(roleId: string, menuIds: string[]) {
+  return req<void>(http.post(`/v1/admin/roles/${roleId}/menus`, menuIds))
+}
+export function listUserRoles(userId: string, projectId: string) {
+  return req<string[]>(http.get(`/v1/admin/users/${userId}/roles`, { params: { projectId } }))
+}
+export function assignUserRoles(userId: string, projectId: string, roleIds: string[]) {
+  return req<void>(http.post(`/v1/admin/users/${userId}/roles?projectId=${projectId}`, roleIds))
 }

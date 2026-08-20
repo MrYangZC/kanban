@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { getMyProfile, updateMyProfile, changeMyPassword, uploadImage } from '@/api'
 import { useUserStore } from '@/stores/user'
 import type { ProfileVO } from '@/api/types'
 import { ElMessage } from 'element-plus'
-import { User, Mail, Lock, Save, ArrowLeft, Camera, ShieldCheck, Clock, BadgeCheck } from 'lucide-vue-next'
+import { User, Lock, Save, Camera, ShieldCheck, Clock } from 'lucide-vue-next'
 
-const router = useRouter()
 const userStore = useUserStore()
 
 const profile = ref<ProfileVO | null>(null)
@@ -140,220 +138,145 @@ onMounted(loadProfile)
 
 <template>
   <div class="page-container">
-    <div class="mx-auto max-w-5xl">
-      <!-- 顶部标题 -->
-      <div class="mb-6 flex items-center gap-3">
-        <button
-          class="flex h-8 w-8 items-center justify-center rounded-md text-ink-regular transition hover:bg-surface-hover hover:text-primary"
-          title="返回"
-          @click="router.back()"
-        >
-          <ArrowLeft :size="18" />
-        </button>
-        <User :size="20" class="text-brand" />
-        <h1 class="text-lg font-semibold text-ink-900">个人中心</h1>
+    <!-- 标题区（与用户管理页一致） -->
+    <div class="mb-6 flex items-center justify-between">
+      <div>
+        <h1 class="page-title">个人中心</h1>
+        <p class="page-subtitle">管理个人信息、头像与登录密码</p>
+      </div>
+    </div>
+
+    <!-- 加载中 -->
+    <div v-if="loading" class="card flex items-center gap-3 p-12 text-sm text-ink-secondary">
+      <div class="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-500"></div>
+      <span>加载中…</span>
+    </div>
+
+    <div v-else-if="profile" class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      <!-- 左栏：账号概览 -->
+      <div class="card p-6">
+        <div class="flex flex-col items-center text-center">
+          <div class="relative">
+            <div
+              v-if="avatarDisplay"
+              class="h-20 w-20 overflow-hidden rounded-full shadow-card"
+            >
+              <img :src="avatarDisplay" :alt="profile.displayName" class="h-full w-full object-cover" />
+            </div>
+            <div
+              v-else
+              class="flex h-20 w-20 items-center justify-center rounded-full bg-primary text-2xl font-medium text-white shadow-card"
+            >
+              {{ initial }}
+            </div>
+            <button
+              class="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-surface-light text-ink-secondary shadow-sm transition hover:text-primary"
+              title="更换头像"
+              :disabled="uploadingAvatar"
+              @click="triggerAvatarUpload"
+            >
+              <Camera :size="14" />
+            </button>
+            <input
+              ref="avatarInput"
+              type="file"
+              accept="image/*"
+              class="hidden"
+              @change="onAvatarChange"
+            />
+          </div>
+          <div class="mt-4 text-base font-semibold text-ink">{{ profile.displayName }}</div>
+          <div class="mt-0.5 text-sm text-ink-secondary">@{{ profile.username }}</div>
+          <div class="mt-3">
+            <span
+              class="tag-status"
+              :class="profile.enabled ? 'bg-success-light text-success' : 'bg-surface-hover text-ink-secondary'"
+            >
+              <span class="h-1.5 w-1.5 rounded-full" :class="profile.enabled ? 'bg-success' : 'bg-ink-placeholder'" />
+              {{ profile.enabled ? '正常' : '已禁用' }}
+            </span>
+          </div>
+        </div>
+
+        <div class="mt-6 border-t border-line-lighter pt-4">
+          <div class="space-y-3 text-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-ink-secondary">用户名</span>
+              <span class="font-medium text-ink">{{ profile.username }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-ink-secondary">邮箱</span>
+              <span class="font-medium text-ink">{{ profile.email || '—' }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="flex items-center gap-1 text-ink-secondary">
+                <Clock :size="13" /> 注册时间
+              </span>
+              <span class="font-medium text-ink">{{ fmtTime(profile.createdAt) }}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- 加载中 -->
-      <div v-if="loading" class="rounded-lg border border-[#E9ECEF] bg-white p-12 text-center text-sm text-ink-400">
-        加载中…
-      </div>
-
-      <template v-else-if="profile">
-        <!-- 头部卡片：头像 + 概览 -->
-        <div class="mb-4 overflow-hidden rounded-lg border border-[#E9ECEF] bg-white shadow-sm">
-          <div class="h-24 bg-gradient-to-r from-primary-light to-brand"></div>
-          <div class="flex items-end gap-4 px-6 pb-5">
-            <div class="relative -mt-12">
-              <div
-                v-if="avatarDisplay"
-                class="h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-white shadow-sm"
-              >
-                <img :src="avatarDisplay" :alt="profile.displayName" class="h-full w-full object-cover" />
-              </div>
-              <div
-                v-else
-                class="flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-primary text-3xl font-medium text-white shadow-sm"
-              >
-                {{ initial }}
-              </div>
-              <button
-                class="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full border border-[#E5E6EB] bg-white text-ink-secondary shadow-sm transition hover:text-primary"
-                title="更换头像"
-                :disabled="uploadingAvatar"
-                @click="triggerAvatarUpload"
-              >
-                <Camera :size="14" />
+      <!-- 右栏：编辑表单 -->
+      <div class="space-y-5 lg:col-span-2">
+        <!-- 基本信息 -->
+        <div class="card p-6">
+          <div class="mb-5 flex items-center gap-2">
+            <User :size="18" class="text-primary-500" />
+            <h2 class="text-sm font-semibold text-ink">基本信息</h2>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="label-base">显示名</label>
+              <input v-model="form.displayName" class="input-base" placeholder="显示名" />
+            </div>
+            <div>
+              <label class="label-base">邮箱</label>
+              <input v-model="form.email" type="email" class="input-base" placeholder="name@example.com" />
+            </div>
+            <div>
+              <label class="label-base">头像 URL</label>
+              <input v-model="form.avatarUrl" class="input-base" placeholder="留空则使用首字母头像" />
+              <p class="mt-1.5 text-xs text-ink-secondary">点击左侧相机图标可直接上传图片</p>
+            </div>
+            <div class="flex justify-end">
+              <button class="btn-primary" :disabled="savingProfile" @click="onSaveProfile">
+                <Save :size="15" />
+                <span>{{ savingProfile ? '保存中…' : '保存' }}</span>
               </button>
-              <input
-                ref="avatarInput"
-                type="file"
-                accept="image/*"
-                class="hidden"
-                @change="onAvatarChange"
-              />
-            </div>
-            <div class="flex-1 pb-1">
-              <div class="flex items-center gap-2">
-                <span class="text-lg font-semibold text-ink-900">{{ profile.displayName }}</span>
-                <span
-                  v-if="profile.enabled"
-                  class="inline-flex items-center gap-1 rounded-full bg-success-light px-2 py-0.5 text-xs font-medium text-success"
-                >
-                  <BadgeCheck :size="12" /> 正常
-                </span>
-                <span
-                  v-else
-                  class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-ink-secondary"
-                >
-                  已禁用
-                </span>
-              </div>
-              <div class="mt-0.5 text-sm text-ink-400">@{{ profile.username }}</div>
             </div>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <!-- 基本信息编辑 -->
-          <div class="rounded-lg border border-[#E9ECEF] bg-white p-5 shadow-sm">
-            <div class="mb-4 flex items-center gap-2 text-sm font-medium text-ink-900">
-              <User :size="16" class="text-brand" /> 基本信息
-            </div>
-            <div class="space-y-4">
-              <div>
-                <label class="mb-1 block text-sm text-ink-400">显示名</label>
-                <input
-                  v-model="form.displayName"
-                  class="w-full rounded-md border border-[#E5E6EB] px-3 py-2 text-sm outline-none focus:border-brand"
-                  placeholder="显示名"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-sm text-ink-400">邮箱</label>
-                <div class="relative">
-                  <Mail :size="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-secondary" />
-                  <input
-                    v-model="form.email"
-                    type="email"
-                    class="w-full rounded-md border border-[#E5E6EB] py-2 pl-9 pr-3 text-sm outline-none focus:border-brand"
-                    placeholder="name@example.com"
-                  />
-                </div>
-              </div>
-              <div>
-                <label class="mb-1 block text-sm text-ink-400">头像 URL</label>
-                <input
-                  v-model="form.avatarUrl"
-                  class="w-full rounded-md border border-[#E5E6EB] px-3 py-2 text-sm outline-none focus:border-brand"
-                  placeholder="留空则使用首字母头像"
-                />
-                <div class="mt-1 text-xs text-ink-secondary">点击左上角相机图标可直接上传图片</div>
-              </div>
-              <div class="flex justify-end">
-                <button
-                  class="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-dark disabled:opacity-50"
-                  :disabled="savingProfile"
-                  @click="onSaveProfile"
-                >
-                  <Save :size="14" />
-                  {{ savingProfile ? '保存中…' : '保存' }}
-                </button>
-              </div>
-            </div>
+        <!-- 修改密码 -->
+        <div class="card p-6">
+          <div class="mb-5 flex items-center gap-2">
+            <ShieldCheck :size="18" class="text-primary-500" />
+            <h2 class="text-sm font-semibold text-ink">修改密码</h2>
           </div>
-
-          <!-- 修改密码 -->
-          <div class="rounded-lg border border-[#E9ECEF] bg-white p-5 shadow-sm">
-            <div class="mb-4 flex items-center gap-2 text-sm font-medium text-ink-900">
-              <ShieldCheck :size="16" class="text-brand" /> 修改密码
+          <div class="space-y-4">
+            <div>
+              <label class="label-base">原密码</label>
+              <input v-model="pwdForm.oldPassword" type="password" class="input-base" placeholder="请输入原密码" autocomplete="current-password" />
             </div>
-            <div class="space-y-4">
-              <div>
-                <label class="mb-1 block text-sm text-ink-400">原密码</label>
-                <div class="relative">
-                  <Lock :size="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-secondary" />
-                  <input
-                    v-model="pwdForm.oldPassword"
-                    type="password"
-                    class="w-full rounded-md border border-[#E5E6EB] py-2 pl-9 pr-3 text-sm outline-none focus:border-brand"
-                    placeholder="请输入原密码"
-                    autocomplete="current-password"
-                  />
-                </div>
-              </div>
-              <div>
-                <label class="mb-1 block text-sm text-ink-400">新密码</label>
-                <div class="relative">
-                  <Lock :size="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-secondary" />
-                  <input
-                    v-model="pwdForm.newPassword"
-                    type="password"
-                    class="w-full rounded-md border border-[#E5E6EB] py-2 pl-9 pr-3 text-sm outline-none focus:border-brand"
-                    placeholder="至少 6 位"
-                    autocomplete="new-password"
-                  />
-                </div>
-              </div>
-              <div>
-                <label class="mb-1 block text-sm text-ink-400">确认新密码</label>
-                <div class="relative">
-                  <Lock :size="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-secondary" />
-                  <input
-                    v-model="pwdForm.confirmPassword"
-                    type="password"
-                    class="w-full rounded-md border border-[#E5E6EB] py-2 pl-9 pr-3 text-sm outline-none focus:border-brand"
-                    placeholder="再次输入新密码"
-                    autocomplete="new-password"
-                  />
-                </div>
-              </div>
-              <div class="flex justify-end">
-                <button
-                  class="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-dark disabled:opacity-50"
-                  :disabled="savingPwd"
-                  @click="onChangePassword"
-                >
-                  <Lock :size="14" />
-                  {{ savingPwd ? '提交中…' : '修改密码' }}
-                </button>
-              </div>
+            <div>
+              <label class="label-base">新密码</label>
+              <input v-model="pwdForm.newPassword" type="password" class="input-base" placeholder="至少 6 位" autocomplete="new-password" />
             </div>
-          </div>
-
-          <!-- 账号信息（只读） -->
-          <div class="rounded-lg border border-[#E9ECEF] bg-white p-5 shadow-sm lg:col-span-2">
-            <div class="mb-4 flex items-center gap-2 text-sm font-medium text-ink-900">
-              <BadgeCheck :size="16" class="text-brand" /> 账号信息
+            <div>
+              <label class="label-base">确认新密码</label>
+              <input v-model="pwdForm.confirmPassword" type="password" class="input-base" placeholder="再次输入新密码" autocomplete="new-password" />
             </div>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div>
-                <div class="text-xs text-ink-400">用户名</div>
-                <div class="mt-1 text-sm text-ink-900">{{ profile.username }}</div>
-              </div>
-              <div>
-                <div class="text-xs text-ink-400">账号状态</div>
-                <div class="mt-1 text-sm">
-                  <span
-                    v-if="profile.enabled"
-                    class="inline-flex items-center gap-1 rounded-full bg-success-light px-2 py-0.5 text-xs font-medium text-success"
-                  >正常</span>
-                  <span
-                    v-else
-                    class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-ink-secondary"
-                  >已禁用</span>
-                </div>
-              </div>
-              <div>
-                <div class="flex items-center gap-1 text-xs text-ink-400">
-                  <Clock :size="12" /> 注册时间
-                </div>
-                <div class="mt-1 text-sm text-ink-900">{{ fmtTime(profile.createdAt) }}</div>
-              </div>
+            <div class="flex justify-end">
+              <button class="btn-primary" :disabled="savingPwd" @click="onChangePassword">
+                <Lock :size="15" />
+                <span>{{ savingPwd ? '提交中…' : '修改密码' }}</span>
+              </button>
             </div>
           </div>
         </div>
-      </template>
+      </div>
     </div>
   </div>
 </template>

@@ -8,6 +8,7 @@ const router = createRouter({
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },
     { path: '/projects', name: 'projects', component: () => import('@/views/ProjectListView.vue') },
     { path: '/users', name: 'users', component: () => import('@/views/UserManageView.vue') },
+    { path: '/rbac', name: 'rbac', component: () => import('@/views/RbacView.vue') },
     { path: '/profile', name: 'profile', component: () => import('@/views/ProfileView.vue') },
     {
       path: '/projects/:projectId',

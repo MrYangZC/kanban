@@ -6,7 +6,7 @@ import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   LayoutGrid, ChevronDown, Search, Plus, Bell,
-  FolderKanban, UserCog, LogOut, User, X
+  FolderKanban, UserCog, LogOut, User, X, Shield
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -25,7 +25,8 @@ const notificationCount = ref(3)
 
 const navItems = [
   { path: '/projects', label: '项目', icon: FolderKanban },
-  { path: '/users', label: '用户管理', icon: UserCog }
+  { path: '/users', label: '用户管理', icon: UserCog },
+  { path: '/rbac', label: '权限管理', icon: Shield }
 ]
 
 function isActive(path: string): boolean {

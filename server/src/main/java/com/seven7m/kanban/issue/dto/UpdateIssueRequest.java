@@ -15,6 +15,7 @@ public class UpdateIssueRequest {
     private UUID issueTypeId;
     private UUID assigneeId;
     private UUID verifierId;
+    private UUID sprintId;
     private LocalDateTime dueDate;
     private String severity;
     private String module;

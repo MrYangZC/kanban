@@ -25,4 +25,16 @@ public interface UserRoleMapper extends BaseMapper<UserRole> {
             """)
     List<String> selectRoleCodesByProjectAndUser(@Param("projectId") UUID projectId,
                                                  @Param("userId") UUID userId);
+
+    /**
+     * 当前用户是否在任一项目拥有 OWNER / ADMIN 角色（即是否系统管理员）。
+     */
+    @Select("""
+            SELECT COUNT(1)
+            FROM user_role ur
+            JOIN role r ON r.id = ur.role_id
+            WHERE ur.user_id = #{userId}
+              AND r.code IN ('OWNER', 'ADMIN')
+            """)
+    int countAdminProjects(@Param("userId") UUID userId);
 }

@@ -1,75 +1,184 @@
-<script setup lang="ts">
-import { ref } from 'vue'
-import { Plus, Repeat, Calendar, MoreHorizontal } from 'lucide-vue-next'
-import { ElMessage } from 'element-plus'
-import ProgressBar from '@/components/ProgressBar.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
-import type { StatusStyle } from '@/components/StatusBadge.vue'
-
-interface Iteration {
-  id: string
-  name: string
-  startDate: string
-  endDate: string
-  status: 'planning' | 'active' | 'closed'
-  taskCount: number
-  doneCount: number
-}
-
-const iterations = ref<Iteration[]>([
-  { id: '1', name: 'Sprint 1', startDate: '2026-08-01', endDate: '2026-08-14', status: 'closed', taskCount: 20, doneCount: 18 },
-  { id: '2', name: 'Sprint 2', startDate: '2026-08-15', endDate: '2026-08-28', status: 'active', taskCount: 15, doneCount: 8 },
-  { id: '3', name: 'Sprint 3', startDate: '2026-08-29', endDate: '2026-09-11', status: 'planning', taskCount: 0, doneCount: 0 }
-])
-
-const STATUS_STYLE: Record<string, StatusStyle> = {
-  planning: { label: '计划中', color: '#8F959E', bg: 'rgba(143,149,158,0.1)' },
-  active: { label: '进行中', color: '#1677FF', bg: 'rgba(22,119,255,0.1)' },
-  closed: { label: '已关闭', color: '#28A745', bg: 'rgba(40,167,69,0.1)' }
-}
-
-function onCreate() {
-  ElMessage.info('新建迭代功能开发中')
-}
-</script>
-
 <template>
-  <div class="h-full overflow-auto p-6">
-    <div class="mb-4 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <Repeat :size="20" class="text-brand" />
-        <h1 class="text-lg font-semibold text-ink-900">迭代</h1>
-      </div>
-      <button class="flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white transition hover:bg-brand-dark" @click="onCreate">
-        <Plus :size="14" /> 新建迭代
-      </button>
+  <div class="iterations">
+    <div class="header">
+      <h2>迭代管理</h2>
+      <el-button type="primary" @click="openCreate" :disabled="!canManage">新建迭代</el-button>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <div v-for="it in iterations" :key="it.id" class="rounded-lg border border-[#E9ECEF] bg-white p-4 shadow-sm transition hover:shadow-md">
-        <div class="flex items-center justify-between">
-          <span class="text-base font-medium text-ink-900">{{ it.name }}</span>
-          <StatusBadge :status="it.status" :dict="STATUS_STYLE" />
-        </div>
-        <div class="mt-2 flex items-center gap-2 text-xs text-ink-400">
-          <Calendar :size="12" />
-          <span>{{ it.startDate }} ~ {{ it.endDate }}</span>
-        </div>
-        <div class="mt-3">
-          <ProgressBar
-            :value="it.doneCount"
-            :max="it.taskCount"
-            height="sm"
-            show-label
-            label="任务进度"
-          />
-        </div>
-        <div class="mt-3 flex justify-end">
-          <button class="text-ink-400 transition hover:text-ink-900" @click="ElMessage.info('查看迭代详情功能开发中')">
-            <MoreHorizontal :size="16" />
-          </button>
-        </div>
-      </div>
-    </div>
+    <el-table :data="sprints" v-loading="loading" border stripe style="width: 100%">
+      <el-table-column prop="name" label="名称" min-width="160" />
+      <el-table-column prop="goal" label="目标" min-width="200" show-overflow-tooltip />
+      <el-table-column label="状态" width="120">
+        <template #default="{ row }">
+          <el-tag :type="statusType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="起止日期" width="220">
+        <template #default="{ row }">
+          {{ row.startDate || '-' }} ~ {{ row.endDate || '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="creatorName" label="创建人" width="120" />
+      <el-table-column label="操作" width="260" fixed="right">
+        <template #default="{ row }">
+          <el-button size="small" @click="openEdit(row)">编辑</el-button>
+          <el-button
+            v-if="row.status === 'PLANNED'"
+            size="small"
+            type="success"
+            :disabled="!canManage"
+            @click="doStart(row)"
+          >开始</el-button>
+          <el-button
+            v-if="row.status === 'ACTIVE'"
+            size="small"
+            type="warning"
+            :disabled="!canManage"
+            @click="doComplete(row)"
+          >完成</el-button>
+          <el-button size="small" type="danger" :disabled="!canManage" @click="doDelete(row)">删除</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-dialog v-model="dialogVisible" :title="editing ? '编辑迭代' : '新建迭代'" width="520px">
+      <el-form :model="form" label-width="80px">
+        <el-form-item label="名称" required>
+          <el-input v-model="form.name" placeholder="如 Sprint 1" />
+        </el-form-item>
+        <el-form-item label="目标">
+          <el-input v-model="form.goal" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="开始日期">
+          <el-date-picker v-model="form.startDate" type="date" value-format="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item label="结束日期">
+          <el-date-picker v-model="form.endDate" type="date" value-format="YYYY-MM-DD" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submit">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
+
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  listSprints,
+  createSprint,
+  updateSprint,
+  deleteSprint,
+  startSprint,
+  completeSprint
+} from '@/api'
+import type { SprintVO } from '@/api/types'
+import { useProjectPermission } from '@/composables/useProjectPermission'
+
+const route = useRoute()
+const projectId = route.params.projectId as string
+
+const sprints = ref<SprintVO[]>([])
+const loading = ref(false)
+const dialogVisible = ref(false)
+const editing = ref<SprintVO | null>(null)
+const form = ref({ name: '', goal: '', startDate: '', endDate: '' })
+
+const { canWrite, refresh } = useProjectPermission(() => projectId)
+const canManage = computed(() => canWrite.value)
+
+async function load() {
+  loading.value = true
+  try {
+    sprints.value = await listSprints(projectId)
+  } catch (e: any) {
+    ElMessage.error(e?.msg || '加载迭代失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+function statusType(s: string) {
+  return s === 'ACTIVE' ? 'success' : s === 'COMPLETED' ? 'info' : 'warning'
+}
+function statusLabel(s: string) {
+  return s === 'ACTIVE' ? '进行中' : s === 'COMPLETED' ? '已完成' : '规划中'
+}
+
+function openCreate() {
+  editing.value = null
+  form.value = { name: '', goal: '', startDate: '', endDate: '' }
+  dialogVisible.value = true
+}
+function openEdit(row: SprintVO) {
+  editing.value = row
+  form.value = {
+    name: row.name,
+    goal: row.goal || '',
+    startDate: row.startDate || '',
+    endDate: row.endDate || ''
+  }
+  dialogVisible.value = true
+}
+async function submit() {
+  if (!form.value.name.trim()) {
+    ElMessage.warning('请输入迭代名称')
+    return
+  }
+  try {
+    if (editing.value) {
+      await updateSprint(projectId, editing.value.id, { ...form.value })
+      ElMessage.success('已更新')
+    } else {
+      await createSprint(projectId, { ...form.value })
+      ElMessage.success('已创建')
+    }
+    dialogVisible.value = false
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.msg || '保存失败')
+  }
+}
+async function doStart(row: SprintVO) {
+  try {
+    await startSprint(projectId, row.id)
+    ElMessage.success('迭代已开始')
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.msg || '操作失败')
+  }
+}
+async function doComplete(row: SprintVO) {
+  try {
+    await completeSprint(projectId, row.id)
+    ElMessage.success('迭代已完成')
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.msg || '操作失败')
+  }
+}
+async function doDelete(row: SprintVO) {
+  try {
+    await ElMessageBox.confirm(`确认删除迭代「${row.name}」？`, '提示', { type: 'warning' })
+    await deleteSprint(projectId, row.id)
+    ElMessage.success('已删除')
+    await load()
+  } catch (e: any) {
+    if (e !== 'cancel') ElMessage.error(e?.msg || '删除失败')
+  }
+}
+
+onMounted(async () => {
+  await refresh()
+  await load()
+})
+</script>
+
+<style scoped>
+.iterations { padding: 20px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+</style>

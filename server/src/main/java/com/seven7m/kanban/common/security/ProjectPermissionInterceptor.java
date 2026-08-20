@@ -69,20 +69,28 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
 
     @SuppressWarnings("unchecked")
     private UUID resolveProjectId(HttpServletRequest request) {
-        // 1. URI 模板变量中的 projectId / id（/v1/projects/{projectId}/... 或 /v1/issues/{id}）
         Object tmpl = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
         if (tmpl instanceof Map<?, ?> vars) {
             UUID pid = asUuid((Map<String, Object>) vars, "projectId");
             if (pid != null) {
                 return pid;
             }
-            UUID issueId = asUuid((Map<String, Object>) vars, "id");
+            UUID issueId = asUuid((Map<String, Object>) vars, "issueId");
             if (issueId != null) {
-                return issueService.getProjectId(issueId);
+                UUID projectId = issueService.getProjectId(issueId);
+                if (projectId != null) {
+                    return projectId;
+                }
+            }
+            UUID id = asUuid((Map<String, Object>) vars, "id");
+            if (id != null) {
+                UUID projectId = issueService.getProjectId(id);
+                if (projectId != null) {
+                    return projectId;
+                }
+                return id;
             }
         }
-        // 2. 从请求体 JSON 解析（如 POST /v1/issues 的 projectId）。
-        //    body 由 CachingRequestBodyFilter 预读并包装为 CachedBodyRequest（可重复读）。
         if ("POST".equalsIgnoreCase(request.getMethod()) && request instanceof CachedBodyRequest cached) {
             try {
                 byte[] buf = cached.getBody();

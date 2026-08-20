@@ -30,6 +30,10 @@ public class IssueController {
     }
 
     @ProjectRole(required = {com.seven7m.kanban.project.ProjectRole.OWNER,
+            com.seven7m.kanban.project.ProjectRole.ADMIN,
+            com.seven7m.kanban.project.ProjectRole.PM,
+            com.seven7m.kanban.project.ProjectRole.DEV,
+            com.seven7m.kanban.project.ProjectRole.QA,
             com.seven7m.kanban.project.ProjectRole.MEMBER,
             com.seven7m.kanban.project.ProjectRole.VIEWER})
     @GetMapping("/{id}")
@@ -59,6 +63,10 @@ public class IssueController {
 
     /** 列表过滤：左侧过滤器 + 顶部筛选，返回分页 IssueVO（只读，项目成员含 VIEWER 可读） */
     @ProjectRole(required = {com.seven7m.kanban.project.ProjectRole.OWNER,
+            com.seven7m.kanban.project.ProjectRole.ADMIN,
+            com.seven7m.kanban.project.ProjectRole.PM,
+            com.seven7m.kanban.project.ProjectRole.DEV,
+            com.seven7m.kanban.project.ProjectRole.QA,
             com.seven7m.kanban.project.ProjectRole.MEMBER,
             com.seven7m.kanban.project.ProjectRole.VIEWER})
     @PostMapping("/filter")
@@ -68,6 +76,10 @@ public class IssueController {
 
     /** 获取某任务的子任务列表（只读） */
     @ProjectRole(required = {com.seven7m.kanban.project.ProjectRole.OWNER,
+            com.seven7m.kanban.project.ProjectRole.ADMIN,
+            com.seven7m.kanban.project.ProjectRole.PM,
+            com.seven7m.kanban.project.ProjectRole.DEV,
+            com.seven7m.kanban.project.ProjectRole.QA,
             com.seven7m.kanban.project.ProjectRole.MEMBER,
             com.seven7m.kanban.project.ProjectRole.VIEWER})
     @GetMapping("/{id}/children")

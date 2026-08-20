@@ -18,6 +18,8 @@ public class CreateIssueRequest {
     @NotNull
     private UUID statusId;
 
+    private UUID sprintId;
+
     @NotBlank
     private String title;
 

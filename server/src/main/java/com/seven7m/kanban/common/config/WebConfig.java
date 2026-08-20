@@ -1,5 +1,6 @@
 package com.seven7m.kanban.common.config;
 
+import com.seven7m.kanban.common.security.AdminAuthInterceptor;
 import com.seven7m.kanban.common.security.ProjectPermissionInterceptor;
 import com.seven7m.kanban.common.security.UserContextInterceptor;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final UserContextInterceptor userContextInterceptor;
     private final ProjectPermissionInterceptor projectPermissionInterceptor;
+    private final AdminAuthInterceptor adminAuthInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -31,7 +33,8 @@ public class WebConfig implements WebMvcConfigurer {
                         "/doc.html",
                         "/actuator/**",
                         "/error",
-                        "/favicon.ico");
+                        "/favicon.ico",
+                        "/v1/users/login");
         // 项目级角色鉴权：在 UserContextInterceptor 之后执行（靠后注册，顺序靠后）
         // 上传接口不绑定具体项目，仅需登录态（UserContextInterceptor 仍生效），因此放行；
         // /uploads/** 不再从登录拦截器排除，保证附件文件访问需要登录态
@@ -42,6 +45,9 @@ public class WebConfig implements WebMvcConfigurer {
                         "/v1/users/**",
                         "/v1/projects",
                         "/v1/upload/**");
+        // 系统管理员后台（RBAC 配置等）：标注 @RequireAdmin 的接口由本拦截器校验管理员身份
+        registry.addInterceptor(adminAuthInterceptor)
+                .addPathPatterns("/v1/admin/**");
     }
 
     @Override

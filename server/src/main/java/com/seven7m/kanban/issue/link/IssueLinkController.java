@@ -18,6 +18,10 @@ public class IssueLinkController {
     private final IssueLinkService linkService;
 
     @ProjectRole(required = {com.seven7m.kanban.project.ProjectRole.OWNER,
+            com.seven7m.kanban.project.ProjectRole.ADMIN,
+            com.seven7m.kanban.project.ProjectRole.PM,
+            com.seven7m.kanban.project.ProjectRole.DEV,
+            com.seven7m.kanban.project.ProjectRole.QA,
             com.seven7m.kanban.project.ProjectRole.MEMBER,
             com.seven7m.kanban.project.ProjectRole.VIEWER})
     @GetMapping("/{issueId}/links")

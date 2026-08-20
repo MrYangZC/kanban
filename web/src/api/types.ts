@@ -66,6 +66,7 @@ export interface Issue {
   issueKey: string
   issueTypeId: string
   statusId: string
+  sprintId: string | null
   title: string
   description: string
   priority: string
@@ -285,4 +286,52 @@ export interface ProjectActivityVO {
   oldValue: string | null
   newValue: string | null
   createdAt: string
+}
+
+// ---- Sprint (迭代) ----
+export interface SprintVO {
+  id: string
+  projectId: string
+  name: string
+  goal?: string
+  status: 'PLANNED' | 'ACTIVE' | 'COMPLETED'
+  startDate?: string
+  endDate?: string
+  creatorName?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+// ---- Risk (风险) ----
+export interface RiskVO {
+  id: string
+  projectId: string
+  title: string
+  description?: string
+  level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  status: 'OPEN' | 'MITIGATING' | 'CLOSED'
+  ownerId?: string
+  ownerName?: string
+  dueDate?: string
+  creatorName?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+// ---- RBAC (全局管理) ----
+export interface RbacRole {
+  id: string
+  code: string
+  name: string
+  description?: string
+  sortOrder?: number
+}
+
+export interface RbacMenu {
+  id: string
+  code: string
+  name: string
+  parentId?: string
+  type: 'MENU' | 'BUTTON'
+  sortOrder?: number
 }

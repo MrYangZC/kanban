@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { filterIssues } from '@/api'
-import type { Issue, PageResult } from '@/api/types'
+import { filterIssues, createIssue, listProjectStatuses } from '@/api'
+import type { Issue, PageResult, IssueStatusVO } from '@/api/types'
 import { FileText } from 'lucide-vue-next'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import SimpleListView from '@/components/SimpleListView.vue'
 
 const route = useRoute()
@@ -13,6 +13,7 @@ const projectId = route.params.projectId as string
 const keyword = ref('')
 const loading = ref(false)
 const list = ref<Issue[]>([])
+const statuses = ref<IssueStatusVO[]>([])
 
 async function load() {
   loading.value = true
@@ -30,11 +31,30 @@ async function load() {
   }
 }
 
-function onCreate() {
-  ElMessage.info('新建需求功能开发中')
+async function onCreate() {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入需求标题', '新建需求', {
+      confirmButtonText: '创建',
+      cancelButtonText: '取消',
+      inputValidator: (v) => (v && v.trim() ? true : '标题不能为空')
+    })
+    await createIssue({
+      projectId,
+      title: value.trim(),
+      statusId: statuses.value[0]?.id || '',
+      priority: 'P2'
+    })
+    ElMessage.success('需求已创建')
+    await load()
+  } catch (e: any) {
+    if (e !== 'cancel') ElMessage.error(e?.msg || '创建失败')
+  }
 }
 
-onMounted(load)
+onMounted(async () => {
+  try { statuses.value = await listProjectStatuses(projectId) } catch { /* ignore */ }
+  await load()
+})
 </script>
 
 <template>

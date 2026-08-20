@@ -81,8 +81,9 @@ public class ProjectService {
         if (p == null || p.getDeleted() != null && p.getDeleted() == 1) {
             throw new ServiceException(404, "项目不存在");
         }
-        if (!isMember(id, UserContext.getUserId())) {
-            throw new ServiceException(403, "无项目访问权限");
+        UUID currentUser = UserContext.getUserId();
+        if (!canWrite(id, currentUser)) {
+            throw new ServiceException(403, "无项目编辑权限");
         }
 
         if (req.getName() != null) {
@@ -125,7 +126,6 @@ public class ProjectService {
             category = ProjectCategoryKey.ALL;
         }
         UUID currentUser = UserContext.getUserId();
-        String memberSubSql = "SELECT project_id FROM project_member WHERE user_id = '" + currentUser + "'";
         String statusFilter = ProjectCategoryKey.ARCHIVED == category
                 ? ProjectStatus.ARCHIVED.name()
                 : ProjectStatus.ACTIVE.name();
@@ -136,14 +136,13 @@ public class ProjectService {
                 .orderByDesc(Project::getCreatedAt);
 
         switch (category) {
-            case MANAGED -> query.inSql(Project::getId,
-                    "SELECT ur.project_id FROM user_role ur " +
+            case MANAGED -> query.apply("id IN (SELECT ur.project_id FROM user_role ur " +
                     "JOIN role r ON r.id = ur.role_id " +
-                    "WHERE ur.user_id = '" + currentUser + "' " +
-                    "AND r.code IN ('" + ProjectRole.OWNER + "','" + ProjectRole.ADMIN + "','" + ProjectRole.PM + "')");
-            case FAVORITED -> query.inSql(Project::getId,
-                    "SELECT project_id FROM project_favorite WHERE user_id = '" + currentUser + "'");
-            default -> query.inSql(Project::getId, memberSubSql);
+                    "WHERE ur.user_id = {0} " +
+                    "AND r.code IN ({1},{2},{3}))",
+                    currentUser, ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.PM);
+            case FAVORITED -> query.apply("id IN (SELECT project_id FROM project_favorite WHERE user_id = {0})", currentUser);
+            default -> query.apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser);
         }
 
         List<Project> projects = projectMapper.selectList(query);
@@ -174,7 +173,6 @@ public class ProjectService {
     public PageResult<ProjectVO> listByFilter(ProjectFilterRequest req) {
         ProjectCategoryKey category = ProjectCategoryKey.of(req.getCategory());
         UUID currentUser = UserContext.getUserId();
-        String memberSubSql = "SELECT project_id FROM project_member WHERE user_id = '" + currentUser + "'";
         String statusFilter = ProjectCategoryKey.ARCHIVED == category
                 ? ProjectStatus.ARCHIVED.name()
                 : ProjectStatus.ACTIVE.name();
@@ -184,14 +182,13 @@ public class ProjectService {
                 .eq(Project::getStatus, statusFilter);
 
         switch (category) {
-            case MANAGED -> query.inSql(Project::getId,
-                    "SELECT ur.project_id FROM user_role ur " +
+            case MANAGED -> query.apply("id IN (SELECT ur.project_id FROM user_role ur " +
                     "JOIN role r ON r.id = ur.role_id " +
-                    "WHERE ur.user_id = '" + currentUser + "' " +
-                    "AND r.code IN ('" + ProjectRole.OWNER + "','" + ProjectRole.ADMIN + "','" + ProjectRole.PM + "')");
-            case FAVORITED -> query.inSql(Project::getId,
-                    "SELECT project_id FROM project_favorite WHERE user_id = '" + currentUser + "'");
-            default -> query.inSql(Project::getId, memberSubSql);
+                    "WHERE ur.user_id = {0} " +
+                    "AND r.code IN ({1},{2},{3}))",
+                    currentUser, ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.PM);
+            case FAVORITED -> query.apply("id IN (SELECT project_id FROM project_favorite WHERE user_id = {0})", currentUser);
+            default -> query.apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser);
         }
 
         if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
@@ -255,31 +252,28 @@ public class ProjectService {
         vo.setAll(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
                 .eq(Project::getDeleted, 0)
                 .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
-                .inSql(Project::getId,
-                        "SELECT project_id FROM project_member WHERE user_id = '" + currentUser + "'")));
+                .apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser)));
 
         vo.setManaged(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
                 .eq(Project::getDeleted, 0)
                 .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
-                .inSql(Project::getId,
-                        "SELECT ur.project_id FROM user_role ur " +
+                .apply("id IN (SELECT ur.project_id FROM user_role ur " +
                         "JOIN role r ON r.id = ur.role_id " +
-                        "WHERE ur.user_id = '" + currentUser + "' " +
-                        "AND r.code IN ('" + ProjectRole.OWNER + "','" + ProjectRole.ADMIN + "','" + ProjectRole.PM + "')")));
+                        "WHERE ur.user_id = {0} " +
+                        "AND r.code IN ({1},{2},{3}))",
+                        currentUser, ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.PM)));
 
         vo.setParticipated(vo.getAll());
 
         vo.setFavorited(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
                 .eq(Project::getDeleted, 0)
                 .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
-                .inSql(Project::getId,
-                        "SELECT project_id FROM project_favorite WHERE user_id = '" + currentUser + "'")));
+                .apply("id IN (SELECT project_id FROM project_favorite WHERE user_id = {0})", currentUser)));
 
         vo.setArchived(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
                 .eq(Project::getDeleted, 0)
                 .eq(Project::getStatus, ProjectStatus.ARCHIVED.name())
-                .inSql(Project::getId,
-                        "SELECT project_id FROM project_member WHERE user_id = '" + currentUser + "'")));
+                .apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser)));
 
         return vo;
     }

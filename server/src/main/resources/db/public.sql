@@ -3618,6 +3618,59 @@ INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000026', 'MEM
 INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000027', 'PROJECT_SETTING', '项目设置', NULL, 'BUTTON', 7, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
 INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000028', 'SPRINT_MANAGE', '迭代管理', NULL, 'BUTTON', 8, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
 INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000029', 'WORKFLOW_MANAGE', '工作流管理', NULL, 'BUTTON', 9, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
+INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000030', 'RISK_MANAGE', '风险管理', NULL, 'BUTTON', 10, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
+INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000040', 'RBAC_MANAGE', '权限管理', NULL, 'MENU', 50, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
+INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000041', 'RBAC_ROLE', '角色管理', '00000000-0000-0000-0000-000000000040', 'MENU', 1, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
+INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000042', 'RBAC_MENU', '菜单与权限', '00000000-0000-0000-0000-000000000040', 'MENU', 2, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
+INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000043', 'RBAC_USER_ROLE', '用户角色', '00000000-0000-0000-0000-000000000040', 'MENU', 3, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
+
+-- ----------------------------
+-- Table structure for sprint
+-- ----------------------------
+DROP TABLE IF EXISTS "public"."sprint";
+CREATE TABLE "public"."sprint" (
+  "id" uuid NOT NULL,
+  "project_id" uuid NOT NULL,
+  "name" varchar(100) COLLATE "pg_catalog"."default" NOT NULL,
+  "goal" text COLLATE "pg_catalog"."default",
+  "status" varchar(20) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'PLANNED'::character varying,
+  "start_date" date,
+  "end_date" date,
+  "created_at" timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "created_by" uuid,
+  "updated_by" uuid,
+  "deleted" int4 NOT NULL DEFAULT 0,
+  CONSTRAINT "pk_sprint" PRIMARY KEY ("id")
+)
+;
+CREATE INDEX "idx_sprint_project" ON "public"."sprint" USING btree ("project_id") WHERE ("deleted" = 0);
+CREATE INDEX "idx_sprint_status" ON "public"."sprint" USING btree ("status") WHERE ("deleted" = 0);
+
+-- ----------------------------
+-- Table structure for risk
+-- ----------------------------
+DROP TABLE IF EXISTS "public"."risk";
+CREATE TABLE "public"."risk" (
+  "id" uuid NOT NULL,
+  "project_id" uuid NOT NULL,
+  "title" varchar(200) COLLATE "pg_catalog"."default" NOT NULL,
+  "description" text COLLATE "pg_catalog"."default",
+  "level" varchar(20) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'MEDIUM'::character varying,
+  "status" varchar(20) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'OPEN'::character varying,
+  "owner_id" uuid,
+  "due_date" date,
+  "created_at" timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "created_by" uuid,
+  "updated_by" uuid,
+  "deleted" int4 NOT NULL DEFAULT 0,
+  CONSTRAINT "pk_risk" PRIMARY KEY ("id")
+)
+;
+CREATE INDEX "idx_risk_project" ON "public"."risk" USING btree ("project_id") WHERE ("deleted" = 0);
+CREATE INDEX "idx_risk_status" ON "public"."risk" USING btree ("status") WHERE ("deleted" = 0);
+CREATE INDEX "idx_risk_level" ON "public"."risk" USING btree ("level") WHERE ("deleted" = 0);
 
 -- ----------------------------
 -- Table structure for milestone
