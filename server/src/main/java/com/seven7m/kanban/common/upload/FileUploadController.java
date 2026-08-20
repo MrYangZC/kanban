@@ -17,7 +17,7 @@ import java.util.UUID;
  * 文件上传接口（当前仅支持图片，供评论/附件内嵌展示）。
  */
 @RestController
-@RequestMapping("/v1/upload")
+@RequestMapping("/upload")
 public class FileUploadController {
 
     private static final Path UPLOAD_DIR = Paths.get("./uploads");

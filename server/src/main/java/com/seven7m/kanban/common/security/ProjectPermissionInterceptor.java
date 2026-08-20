@@ -1,124 +1,146 @@
 package com.seven7m.kanban.common.security;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.exception.ServiceException;
-import com.seven7m.kanban.common.security.annotation.ProjectRole;
-import com.seven7m.kanban.issue.service.IssueService;
-import com.seven7m.kanban.project.service.ProjectMemberService;
+import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
+import com.seven7m.kanban.common.security.RequireAdmin;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.annotation.AnnotationUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
-import org.springframework.web.servlet.HandlerMapping;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.util.Map;
 import java.util.UUID;
 
 /**
- * 项目级角色鉴权拦截器。在 UserContextInterceptor 之后执行，从 @ProjectRole 注解读取角色要求，
- * 解析 projectId（路径变量或请求体 JSON），查询当前用户在项目中的角色并校验。
- * 无注解的方法直接放行；未登录（回退默认管理员）放行以兼容现有桩逻辑。
+ * 项目级权限拦截器：依据接口声明的“操作权限”（READ/WRITE/MANAGE）进行鉴权。
+ * 角色 -> 操作权限的映射存于 role_permission 表，运行时由 PermissionService 动态判定，
+ * 因此新增/调整角色无需改动本拦截器或注解。
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ProjectPermissionInterceptor implements HandlerInterceptor {
 
-    private final ProjectMemberService projectMemberService;
-    private final IssueService issueService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final PermissionService permissionService;
+    private final IssueProjectCache issueProjectCache;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (!(handler instanceof HandlerMethod hm)) {
             return true;
         }
-        ProjectRole annotation = AnnotationUtils.findAnnotation(hm.getMethod(), ProjectRole.class);
-        if (annotation == null) {
-            annotation = AnnotationUtils.findAnnotation(hm.getBeanType(), ProjectRole.class);
+        ProjectRoleAnnotation ann = hm.getMethodAnnotation(ProjectRoleAnnotation.class);
+        if (ann == null) {
+            ann = hm.getBeanType().getAnnotation(ProjectRoleAnnotation.class);
         }
-        if (annotation == null) {
+        if (ann == null) {
+            // 需要登录态（UserContextInterceptor 已校验），但无项目级权限要求
             return true;
         }
 
+        UUID userId = UserContext.getUserId();
         UUID projectId = resolveProjectId(request);
         if (projectId == null) {
-            // 无法解析项目，交由 Controller 自身校验（如创建项目无需项目级角色）
-            return true;
+            // 路径变量无 projectId 时，尝试从缓存的请求体(projectId 字段)解析，兼容 /issues/filter 等
+            projectId = resolveProjectIdFromBody(request);
+        }
+        final UUID resolvedProjectId = projectId;
+        if (resolvedProjectId == null) {
+            // 无法解析出项目（请求体未被缓存等情况）：拒绝，避免越权放行
+            writeForbidden(response, "无法解析项目上下文");
+            return false;
         }
 
-        java.util.Set<String> roles = projectMemberService.getRoles(projectId, UserContext.getUserId());
-        String[] required = annotation.required();
-        // RBAC：用户任一角色命中 required 即通过
-        boolean allowed = roles.stream().anyMatch(r -> java.util.Arrays.asList(required).contains(r));
-        if (!allowed) {
-            ProjectRoleContext.setRoles(roles);
-            throw new ServiceException(403, "无权限执行该操作，需要角色：" + String.join("/", required));
+        Permission[] required = ann.value();
+        boolean ok = java.util.Arrays.stream(required)
+                .allMatch(p -> permissionService.hasPermission(userId, resolvedProjectId, p));
+        if (!ok) {
+            writeForbidden(response, "无权限执行该操作");
+            return false;
         }
-        ProjectRoleContext.setRoles(roles);
         return true;
     }
 
-    @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
-        ProjectRoleContext.clear();
-    }
-
-    @SuppressWarnings("unchecked")
+    /**
+     * 从路径变量中解析 projectId。
+     * 直接挂在项目下的资源使用 projectId；挂在 issue 下的资源使用 issueId，
+     * 再通过 IssueMapper/缓存解析出所属 projectId。
+     */
     private UUID resolveProjectId(HttpServletRequest request) {
-        Object tmpl = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
-        if (tmpl instanceof Map<?, ?> vars) {
-            UUID pid = asUuid((Map<String, Object>) vars, "projectId");
-            if (pid != null) {
-                return pid;
-            }
-            UUID issueId = asUuid((Map<String, Object>) vars, "issueId");
-            if (issueId != null) {
-                UUID projectId = issueService.getProjectId(issueId);
-                if (projectId != null) {
-                    return projectId;
-                }
-            }
-            UUID id = asUuid((Map<String, Object>) vars, "id");
-            if (id != null) {
-                UUID projectId = issueService.getProjectId(id);
-                if (projectId != null) {
-                    return projectId;
-                }
-                return id;
+        String projectId = request.getAttribute("projectId") != null
+                ? request.getAttribute("projectId").toString() : null;
+        if (projectId != null) {
+            try {
+                return UUID.fromString(projectId);
+            } catch (IllegalArgumentException ignored) {
             }
         }
-        if ("POST".equalsIgnoreCase(request.getMethod()) && request instanceof CachedBodyRequest cached) {
+        String issueId = request.getAttribute("issueId") != null
+                ? request.getAttribute("issueId").toString() : null;
+        if (issueId != null) {
             try {
-                byte[] buf = cached.getBody();
-                if (buf.length > 0) {
-                    JsonNode node = objectMapper.readTree(buf);
-                    JsonNode pid = node.get("projectId");
-                    if (pid != null && !pid.isNull()) {
-                        return UUID.fromString(pid.asText());
-                    }
-                }
-            } catch (Exception ignored) {
+                UUID issueUUID = UUID.fromString(issueId);
+                return issueProjectCache.getProjectId(issueUUID);
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        String id = request.getAttribute("id") != null
+                ? request.getAttribute("id").toString() : null;
+        if (id != null) {
+            try {
+                UUID idUUID = UUID.fromString(id);
+                return issueProjectCache.getProjectId(idUUID);
+            } catch (IllegalArgumentException ignored) {
             }
         }
         return null;
     }
 
-    private UUID asUuid(Map<String, Object> vars, String key) {
-        Object v = vars.get(key);
-        if (v == null) {
+    /**
+     * 兜底：从缓存的请求体(projectId 字段)解析，兼容 POST /issues/filter 等 projectId 在 body 的接口。
+     * 依赖 CachingRequestBodyFilter 预读并包装为 CachedBodyRequest。
+     */
+    private UUID resolveProjectIdFromBody(HttpServletRequest request) {
+        if (!(request instanceof CachedBodyRequest cached)) {
             return null;
         }
-        if (v instanceof UUID u) {
-            return u;
+        byte[] body = cached.getBody();
+        if (body == null || body.length == 0) {
+            return null;
         }
         try {
-            return UUID.fromString(v.toString());
-        } catch (IllegalArgumentException e) {
-            return null;
+            JsonNode node = OBJECT_MAPPER.readTree(body);
+            JsonNode pid = node.get("projectId");
+            if (pid != null && !pid.isNull()) {
+                return UUID.fromString(pid.asText());
+            }
+        } catch (Exception e) {
+            log.debug("从请求体解析 projectId 失败", e);
         }
+        return null;
+    }
+
+    private void writeForbidden(HttpServletResponse response, String msg) {
+        try {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json;charset=UTF-8");
+            String json = "{\"code\":403,\"msg\":" + escape(msg) + ",\"data\":null}";
+            response.getWriter().write(json);
+        } catch (Exception e) {
+            log.warn("写回 403 失败", e);
+        }
+    }
+
+    private static String escape(String s) {
+        if (s == null) {
+            return "null";
+        }
+        return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 }

@@ -3,6 +3,10 @@ server:
   servlet:
     context-path: /api
 
+kanban:
+  api:
+    prefix: /v1
+
 spring:
   main:
     allow-circular-references: true

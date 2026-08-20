@@ -1,9 +1,0 @@
-package com.seven7m.kanban.project.mapper;
-
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.seven7m.kanban.project.entity.ProjectMember;
-import org.apache.ibatis.annotations.Mapper;
-
-@Mapper
-public interface ProjectMemberMapper extends BaseMapper<ProjectMember> {
-}

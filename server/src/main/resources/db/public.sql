@@ -12,7 +12,7 @@
  Target Server Version : 160009 (160009)
  File Encoding         : 65001
 
- Date: 19/08/2026 15:02:08
+ Date: 20/08/2026 16:26:44
 */
 
 
@@ -319,6 +319,11 @@ INSERT INTO "public"."flyway_schema_history" VALUES (10, '10', 'fix constraints 
 INSERT INTO "public"."flyway_schema_history" VALUES (11, '11', 'add milestone and announcement', 'SQL', 'V11__add_milestone_and_announcement.sql', 1134232394, 'postgres', '2026-08-19 13:48:25.039114', 214, 't');
 INSERT INTO "public"."flyway_schema_history" VALUES (12, '12', 'add comment parent', 'SQL', 'V12__add_comment_parent.sql', 2055028902, 'postgres', '2026-08-19 14:16:41.122072', 102, 't');
 INSERT INTO "public"."flyway_schema_history" VALUES (13, '13', 'add project favorite', 'SQL', 'V13__add_project_favorite.sql', 853651519, 'postgres', '2026-08-19 15:00:31.452281', 173, 't');
+INSERT INTO "public"."flyway_schema_history" VALUES (14, '14', 'add sprint', 'SQL', 'V14__add_sprint.sql', 992961285, 'postgres', '2026-08-20 13:57:00.605349', 141, 't');
+INSERT INTO "public"."flyway_schema_history" VALUES (15, '15', 'add risk', 'SQL', 'V15__add_risk.sql', -1506789478, 'postgres', '2026-08-20 13:57:00.874387', 165, 't');
+INSERT INTO "public"."flyway_schema_history" VALUES (16, '16', 'seed risk and rbac menu', 'SQL', 'V16__seed_risk_and_rbac_menu.sql', 2011598656, 'postgres', '2026-08-20 13:57:01.158545', 21, 't');
+INSERT INTO "public"."flyway_schema_history" VALUES (17, '17', 'operation permission rbac', 'SQL', 'V17__operation_permission_rbac.sql', -241573618, 'postgres', '2026-08-20 15:45:50.639686', 92, 't');
+INSERT INTO "public"."flyway_schema_history" VALUES (18, '18', 'permission rbac idempotent seed', 'SQL', 'V18__permission_rbac_idempotent_seed.sql', 946514687, 'postgres', '2026-08-20 15:54:14.953287', 30, 't');
 
 -- ----------------------------
 -- Table structure for issue
@@ -3618,59 +3623,11 @@ INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000026', 'MEM
 INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000027', 'PROJECT_SETTING', '项目设置', NULL, 'BUTTON', 7, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
 INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000028', 'SPRINT_MANAGE', '迭代管理', NULL, 'BUTTON', 8, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
 INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000029', 'WORKFLOW_MANAGE', '工作流管理', NULL, 'BUTTON', 9, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
-INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000030', 'RISK_MANAGE', '风险管理', NULL, 'BUTTON', 10, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
-INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000040', 'RBAC_MANAGE', '权限管理', NULL, 'MENU', 50, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
-INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000041', 'RBAC_ROLE', '角色管理', '00000000-0000-0000-0000-000000000040', 'MENU', 1, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
-INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000042', 'RBAC_MENU', '菜单与权限', '00000000-0000-0000-0000-000000000040', 'MENU', 2, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
-INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000043', 'RBAC_USER_ROLE', '用户角色', '00000000-0000-0000-0000-000000000040', 'MENU', 3, '2026-08-19 09:38:02.958565', '2026-08-19 09:38:02.958565', 0);
-
--- ----------------------------
--- Table structure for sprint
--- ----------------------------
-DROP TABLE IF EXISTS "public"."sprint";
-CREATE TABLE "public"."sprint" (
-  "id" uuid NOT NULL,
-  "project_id" uuid NOT NULL,
-  "name" varchar(100) COLLATE "pg_catalog"."default" NOT NULL,
-  "goal" text COLLATE "pg_catalog"."default",
-  "status" varchar(20) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'PLANNED'::character varying,
-  "start_date" date,
-  "end_date" date,
-  "created_at" timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "created_by" uuid,
-  "updated_by" uuid,
-  "deleted" int4 NOT NULL DEFAULT 0,
-  CONSTRAINT "pk_sprint" PRIMARY KEY ("id")
-)
-;
-CREATE INDEX "idx_sprint_project" ON "public"."sprint" USING btree ("project_id") WHERE ("deleted" = 0);
-CREATE INDEX "idx_sprint_status" ON "public"."sprint" USING btree ("status") WHERE ("deleted" = 0);
-
--- ----------------------------
--- Table structure for risk
--- ----------------------------
-DROP TABLE IF EXISTS "public"."risk";
-CREATE TABLE "public"."risk" (
-  "id" uuid NOT NULL,
-  "project_id" uuid NOT NULL,
-  "title" varchar(200) COLLATE "pg_catalog"."default" NOT NULL,
-  "description" text COLLATE "pg_catalog"."default",
-  "level" varchar(20) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'MEDIUM'::character varying,
-  "status" varchar(20) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'OPEN'::character varying,
-  "owner_id" uuid,
-  "due_date" date,
-  "created_at" timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "created_by" uuid,
-  "updated_by" uuid,
-  "deleted" int4 NOT NULL DEFAULT 0,
-  CONSTRAINT "pk_risk" PRIMARY KEY ("id")
-)
-;
-CREATE INDEX "idx_risk_project" ON "public"."risk" USING btree ("project_id") WHERE ("deleted" = 0);
-CREATE INDEX "idx_risk_status" ON "public"."risk" USING btree ("status") WHERE ("deleted" = 0);
-CREATE INDEX "idx_risk_level" ON "public"."risk" USING btree ("level") WHERE ("deleted" = 0);
+INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000030', 'RISK_MANAGE', '风险管理', NULL, 'BUTTON', 10, '2026-08-20 13:57:01.181057', '2026-08-20 13:57:01.181057', 0);
+INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000040', 'RBAC_MANAGE', '权限管理', NULL, 'MENU', 50, '2026-08-20 13:57:01.181057', '2026-08-20 13:57:01.181057', 0);
+INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000041', 'RBAC_ROLE', '角色管理', '00000000-0000-0000-0000-000000000040', 'MENU', 1, '2026-08-20 13:57:01.181057', '2026-08-20 13:57:01.181057', 0);
+INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000042', 'RBAC_MENU', '菜单与权限', '00000000-0000-0000-0000-000000000040', 'MENU', 2, '2026-08-20 13:57:01.181057', '2026-08-20 13:57:01.181057', 0);
+INSERT INTO "public"."menu" VALUES ('00000000-0000-0000-0000-000000000043', 'RBAC_USER_ROLE', '用户角色', '00000000-0000-0000-0000-000000000040', 'MENU', 3, '2026-08-20 13:57:01.181057', '2026-08-20 13:57:01.181057', 0);
 
 -- ----------------------------
 -- Table structure for milestone
@@ -3695,6 +3652,25 @@ CREATE TABLE "public"."milestone" (
 -- ----------------------------
 -- Records of milestone
 -- ----------------------------
+
+-- ----------------------------
+-- Table structure for permission
+-- ----------------------------
+DROP TABLE IF EXISTS "public"."permission";
+CREATE TABLE "public"."permission" (
+  "code" varchar(32) COLLATE "pg_catalog"."default" NOT NULL,
+  "name" varchar(64) COLLATE "pg_catalog"."default" NOT NULL,
+  "description" varchar(255) COLLATE "pg_catalog"."default",
+  "created_at" timestamp(6) NOT NULL DEFAULT now()
+)
+;
+
+-- ----------------------------
+-- Records of permission
+-- ----------------------------
+INSERT INTO "public"."permission" VALUES ('READ', '查看', '查看项目内资源（issue/评论/附件/活动流/状态等）', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."permission" VALUES ('WRITE', '协作', '在项目内创建/编辑/评论/附件等协作操作', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."permission" VALUES ('MANAGE', '管理', '项目成员、标签、状态等配置类管理操作', '2026-08-20 15:45:50.726231');
 
 -- ----------------------------
 -- Table structure for project
@@ -3902,6 +3878,31 @@ INSERT INTO "public"."project_member" VALUES ('eef0c90e-b3eb-468a-a288-87a5d594c
 INSERT INTO "public"."project_member" VALUES ('6815cf40-faf5-4407-80bc-3aa25bc1e037', '926b8386-d645-46f9-b077-a338512ac80b', '00000000-0000-0000-0000-000000000001', '2026-08-19 09:39:57.987284');
 
 -- ----------------------------
+-- Table structure for risk
+-- ----------------------------
+DROP TABLE IF EXISTS "public"."risk";
+CREATE TABLE "public"."risk" (
+  "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+  "project_id" uuid NOT NULL,
+  "title" varchar(200) COLLATE "pg_catalog"."default" NOT NULL,
+  "description" text COLLATE "pg_catalog"."default",
+  "level" varchar(20) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'MEDIUM'::character varying,
+  "status" varchar(20) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'OPEN'::character varying,
+  "owner_id" uuid,
+  "due_date" date,
+  "created_at" timestamp(6) NOT NULL DEFAULT now(),
+  "updated_at" timestamp(6) NOT NULL DEFAULT now(),
+  "created_by" uuid,
+  "updated_by" uuid,
+  "deleted" int4 NOT NULL DEFAULT 0
+)
+;
+
+-- ----------------------------
+-- Records of risk
+-- ----------------------------
+
+-- ----------------------------
 -- Table structure for role
 -- ----------------------------
 DROP TABLE IF EXISTS "public"."role";
@@ -3981,6 +3982,46 @@ INSERT INTO "public"."role_menu" VALUES ('829180b1-fcee-40c4-93ad-b1ce9e1858ca',
 INSERT INTO "public"."role_menu" VALUES ('bb0b0303-aedc-4b11-b381-a533f821d81b', '00000000-0000-0000-0000-000000000016', '00000000-0000-0000-0000-000000000025', '2026-08-19 09:38:02.958565');
 INSERT INTO "public"."role_menu" VALUES ('6b4e5a5e-63c9-4c9a-9c6c-3d375eab8678', '00000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000021', '2026-08-19 09:38:02.958565');
 INSERT INTO "public"."role_menu" VALUES ('e8ce3971-8c7a-4778-a158-2a289716d156', '00000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000022', '2026-08-19 09:38:02.958565');
+INSERT INTO "public"."role_menu" VALUES ('64620c29-bd2c-496e-83e5-045999111b4e', '00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000030', '2026-08-20 13:57:01.181057');
+INSERT INTO "public"."role_menu" VALUES ('7d295930-fddf-4ef1-aaaa-c93971e6b744', '00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000030', '2026-08-20 13:57:01.181057');
+INSERT INTO "public"."role_menu" VALUES ('43f3db22-e028-4882-8cef-0c9c3bf875a0', '00000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000030', '2026-08-20 13:57:01.181057');
+INSERT INTO "public"."role_menu" VALUES ('f8e15b29-4472-4789-bc36-57134b9aa213', '00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000041', '2026-08-20 13:57:01.181057');
+INSERT INTO "public"."role_menu" VALUES ('f2129bf5-9b53-4076-97a9-fd74f3cca9a5', '00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000041', '2026-08-20 13:57:01.181057');
+INSERT INTO "public"."role_menu" VALUES ('1b9f72a5-8dc1-461b-86ef-cc02f486ed74', '00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000042', '2026-08-20 13:57:01.181057');
+INSERT INTO "public"."role_menu" VALUES ('73bc997a-4974-4507-b6eb-1dd3d9100347', '00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000042', '2026-08-20 13:57:01.181057');
+INSERT INTO "public"."role_menu" VALUES ('da16c4ca-b34f-4c68-b0dc-b04b8befe396', '00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000043', '2026-08-20 13:57:01.181057');
+INSERT INTO "public"."role_menu" VALUES ('291a8054-36eb-408b-9277-4a46c7d4d61a', '00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000043', '2026-08-20 13:57:01.181057');
+
+-- ----------------------------
+-- Table structure for role_permission
+-- ----------------------------
+DROP TABLE IF EXISTS "public"."role_permission";
+CREATE TABLE "public"."role_permission" (
+  "role_code" varchar(32) COLLATE "pg_catalog"."default" NOT NULL,
+  "permission_code" varchar(32) COLLATE "pg_catalog"."default" NOT NULL,
+  "created_at" timestamp(6) NOT NULL DEFAULT now()
+)
+;
+
+-- ----------------------------
+-- Records of role_permission
+-- ----------------------------
+INSERT INTO "public"."role_permission" VALUES ('OWNER', 'READ', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('OWNER', 'WRITE', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('OWNER', 'MANAGE', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('ADMIN', 'READ', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('ADMIN', 'WRITE', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('ADMIN', 'MANAGE', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('PM', 'READ', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('PM', 'WRITE', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('PM', 'MANAGE', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('DEV', 'READ', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('DEV', 'WRITE', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('QA', 'READ', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('QA', 'WRITE', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('MEMBER', 'READ', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('MEMBER', 'WRITE', '2026-08-20 15:45:50.726231');
+INSERT INTO "public"."role_permission" VALUES ('VIEWER', 'READ', '2026-08-20 15:45:50.726231');
 
 -- ----------------------------
 -- Table structure for sprint
@@ -3996,7 +4037,9 @@ CREATE TABLE "public"."sprint" (
   "end_date" date,
   "created_by" uuid,
   "created_at" timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  "updated_at" timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_by" uuid,
+  "deleted" int4 NOT NULL DEFAULT 0
 )
 ;
 
@@ -4887,6 +4930,11 @@ CREATE INDEX "idx_milestone_project" ON "public"."milestone" USING btree (
 ALTER TABLE "public"."milestone" ADD CONSTRAINT "milestone_pkey" PRIMARY KEY ("id");
 
 -- ----------------------------
+-- Primary Key structure for table permission
+-- ----------------------------
+ALTER TABLE "public"."permission" ADD CONSTRAINT "permission_pkey" PRIMARY KEY ("code");
+
+-- ----------------------------
 -- Uniques structure for table project
 -- ----------------------------
 ALTER TABLE "public"."project" ADD CONSTRAINT "uk_project_key" UNIQUE ("project_key");
@@ -4927,6 +4975,24 @@ ALTER TABLE "public"."project_member" ADD CONSTRAINT "uk_project_member" UNIQUE 
 ALTER TABLE "public"."project_member" ADD CONSTRAINT "project_member_pkey" PRIMARY KEY ("id");
 
 -- ----------------------------
+-- Indexes structure for table risk
+-- ----------------------------
+CREATE INDEX "idx_risk_level" ON "public"."risk" USING btree (
+  "level" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST
+) WHERE deleted = 0;
+CREATE INDEX "idx_risk_project" ON "public"."risk" USING btree (
+  "project_id" "pg_catalog"."uuid_ops" ASC NULLS LAST
+) WHERE deleted = 0;
+CREATE INDEX "idx_risk_status" ON "public"."risk" USING btree (
+  "status" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST
+) WHERE deleted = 0;
+
+-- ----------------------------
+-- Primary Key structure for table risk
+-- ----------------------------
+ALTER TABLE "public"."risk" ADD CONSTRAINT "risk_pkey" PRIMARY KEY ("id");
+
+-- ----------------------------
 -- Uniques structure for table role
 -- ----------------------------
 ALTER TABLE "public"."role" ADD CONSTRAINT "uk_role_code" UNIQUE ("code");
@@ -4952,6 +5018,21 @@ ALTER TABLE "public"."role_menu" ADD CONSTRAINT "uk_role_menu" UNIQUE ("role_id"
 -- Primary Key structure for table role_menu
 -- ----------------------------
 ALTER TABLE "public"."role_menu" ADD CONSTRAINT "role_menu_pkey" PRIMARY KEY ("id");
+
+-- ----------------------------
+-- Primary Key structure for table role_permission
+-- ----------------------------
+ALTER TABLE "public"."role_permission" ADD CONSTRAINT "role_permission_pkey" PRIMARY KEY ("role_code", "permission_code");
+
+-- ----------------------------
+-- Indexes structure for table sprint
+-- ----------------------------
+CREATE INDEX "idx_sprint_project" ON "public"."sprint" USING btree (
+  "project_id" "pg_catalog"."uuid_ops" ASC NULLS LAST
+) WHERE deleted = 0;
+CREATE INDEX "idx_sprint_status" ON "public"."sprint" USING btree (
+  "status" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST
+) WHERE deleted = 0;
 
 -- ----------------------------
 -- Primary Key structure for table sprint
@@ -5117,10 +5198,21 @@ ALTER TABLE "public"."project_member" ADD CONSTRAINT "fk_pm_project" FOREIGN KEY
 ALTER TABLE "public"."project_member" ADD CONSTRAINT "fk_pm_user" FOREIGN KEY ("user_id") REFERENCES "public"."sys_user" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- ----------------------------
+-- Foreign Keys structure for table risk
+-- ----------------------------
+ALTER TABLE "public"."risk" ADD CONSTRAINT "risk_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "public"."project" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- ----------------------------
 -- Foreign Keys structure for table role_menu
 -- ----------------------------
 ALTER TABLE "public"."role_menu" ADD CONSTRAINT "fk_rm_menu" FOREIGN KEY ("menu_id") REFERENCES "public"."menu" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
 ALTER TABLE "public"."role_menu" ADD CONSTRAINT "fk_rm_role" FOREIGN KEY ("role_id") REFERENCES "public"."role" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- ----------------------------
+-- Foreign Keys structure for table role_permission
+-- ----------------------------
+ALTER TABLE "public"."role_permission" ADD CONSTRAINT "role_permission_permission_code_fkey" FOREIGN KEY ("permission_code") REFERENCES "public"."permission" ("code") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "public"."role_permission" ADD CONSTRAINT "role_permission_role_code_fkey" FOREIGN KEY ("role_code") REFERENCES "public"."role" ("code") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- ----------------------------
 -- Foreign Keys structure for table sprint

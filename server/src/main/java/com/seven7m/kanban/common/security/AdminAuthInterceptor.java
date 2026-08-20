@@ -1,6 +1,6 @@
 package com.seven7m.kanban.common.security;
 
-import com.seven7m.kanban.rbac.mapper.UserRoleMapper;
+import com.seven7m.kanban.mapper.rbac.UserRoleMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;

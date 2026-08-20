@@ -1,0 +1,415 @@
+[ERROR] COMPILATION ERROR :
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[15,52] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/comment/IssueCommentMapper.java:[14,56] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/attachment/IssueAttachmentMapper.java:[7,59] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/link/IssueLinkMapper.java:[7,53] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[23,10] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[39,10] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[59,10] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/dev/ExcelImportController.java:[28,19] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/dev/ExcelImportController.java:[31,32] 绋嬪簭鍖匛xcelImportService涓嶅瓨鍦�
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/attachment/IssueAttachmentService.java:[30,19] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/attachment/IssueAttachmentService.java:[135,31] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/comment/IssueCommentService.java:[24,19] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[18,19] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[17,19] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/dev/ExcelImportService.java:[217,18] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/dev/ExcelImportService.java:[371,37] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/link/IssueLinkService.java:[22,19] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/tag/IssueTagService.java:[19,19] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[18,13] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[19,13] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[20,13] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[21,13] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[22,13] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[23,13] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[28,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[35,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[43,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[26,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[32,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[44,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[51,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[57,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[65,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[78,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[24,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[37,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[44,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[50,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[20,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[32,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[38,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[31,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[38,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[28,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[35,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[43,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectController.java:[65,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[27,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[34,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[41,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[39,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[45,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[51,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[39,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[45,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[51,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[58,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[64,6] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[39,49] 瀵逛簬findAnnotation(java.lang.reflect.Method,java.lang.Class<com.seven7m.kanban.entity.project.ProjectRole>), 鎵句笉鍒板悎閫傜殑鏂规硶
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[41,41] 瀵逛簬findAnnotation(java.lang.Class<capture#1, 鍏� ?>,java.lang.Class<com.seven7m.kanban.entity.project.ProjectRole>), 鎵句笉鍒板悎閫傜殑鏂规硶
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[54,39] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[62,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[68,29] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[69,37] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[76,26] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[77,38] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[80,51] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[84,10] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[85,10] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[86,24] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[87,10] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[89,34] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[89,51] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[90,38] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[105,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[106,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[108,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[109,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[118,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[119,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[129,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[130,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[171,25] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[177,15] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[178,15] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[179,30] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[180,15] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[181,15] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[196,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[197,24] 鏂规硶寮曠敤鏃犳晥
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[208,19] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[209,26] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[210,23] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[211,31] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[211,49] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[212,26] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[213,44] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[215,29] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[216,32] 鎵句笉鍒扮�﹀彿
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[217,30] 鎵句笉鍒扮�﹀彿
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:compile (default-compile) on project kanban-server: Compilation failure: Compilation failure:
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[15,52] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿: 绫� IssueTag
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/comment/IssueCommentMapper.java:[14,56] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿: 绫� IssueComment
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/attachment/IssueAttachmentMapper.java:[7,59] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿: 绫� IssueAttachment
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/link/IssueLinkMapper.java:[7,53] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿: 绫� IssueLink
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[23,10] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� IssueTag
+[ERROR]   浣嶇疆: 鎺ュ彛 com.seven7m.kanban.mapper.issue.tag.IssueTagMapper
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[39,10] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� IssueTag
+[ERROR]   浣嶇疆: 鎺ュ彛 com.seven7m.kanban.mapper.issue.tag.IssueTagMapper
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[59,10] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� IssueTag
+[ERROR]   浣嶇疆: 鎺ュ彛 com.seven7m.kanban.mapper.issue.tag.IssueTagMapper
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/dev/ExcelImportController.java:[28,19] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ExcelImportService
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.dev.ExcelImportController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/dev/ExcelImportController.java:[31,32] 绋嬪簭鍖匛xcelImportService涓嶅瓨鍦�
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/attachment/IssueAttachmentService.java:[30,19] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� IssueAttachmentMapper
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.service.issue.attachment.IssueAttachmentService
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/attachment/IssueAttachmentService.java:[135,31] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� IssueAttachment
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.service.issue.attachment.IssueAttachmentService
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/comment/IssueCommentService.java:[24,19] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� IssueCommentMapper
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.service.issue.comment.IssueCommentService
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[18,19] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� IssueLinkService
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.issue.link.IssueLinkController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[17,19] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� IssueTagService
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.issue.tag.IssueTagController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/dev/ExcelImportService.java:[217,18] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ExcelRow
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.service.dev.ExcelImportService
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/dev/ExcelImportService.java:[371,37] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ExcelRow
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.service.dev.ExcelImportService
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/link/IssueLinkService.java:[22,19] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� IssueLinkMapper
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.service.issue.link.IssueLinkService
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/tag/IssueTagService.java:[19,19] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� IssueTagMapper
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.service.issue.tag.IssueTagService
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[18,13] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鍙橀噺 ProjectRole
+[ERROR]   浣嶇疆: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[19,13] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鍙橀噺 ProjectRole
+[ERROR]   浣嶇疆: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[20,13] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鍙橀噺 ProjectRole
+[ERROR]   浣嶇疆: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[21,13] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鍙橀噺 ProjectRole
+[ERROR]   浣嶇疆: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[22,13] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鍙橀噺 ProjectRole
+[ERROR]   浣嶇疆: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[23,13] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鍙橀噺 ProjectRole
+[ERROR]   浣嶇疆: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[28,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.announcement.AnnouncementController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[35,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.announcement.AnnouncementController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[43,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.announcement.AnnouncementController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[26,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[32,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.issue.IssueController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[44,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[51,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[57,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[65,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.issue.IssueController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[78,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.issue.IssueController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[24,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.issue.attachment.IssueAttachmentController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[37,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[44,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[50,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[20,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.issue.link.IssueLinkController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[32,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[38,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[31,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.issue.tag.IssueTagController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[38,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.issue.tag.IssueTagController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[28,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.milestone.MilestoneController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[35,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.milestone.MilestoneController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[43,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.milestone.MilestoneController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectController.java:[65,6] 涓嶅吋瀹圭殑绫诲瀷: com.seven7m.kanban.entity.project.ProjectRole鏃犳硶杞�鎹�涓簀ava.lang.annotation.Annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[27,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.project.ProjectMemberController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[34,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.project.ProjectMemberController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[41,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.project.ProjectMemberController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[39,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.risk.RiskController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[45,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.risk.RiskController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[51,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.risk.RiskController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[39,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[45,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[51,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[58,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[64,6] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   绫� ProjectRoleAnnotation
+[ERROR]   浣嶇疆: 绫� com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[39,49] 瀵逛簬findAnnotation(java.lang.reflect.Method,java.lang.Class<com.seven7m.kanban.entity.project.ProjectRole>), 鎵句笉鍒板悎閫傜殑鏂规硶
+[ERROR]     鏂规硶 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.AnnotatedElement,java.lang.Class<A>)涓嶉�傜敤
+[ERROR]       (鎺ㄨ�哄彉閲� A 鍏锋湁涓嶅吋瀹圭殑涓婇檺
+[ERROR]         绛夊紡绾︽潫鏉′欢锛歝om.seven7m.kanban.entity.project.ProjectRole
+[ERROR]         涓婇檺锛歫ava.lang.annotation.Annotation)
+[ERROR]     鏂规硶 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.Method,java.lang.Class<A>)涓嶉�傜敤
+[ERROR]       (鎺ㄨ�哄彉閲� A 鍏锋湁涓嶅吋瀹圭殑涓婇檺
+[ERROR]         绛夊紡绾︽潫鏉′欢锛歝om.seven7m.kanban.entity.project.ProjectRole
+[ERROR]         涓婇檺锛歫ava.lang.annotation.Annotation)
+[ERROR]     鏂规硶 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.Class<?>,java.lang.Class<A>)涓嶉�傜敤
+[ERROR]       (鏃犳硶鎺ㄦ柇绫诲瀷鍙橀噺 A
+[ERROR]         (鍙傛暟涓嶅尮閰�; java.lang.reflect.Method鏃犳硶杞�鎹�涓簀ava.lang.Class<?>))
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[41,41] 瀵逛簬findAnnotation(java.lang.Class<capture#1, 鍏� ?>,java.lang.Class<com.seven7m.kanban.entity.project.ProjectRole>), 鎵句笉鍒板悎閫傜殑鏂规硶
+[ERROR]     鏂规硶 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.AnnotatedElement,java.lang.Class<A>)涓嶉�傜敤
+[ERROR]       (鎺ㄨ�哄彉閲� A 鍏锋湁涓嶅吋瀹圭殑涓婇檺
+[ERROR]         绛夊紡绾︽潫鏉′欢锛歝om.seven7m.kanban.entity.project.ProjectRole
+[ERROR]         涓婇檺锛歫ava.lang.annotation.Annotation)
+[ERROR]     鏂规硶 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.Method,java.lang.Class<A>)涓嶉�傜敤
+[ERROR]       (鏃犳硶鎺ㄦ柇绫诲瀷鍙橀噺 A
+[ERROR]         (鍙傛暟涓嶅尮閰�; java.lang.Class<capture#2, 鍏� ?>鏃犳硶杞�鎹�涓簀ava.lang.reflect.Method))
+[ERROR]     鏂规硶 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.Class<?>,java.lang.Class<A>)涓嶉�傜敤
+[ERROR]       (鎺ㄨ�哄彉閲� A 鍏锋湁涓嶅吋瀹圭殑涓婇檺
+[ERROR]         绛夊紡绾︽潫鏉′欢锛歝om.seven7m.kanban.entity.project.ProjectRole
+[ERROR]         涓婇檺锛歫ava.lang.annotation.Annotation)
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[54,39] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 required()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.project.ProjectRole鐨勫彉閲� annotation
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[62,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getProjectId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[68,29] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getProjectId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[69,37] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getCreatedAt()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[76,26] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getRoles()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.dto.project.AddMemberRequest鐨勫彉閲� req
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[77,38] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getUserId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.dto.project.AddMemberRequest鐨勫彉閲� req
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[80,51] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getUserId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.dto.project.AddMemberRequest鐨勫彉閲� req
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[84,10] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 setId(java.util.UUID)
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.project.ProjectMember鐨勫彉閲� m
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[85,10] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 setProjectId(java.util.UUID)
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.project.ProjectMember鐨勫彉閲� m
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[86,24] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getUserId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.dto.project.AddMemberRequest鐨勫彉閲� req
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[87,10] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 setCreatedAt(java.time.LocalDateTime)
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.project.ProjectMember鐨勫彉閲� m
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[89,34] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getUserId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.dto.project.AddMemberRequest鐨勫彉閲� req
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[89,51] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getRoles()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.dto.project.AddMemberRequest鐨勫彉閲� req
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[90,38] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getUserId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.dto.project.AddMemberRequest鐨勫彉閲� req
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[105,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getProjectId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[106,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getUserId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[108,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getProjectId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[109,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getUserId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[118,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getProjectId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[119,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getUserId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[129,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getProjectId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[130,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getUserId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[171,25] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getCode()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.rbac.Role
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[177,15] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 setId(java.util.UUID)
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.rbac.UserRole鐨勫彉閲� ur
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[178,15] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 setUserId(java.util.UUID)
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.rbac.UserRole鐨勫彉閲� ur
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[179,30] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.rbac.Role鐨勫彉閲� role
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[180,15] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 setProjectId(java.util.UUID)
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.rbac.UserRole鐨勫彉閲� ur
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[181,15] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 setCreatedAt(java.time.LocalDateTime)
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.rbac.UserRole鐨勫彉閲� ur
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[196,21] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getProjectId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[197,24] 鏂规硶寮曠敤鏃犳晥
+[ERROR]   鎵句笉鍒扮�﹀彿
+[ERROR]     绗﹀彿:   鏂规硶 getRoleId()
+[ERROR]     浣嶇疆: 绫� com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[208,19] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.project.ProjectMember鐨勫彉閲� m
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[209,26] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getProjectId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.project.ProjectMember鐨勫彉閲� m
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[210,23] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getUserId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.project.ProjectMember鐨勫彉閲� m
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[211,31] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getProjectId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.project.ProjectMember鐨勫彉閲� m
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[211,49] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getUserId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.project.ProjectMember鐨勫彉閲� m
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[212,26] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getCreatedAt()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.project.ProjectMember鐨勫彉閲� m
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[213,44] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getUserId()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.project.ProjectMember鐨勫彉閲� m
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[215,29] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getUsername()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.user.SysUser鐨勫彉閲� u
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[216,32] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getDisplayName()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.user.SysUser鐨勫彉閲� u
+[ERROR] /E:/sevenM/娌冲浘/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[217,30] 鎵句笉鍒扮�﹀彿
+[ERROR]   绗﹀彿:   鏂规硶 getAvatarUrl()
+[ERROR]   浣嶇疆: 绫诲瀷涓篶om.seven7m.kanban.entity.user.SysUser鐨勫彉閲� u
+[ERROR] -> [Help 1]
+[ERROR]
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR]
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

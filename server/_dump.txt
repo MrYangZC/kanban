@@ -1,0 +1,59 @@
+½âÎöÎÄ¼þ: 182
+Ç¨ÒÆ: 141 | É¾³ý(¾É°æ): 17 | Ìø¹ý: 24 | ³åÍ»: 0
+
+--- ´ýÉ¾³ý(¾É°æ issue Í¬ÃûÀà) ---
+  DEL issue/JsonbTypeHandler.java
+  DEL issue/controller/IssueAttachmentController.java
+  DEL issue/controller/IssueCommentController.java
+  DEL issue/controller/IssueLinkController.java
+  DEL issue/controller/IssueTagController.java
+  DEL issue/entity/IssueAttachment.java
+  DEL issue/entity/IssueComment.java
+  DEL issue/entity/IssueLink.java
+  DEL issue/entity/IssueTag.java
+  DEL issue/mapper/IssueAttachmentMapper.java
+  DEL issue/mapper/IssueCommentMapper.java
+  DEL issue/mapper/IssueLinkMapper.java
+  DEL issue/mapper/IssueTagMapper.java
+  DEL issue/service/IssueAttachmentService.java
+  DEL issue/service/IssueCommentService.java
+  DEL issue/service/IssueLinkService.java
+  DEL issue/service/IssueTagService.java
+
+--- ³åÍ»(Í¬ new FQN) ---
+
+--- Ìø¹ý ---
+  SKIP PmServerApplication.java - root app
+  SKIP common/config/AuditMetaObjectHandler.java - common
+  SKIP common/config/WebConfig.java - common
+  SKIP common/config/handler/JsonbTypeHandler.java - common
+  SKIP common/config/handler/UuidTypeHandler.java - common
+  SKIP common/domain/PageResult.java - common
+  SKIP common/domain/R.java - common
+  SKIP common/entity/BaseEntity.java - common
+  SKIP common/exception/BaseException.java - common
+  SKIP common/exception/GlobalExceptionHandler.java - common
+  SKIP common/exception/ServiceException.java - common
+  SKIP common/security/AdminAuthInterceptor.java - common
+  SKIP common/security/CachedBodyRequest.java - common
+  SKIP common/security/CachingRequestBodyFilter.java - common
+  SKIP common/security/ProjectPermissionInterceptor.java - common
+  SKIP common/security/ProjectRoleContext.java - common
+  SKIP common/security/RequireAdmin.java - common
+  SKIP common/security/UserContext.java - common
+  SKIP common/security/UserContextInterceptor.java - common
+  SKIP common/security/annotation/ProjectRole.java - common
+  SKIP common/upload/FileUploadController.java - common
+  SKIP common/upload/ImageFileUtil.java - common
+  SKIP common/upload/UploadImageVO.java - common
+  SKIP common/util/SortKeyUtils.java - common
+=== old2new IssueAttachment entries ===
+  com.seven7m.kanban.issue.attachment.IssueAttachment  ->  com.seven7m.kanban.entity.issue.attachment.IssueAttachment
+  com.seven7m.kanban.issue.attachment.IssueAttachmentController  ->  com.seven7m.kanban.controller.issue.attachment.IssueAttachmentController
+  com.seven7m.kanban.issue.attachment.IssueAttachmentMapper  ->  com.seven7m.kanban.mapper.issue.attachment.IssueAttachmentMapper
+  com.seven7m.kanban.issue.attachment.IssueAttachmentService  ->  com.seven7m.kanban.service.issue.attachment.IssueAttachmentService
+  com.seven7m.kanban.issue.controller.IssueAttachmentController  ->  com.seven7m.kanban.controller.issue.attachment.IssueAttachmentController
+  com.seven7m.kanban.issue.entity.IssueAttachment  ->  com.seven7m.kanban.entity.issue.attachment.IssueAttachment
+  com.seven7m.kanban.issue.mapper.IssueAttachmentMapper  ->  com.seven7m.kanban.mapper.issue.attachment.IssueAttachmentMapper
+  com.seven7m.kanban.issue.service.IssueAttachmentService  ->  com.seven7m.kanban.service.issue.attachment.IssueAttachmentService
+=== total entries: 158 ===

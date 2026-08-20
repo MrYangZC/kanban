@@ -1,0 +1,647 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------------< com.seven7m:kanban-server >----------------------
+[INFO] Building kanban-server 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ kanban-server ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 13 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ kanban-server ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 165 source files with javac [debug parameters release 17] to target\classes
+[INFO] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/IssueService.java: E:\sevenM\河图\java\kanban\server\src\main\java\com\seven7m\kanban\service\issue\IssueService.java使用或覆盖了已过时的 API。
+[INFO] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/IssueService.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[15,52] 找不到符号
+  符号: 类 IssueTag
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/comment/IssueCommentMapper.java:[14,56] 找不到符号
+  符号: 类 IssueComment
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/attachment/IssueAttachmentMapper.java:[7,59] 找不到符号
+  符号: 类 IssueAttachment
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/link/IssueLinkMapper.java:[7,53] 找不到符号
+  符号: 类 IssueLink
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[23,10] 找不到符号
+  符号:   类 IssueTag
+  位置: 接口 com.seven7m.kanban.mapper.issue.tag.IssueTagMapper
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[39,10] 找不到符号
+  符号:   类 IssueTag
+  位置: 接口 com.seven7m.kanban.mapper.issue.tag.IssueTagMapper
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[59,10] 找不到符号
+  符号:   类 IssueTag
+  位置: 接口 com.seven7m.kanban.mapper.issue.tag.IssueTagMapper
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/dev/ExcelImportController.java:[28,19] 找不到符号
+  符号:   类 ExcelImportService
+  位置: 类 com.seven7m.kanban.controller.dev.ExcelImportController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/dev/ExcelImportController.java:[31,32] 程序包ExcelImportService不存在
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/attachment/IssueAttachmentService.java:[30,19] 找不到符号
+  符号:   类 IssueAttachmentMapper
+  位置: 类 com.seven7m.kanban.service.issue.attachment.IssueAttachmentService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/attachment/IssueAttachmentService.java:[135,31] 找不到符号
+  符号:   类 IssueAttachment
+  位置: 类 com.seven7m.kanban.service.issue.attachment.IssueAttachmentService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/comment/IssueCommentService.java:[24,19] 找不到符号
+  符号:   类 IssueCommentMapper
+  位置: 类 com.seven7m.kanban.service.issue.comment.IssueCommentService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[18,19] 找不到符号
+  符号:   类 IssueLinkService
+  位置: 类 com.seven7m.kanban.controller.issue.link.IssueLinkController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[17,19] 找不到符号
+  符号:   类 IssueTagService
+  位置: 类 com.seven7m.kanban.controller.issue.tag.IssueTagController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/dev/ExcelImportService.java:[217,18] 找不到符号
+  符号:   类 ExcelRow
+  位置: 类 com.seven7m.kanban.service.dev.ExcelImportService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/dev/ExcelImportService.java:[371,37] 找不到符号
+  符号:   类 ExcelRow
+  位置: 类 com.seven7m.kanban.service.dev.ExcelImportService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/link/IssueLinkService.java:[22,19] 找不到符号
+  符号:   类 IssueLinkMapper
+  位置: 类 com.seven7m.kanban.service.issue.link.IssueLinkService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/tag/IssueTagService.java:[19,19] 找不到符号
+  符号:   类 IssueTagMapper
+  位置: 类 com.seven7m.kanban.service.issue.tag.IssueTagService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[18,13] 找不到符号
+  符号:   变量 ProjectRole
+  位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[19,13] 找不到符号
+  符号:   变量 ProjectRole
+  位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[20,13] 找不到符号
+  符号:   变量 ProjectRole
+  位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[21,13] 找不到符号
+  符号:   变量 ProjectRole
+  位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[22,13] 找不到符号
+  符号:   变量 ProjectRole
+  位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[23,13] 找不到符号
+  符号:   变量 ProjectRole
+  位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[28,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.announcement.AnnouncementController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[35,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.announcement.AnnouncementController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[43,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.announcement.AnnouncementController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[26,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[32,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.issue.IssueController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[44,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[51,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[57,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[65,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.issue.IssueController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[78,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.issue.IssueController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[24,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.issue.attachment.IssueAttachmentController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[37,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[44,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[50,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[20,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.issue.link.IssueLinkController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[32,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[38,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[31,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.issue.tag.IssueTagController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[38,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.issue.tag.IssueTagController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[28,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.milestone.MilestoneController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[35,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.milestone.MilestoneController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[43,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.milestone.MilestoneController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectController.java:[65,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[27,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.project.ProjectMemberController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[34,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.project.ProjectMemberController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[41,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.project.ProjectMemberController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[39,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.risk.RiskController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[45,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.risk.RiskController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[51,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.risk.RiskController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[39,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[45,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[51,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[58,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[64,6] 找不到符号
+  符号:   类 ProjectRoleAnnotation
+  位置: 类 com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[39,49] 对于findAnnotation(java.lang.reflect.Method,java.lang.Class<com.seven7m.kanban.entity.project.ProjectRole>), 找不到合适的方法
+    方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.AnnotatedElement,java.lang.Class<A>)不适用
+      (推论变量 A 具有不兼容的上限
+        等式约束条件：com.seven7m.kanban.entity.project.ProjectRole
+        上限：java.lang.annotation.Annotation)
+    方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.Method,java.lang.Class<A>)不适用
+      (推论变量 A 具有不兼容的上限
+        等式约束条件：com.seven7m.kanban.entity.project.ProjectRole
+        上限：java.lang.annotation.Annotation)
+    方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.Class<?>,java.lang.Class<A>)不适用
+      (无法推断类型变量 A
+        (参数不匹配; java.lang.reflect.Method无法转换为java.lang.Class<?>))
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[41,41] 对于findAnnotation(java.lang.Class<capture#1, 共 ?>,java.lang.Class<com.seven7m.kanban.entity.project.ProjectRole>), 找不到合适的方法
+    方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.AnnotatedElement,java.lang.Class<A>)不适用
+      (推论变量 A 具有不兼容的上限
+        等式约束条件：com.seven7m.kanban.entity.project.ProjectRole
+        上限：java.lang.annotation.Annotation)
+    方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.Method,java.lang.Class<A>)不适用
+      (无法推断类型变量 A
+        (参数不匹配; java.lang.Class<capture#2, 共 ?>无法转换为java.lang.reflect.Method))
+    方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.Class<?>,java.lang.Class<A>)不适用
+      (推论变量 A 具有不兼容的上限
+        等式约束条件：com.seven7m.kanban.entity.project.ProjectRole
+        上限：java.lang.annotation.Annotation)
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[54,39] 找不到符号
+  符号:   方法 required()
+  位置: 类型为com.seven7m.kanban.entity.project.ProjectRole的变量 annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[62,21] 方法引用无效
+  找不到符号
+    符号:   方法 getProjectId()
+    位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[68,29] 方法引用无效
+  找不到符号
+    符号:   方法 getProjectId()
+    位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[69,37] 方法引用无效
+  找不到符号
+    符号:   方法 getCreatedAt()
+    位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[76,26] 找不到符号
+  符号:   方法 getRoles()
+  位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[77,38] 找不到符号
+  符号:   方法 getUserId()
+  位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[80,51] 找不到符号
+  符号:   方法 getUserId()
+  位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[84,10] 找不到符号
+  符号:   方法 setId(java.util.UUID)
+  位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[85,10] 找不到符号
+  符号:   方法 setProjectId(java.util.UUID)
+  位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[86,24] 找不到符号
+  符号:   方法 getUserId()
+  位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[87,10] 找不到符号
+  符号:   方法 setCreatedAt(java.time.LocalDateTime)
+  位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[89,34] 找不到符号
+  符号:   方法 getUserId()
+  位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[89,51] 找不到符号
+  符号:   方法 getRoles()
+  位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[90,38] 找不到符号
+  符号:   方法 getUserId()
+  位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[105,21] 方法引用无效
+  找不到符号
+    符号:   方法 getProjectId()
+    位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[106,21] 方法引用无效
+  找不到符号
+    符号:   方法 getUserId()
+    位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[108,21] 方法引用无效
+  找不到符号
+    符号:   方法 getProjectId()
+    位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[109,21] 方法引用无效
+  找不到符号
+    符号:   方法 getUserId()
+    位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[118,21] 方法引用无效
+  找不到符号
+    符号:   方法 getProjectId()
+    位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[119,21] 方法引用无效
+  找不到符号
+    符号:   方法 getUserId()
+    位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[129,21] 方法引用无效
+  找不到符号
+    符号:   方法 getProjectId()
+    位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[130,21] 方法引用无效
+  找不到符号
+    符号:   方法 getUserId()
+    位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[171,25] 方法引用无效
+  找不到符号
+    符号:   方法 getCode()
+    位置: 类 com.seven7m.kanban.entity.rbac.Role
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[177,15] 找不到符号
+  符号:   方法 setId(java.util.UUID)
+  位置: 类型为com.seven7m.kanban.entity.rbac.UserRole的变量 ur
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[178,15] 找不到符号
+  符号:   方法 setUserId(java.util.UUID)
+  位置: 类型为com.seven7m.kanban.entity.rbac.UserRole的变量 ur
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[179,30] 找不到符号
+  符号:   方法 getId()
+  位置: 类型为com.seven7m.kanban.entity.rbac.Role的变量 role
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[180,15] 找不到符号
+  符号:   方法 setProjectId(java.util.UUID)
+  位置: 类型为com.seven7m.kanban.entity.rbac.UserRole的变量 ur
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[181,15] 找不到符号
+  符号:   方法 setCreatedAt(java.time.LocalDateTime)
+  位置: 类型为com.seven7m.kanban.entity.rbac.UserRole的变量 ur
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[196,21] 方法引用无效
+  找不到符号
+    符号:   方法 getProjectId()
+    位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[197,24] 方法引用无效
+  找不到符号
+    符号:   方法 getRoleId()
+    位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[208,19] 找不到符号
+  符号:   方法 getId()
+  位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[209,26] 找不到符号
+  符号:   方法 getProjectId()
+  位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[210,23] 找不到符号
+  符号:   方法 getUserId()
+  位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[211,31] 找不到符号
+  符号:   方法 getProjectId()
+  位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[211,49] 找不到符号
+  符号:   方法 getUserId()
+  位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[212,26] 找不到符号
+  符号:   方法 getCreatedAt()
+  位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[213,44] 找不到符号
+  符号:   方法 getUserId()
+  位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[215,29] 找不到符号
+  符号:   方法 getUsername()
+  位置: 类型为com.seven7m.kanban.entity.user.SysUser的变量 u
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[216,32] 找不到符号
+  符号:   方法 getDisplayName()
+  位置: 类型为com.seven7m.kanban.entity.user.SysUser的变量 u
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[217,30] 找不到符号
+  符号:   方法 getAvatarUrl()
+  位置: 类型为com.seven7m.kanban.entity.user.SysUser的变量 u
+[INFO] 100 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  15.763 s
+[INFO] Finished at: 2026-08-20T15:05:10+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:compile (default-compile) on project kanban-server: Compilation failure: Compilation failure: 
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[15,52] 找不到符号
+[ERROR]   符号: 类 IssueTag
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/comment/IssueCommentMapper.java:[14,56] 找不到符号
+[ERROR]   符号: 类 IssueComment
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/attachment/IssueAttachmentMapper.java:[7,59] 找不到符号
+[ERROR]   符号: 类 IssueAttachment
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/link/IssueLinkMapper.java:[7,53] 找不到符号
+[ERROR]   符号: 类 IssueLink
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[23,10] 找不到符号
+[ERROR]   符号:   类 IssueTag
+[ERROR]   位置: 接口 com.seven7m.kanban.mapper.issue.tag.IssueTagMapper
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[39,10] 找不到符号
+[ERROR]   符号:   类 IssueTag
+[ERROR]   位置: 接口 com.seven7m.kanban.mapper.issue.tag.IssueTagMapper
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/mapper/issue/tag/IssueTagMapper.java:[59,10] 找不到符号
+[ERROR]   符号:   类 IssueTag
+[ERROR]   位置: 接口 com.seven7m.kanban.mapper.issue.tag.IssueTagMapper
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/dev/ExcelImportController.java:[28,19] 找不到符号
+[ERROR]   符号:   类 ExcelImportService
+[ERROR]   位置: 类 com.seven7m.kanban.controller.dev.ExcelImportController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/dev/ExcelImportController.java:[31,32] 程序包ExcelImportService不存在
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/attachment/IssueAttachmentService.java:[30,19] 找不到符号
+[ERROR]   符号:   类 IssueAttachmentMapper
+[ERROR]   位置: 类 com.seven7m.kanban.service.issue.attachment.IssueAttachmentService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/attachment/IssueAttachmentService.java:[135,31] 找不到符号
+[ERROR]   符号:   类 IssueAttachment
+[ERROR]   位置: 类 com.seven7m.kanban.service.issue.attachment.IssueAttachmentService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/comment/IssueCommentService.java:[24,19] 找不到符号
+[ERROR]   符号:   类 IssueCommentMapper
+[ERROR]   位置: 类 com.seven7m.kanban.service.issue.comment.IssueCommentService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[18,19] 找不到符号
+[ERROR]   符号:   类 IssueLinkService
+[ERROR]   位置: 类 com.seven7m.kanban.controller.issue.link.IssueLinkController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[17,19] 找不到符号
+[ERROR]   符号:   类 IssueTagService
+[ERROR]   位置: 类 com.seven7m.kanban.controller.issue.tag.IssueTagController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/dev/ExcelImportService.java:[217,18] 找不到符号
+[ERROR]   符号:   类 ExcelRow
+[ERROR]   位置: 类 com.seven7m.kanban.service.dev.ExcelImportService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/dev/ExcelImportService.java:[371,37] 找不到符号
+[ERROR]   符号:   类 ExcelRow
+[ERROR]   位置: 类 com.seven7m.kanban.service.dev.ExcelImportService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/link/IssueLinkService.java:[22,19] 找不到符号
+[ERROR]   符号:   类 IssueLinkMapper
+[ERROR]   位置: 类 com.seven7m.kanban.service.issue.link.IssueLinkService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/issue/tag/IssueTagService.java:[19,19] 找不到符号
+[ERROR]   符号:   类 IssueTagMapper
+[ERROR]   位置: 类 com.seven7m.kanban.service.issue.tag.IssueTagService
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[18,13] 找不到符号
+[ERROR]   符号:   变量 ProjectRole
+[ERROR]   位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[19,13] 找不到符号
+[ERROR]   符号:   变量 ProjectRole
+[ERROR]   位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[20,13] 找不到符号
+[ERROR]   符号:   变量 ProjectRole
+[ERROR]   位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[21,13] 找不到符号
+[ERROR]   符号:   变量 ProjectRole
+[ERROR]   位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[22,13] 找不到符号
+[ERROR]   符号:   变量 ProjectRole
+[ERROR]   位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/annotation/ProjectRoleAnnotation.java:[23,13] 找不到符号
+[ERROR]   符号:   变量 ProjectRole
+[ERROR]   位置: @interface com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[28,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.announcement.AnnouncementController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[35,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.announcement.AnnouncementController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/announcement/AnnouncementController.java:[43,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.announcement.AnnouncementController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[26,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[32,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.issue.IssueController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[44,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[51,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[57,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[65,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.issue.IssueController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/IssueController.java:[78,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.issue.IssueController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[24,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.issue.attachment.IssueAttachmentController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[37,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[44,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/attachment/IssueAttachmentController.java:[50,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[20,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.issue.link.IssueLinkController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[32,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/link/IssueLinkController.java:[38,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[31,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.issue.tag.IssueTagController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/issue/tag/IssueTagController.java:[38,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.issue.tag.IssueTagController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[28,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.milestone.MilestoneController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[35,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.milestone.MilestoneController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/milestone/MilestoneController.java:[43,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.milestone.MilestoneController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectController.java:[65,6] 不兼容的类型: com.seven7m.kanban.entity.project.ProjectRole无法转换为java.lang.annotation.Annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[27,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.project.ProjectMemberController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[34,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.project.ProjectMemberController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/project/ProjectMemberController.java:[41,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.project.ProjectMemberController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[39,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.risk.RiskController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[45,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.risk.RiskController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/risk/RiskController.java:[51,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.risk.RiskController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[39,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[45,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[51,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[58,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/controller/sprint/SprintController.java:[64,6] 找不到符号
+[ERROR]   符号:   类 ProjectRoleAnnotation
+[ERROR]   位置: 类 com.seven7m.kanban.controller.sprint.SprintController
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[39,49] 对于findAnnotation(java.lang.reflect.Method,java.lang.Class<com.seven7m.kanban.entity.project.ProjectRole>), 找不到合适的方法
+[ERROR]     方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.AnnotatedElement,java.lang.Class<A>)不适用
+[ERROR]       (推论变量 A 具有不兼容的上限
+[ERROR]         等式约束条件：com.seven7m.kanban.entity.project.ProjectRole
+[ERROR]         上限：java.lang.annotation.Annotation)
+[ERROR]     方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.Method,java.lang.Class<A>)不适用
+[ERROR]       (推论变量 A 具有不兼容的上限
+[ERROR]         等式约束条件：com.seven7m.kanban.entity.project.ProjectRole
+[ERROR]         上限：java.lang.annotation.Annotation)
+[ERROR]     方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.Class<?>,java.lang.Class<A>)不适用
+[ERROR]       (无法推断类型变量 A
+[ERROR]         (参数不匹配; java.lang.reflect.Method无法转换为java.lang.Class<?>))
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[41,41] 对于findAnnotation(java.lang.Class<capture#1, 共 ?>,java.lang.Class<com.seven7m.kanban.entity.project.ProjectRole>), 找不到合适的方法
+[ERROR]     方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.AnnotatedElement,java.lang.Class<A>)不适用
+[ERROR]       (推论变量 A 具有不兼容的上限
+[ERROR]         等式约束条件：com.seven7m.kanban.entity.project.ProjectRole
+[ERROR]         上限：java.lang.annotation.Annotation)
+[ERROR]     方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.reflect.Method,java.lang.Class<A>)不适用
+[ERROR]       (无法推断类型变量 A
+[ERROR]         (参数不匹配; java.lang.Class<capture#2, 共 ?>无法转换为java.lang.reflect.Method))
+[ERROR]     方法 org.springframework.core.annotation.AnnotationUtils.<A>findAnnotation(java.lang.Class<?>,java.lang.Class<A>)不适用
+[ERROR]       (推论变量 A 具有不兼容的上限
+[ERROR]         等式约束条件：com.seven7m.kanban.entity.project.ProjectRole
+[ERROR]         上限：java.lang.annotation.Annotation)
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/common/security/ProjectPermissionInterceptor.java:[54,39] 找不到符号
+[ERROR]   符号:   方法 required()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.project.ProjectRole的变量 annotation
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[62,21] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getProjectId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[68,29] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getProjectId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[69,37] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getCreatedAt()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[76,26] 找不到符号
+[ERROR]   符号:   方法 getRoles()
+[ERROR]   位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[77,38] 找不到符号
+[ERROR]   符号:   方法 getUserId()
+[ERROR]   位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[80,51] 找不到符号
+[ERROR]   符号:   方法 getUserId()
+[ERROR]   位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[84,10] 找不到符号
+[ERROR]   符号:   方法 setId(java.util.UUID)
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[85,10] 找不到符号
+[ERROR]   符号:   方法 setProjectId(java.util.UUID)
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[86,24] 找不到符号
+[ERROR]   符号:   方法 getUserId()
+[ERROR]   位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[87,10] 找不到符号
+[ERROR]   符号:   方法 setCreatedAt(java.time.LocalDateTime)
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[89,34] 找不到符号
+[ERROR]   符号:   方法 getUserId()
+[ERROR]   位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[89,51] 找不到符号
+[ERROR]   符号:   方法 getRoles()
+[ERROR]   位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[90,38] 找不到符号
+[ERROR]   符号:   方法 getUserId()
+[ERROR]   位置: 类型为com.seven7m.kanban.dto.project.AddMemberRequest的变量 req
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[105,21] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getProjectId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[106,21] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getUserId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[108,21] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getProjectId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[109,21] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getUserId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[118,21] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getProjectId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[119,21] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getUserId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.project.ProjectMember
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[129,21] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getProjectId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[130,21] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getUserId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[171,25] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getCode()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.rbac.Role
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[177,15] 找不到符号
+[ERROR]   符号:   方法 setId(java.util.UUID)
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.rbac.UserRole的变量 ur
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[178,15] 找不到符号
+[ERROR]   符号:   方法 setUserId(java.util.UUID)
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.rbac.UserRole的变量 ur
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[179,30] 找不到符号
+[ERROR]   符号:   方法 getId()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.rbac.Role的变量 role
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[180,15] 找不到符号
+[ERROR]   符号:   方法 setProjectId(java.util.UUID)
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.rbac.UserRole的变量 ur
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[181,15] 找不到符号
+[ERROR]   符号:   方法 setCreatedAt(java.time.LocalDateTime)
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.rbac.UserRole的变量 ur
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[196,21] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getProjectId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[197,24] 方法引用无效
+[ERROR]   找不到符号
+[ERROR]     符号:   方法 getRoleId()
+[ERROR]     位置: 类 com.seven7m.kanban.entity.rbac.UserRole
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[208,19] 找不到符号
+[ERROR]   符号:   方法 getId()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[209,26] 找不到符号
+[ERROR]   符号:   方法 getProjectId()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[210,23] 找不到符号
+[ERROR]   符号:   方法 getUserId()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[211,31] 找不到符号
+[ERROR]   符号:   方法 getProjectId()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[211,49] 找不到符号
+[ERROR]   符号:   方法 getUserId()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[212,26] 找不到符号
+[ERROR]   符号:   方法 getCreatedAt()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[213,44] 找不到符号
+[ERROR]   符号:   方法 getUserId()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.project.ProjectMember的变量 m
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[215,29] 找不到符号
+[ERROR]   符号:   方法 getUsername()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.user.SysUser的变量 u
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[216,32] 找不到符号
+[ERROR]   符号:   方法 getDisplayName()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.user.SysUser的变量 u
+[ERROR] /E:/sevenM/河图/java/kanban/server/src/main/java/com/seven7m/kanban/service/project/ProjectMemberService.java:[217,30] 找不到符号
+[ERROR]   符号:   方法 getAvatarUrl()
+[ERROR]   位置: 类型为com.seven7m.kanban.entity.user.SysUser的变量 u
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
