@@ -12,7 +12,7 @@ public class ProjectActivityVO {
     private String actorName;
     private String action;
     private UUID issueId;
-    private Long issueNumber;
+    private String issueNumber;
     private String issueTitle;
     private String oldValue;
     private String newValue;

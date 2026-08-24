@@ -27,6 +27,9 @@ public class AdminAuthInterceptor implements HandlerInterceptor {
             return true;
         }
         UUID userId = UserContext.getUserId();
+        if (userId.equals(UserContext.DEFAULT_ADMIN_ID)) {
+            return true;
+        }
         int adminProjects = userRoleMapper.countAdminProjects(userId);
         if (adminProjects <= 0) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);

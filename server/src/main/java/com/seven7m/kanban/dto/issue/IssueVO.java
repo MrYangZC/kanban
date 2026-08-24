@@ -12,7 +12,7 @@ public class IssueVO {
 
     private UUID id;
     private UUID projectId;
-    private Long issueNumber;
+    private String issueNumber;
     private String issueKey;
     private UUID issueTypeId;
     private UUID statusId;
@@ -35,8 +35,10 @@ public class IssueVO {
     // 缺陷详情页（云效风格）扩展字段
     private UUID verifierId;
     private String iteration;
-    private String participants;
-    private String ccUsers;
+    /** 参与者用户 ID 列表（来自 issue_participant 关联表） */
+    private List<String> participants;
+    /** 抄送人用户 ID 列表（来自 issue_cc 关联表） */
+    private List<String> ccUsers;
     private LocalDateTime planStart;
     private String noFixReason;
 

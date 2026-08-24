@@ -14,7 +14,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,10 +29,17 @@ public class MilestoneService {
     private final SysUserMapper userMapper;
 
     public List<MilestoneVO> list(UUID projectId) {
-        return milestoneMapper.selectList(Wrappers.<Milestone>lambdaQuery()
+        List<Milestone> milestones = milestoneMapper.selectList(Wrappers.<Milestone>lambdaQuery()
                         .eq(Milestone::getProjectId, projectId)
-                        .orderByAsc(Milestone::getDueDate))
-                .stream().map(this::toVO).collect(Collectors.toList());
+                        .orderByAsc(Milestone::getDueDate));
+        Set<UUID> creatorIds = milestones.stream()
+                .map(Milestone::getCreatedBy)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, SysUser> userMap = creatorIds.isEmpty() ? Map.of() :
+                userMapper.selectBatchIds(creatorIds).stream()
+                        .collect(Collectors.toMap(SysUser::getId, Function.identity()));
+        return milestones.stream().map(m -> toVO(m, userMap)).collect(Collectors.toList());
     }
 
     @Transactional
@@ -66,6 +77,24 @@ public class MilestoneService {
             throw new ServiceException(404, "里程碑不存在");
         }
         milestoneMapper.deleteById(id);
+    }
+
+    private MilestoneVO toVO(Milestone m, Map<UUID, SysUser> userMap) {
+        MilestoneVO vo = new MilestoneVO();
+        vo.setId(m.getId());
+        vo.setProjectId(m.getProjectId());
+        vo.setName(m.getName());
+        vo.setDescription(m.getDescription());
+        vo.setDueDate(m.getDueDate());
+        vo.setStatus(m.getStatus());
+        vo.setProgress(m.getProgress());
+        vo.setCreatedAt(m.getCreatedAt() != null ? m.getCreatedAt().toString() : null);
+        vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().toString() : null);
+        if (m.getCreatedBy() != null) {
+            SysUser u = userMap.get(m.getCreatedBy());
+            if (u != null) vo.setCreatorName(u.getDisplayName());
+        }
+        return vo;
     }
 
     private MilestoneVO toVO(Milestone m) {

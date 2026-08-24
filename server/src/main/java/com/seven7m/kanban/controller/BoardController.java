@@ -4,6 +4,8 @@ import com.seven7m.kanban.dto.board.BoardGroupView;
 import com.seven7m.kanban.dto.board.BoardView;
 import com.seven7m.kanban.service.board.BoardService;
 import com.seven7m.kanban.common.domain.R;
+import com.seven7m.kanban.common.security.Permission;
+import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,12 +22,14 @@ public class BoardController {
 
     private final BoardService boardService;
 
+    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping("/{projectId}/board")
     public R<BoardView> getBoard(@PathVariable UUID projectId) {
         return R.ok(boardService.getBoard(projectId));
     }
 
     /** 分组看板：groupBy=STATUS/ASSIGNEE/PRIORITY/SPRINT（缺省 STATUS） */
+    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping("/{projectId}/board/grouped")
     public R<BoardGroupView> getBoardGrouped(@PathVariable UUID projectId,
                                              @RequestParam(required = false) String groupBy) {

@@ -19,7 +19,6 @@ public class BoardColumn {
 
     private UUID boardId;
     private UUID statusId;
-    private String name;
     private Integer sortOrder;
     private Integer wipLimit;
     private LocalDateTime createdAt;

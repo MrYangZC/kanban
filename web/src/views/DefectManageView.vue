@@ -21,6 +21,7 @@ import {
 } from '@/constants/issueDict'
 import { avatarChar, avatarColor } from '@/utils/avatar'
 import { useWorkflowTransition } from '@/composables/useWorkflowTransition'
+import { useProjectPermission } from '@/composables/useProjectPermission'
 import {
   Plus, Search, List, GitBranch, LayoutGrid, ChevronDown,
   AlertTriangle, MoreHorizontal, ArrowLeft, RefreshCw, Save,
@@ -39,7 +40,8 @@ const allTags = ref<LabelVO[]>([])
 const members = ref<ProjectMember[]>([])
 const users = ref<UserVO[]>([])
 const statuses = ref<IssueStatusVO[]>([])
-const canWrite = ref(true)
+const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId)
+const canWrite = computed(() => hasPermission('issue:edit'))
 
 type ViewMode = 'list' | 'tree' | 'board'
 const view = ref<ViewMode>('list')
@@ -127,9 +129,7 @@ async function loadMeta() {
   try { allTags.value = await listProjectTags(projectId) } catch { /* ignore */ }
   try { members.value = await listProjectMembers(projectId) } catch { /* ignore */ }
   try { users.value = await listUsers() } catch { /* ignore */ }
-  // 权限依据当前登录用户（与看板一致），不再硬编码 admin
-  const me = members.value.find((m) => m.userId === userStore.user?.id)
-  canWrite.value = !me || ['OWNER', 'ADMIN', 'PM', 'DEV', 'QA', 'MEMBER'].some((r) => me.roles.includes(r))
+  refreshPermission()
 }
 
 /** 列表状态下拉：当前状态 + 工作流可达状态，与看板拖拽规则一致 */

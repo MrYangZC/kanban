@@ -26,18 +26,25 @@ public class UserContext {
     }
 
     /**
-     * 操作人 id，未设置时回退默认管理员，避免审计字段为 null 或 ThreadLocal 串号。
+     * 操作人 id，未设置时抛异常避免未登录用户被当作超级管理员。
+     * 拦截器漏配或非请求上下文调用会立即暴露问题。
      */
     public static UUID getUserId() {
         UUID id = USER_ID.get();
-        return id != null ? id : DEFAULT_ADMIN_ID;
+        if (id == null) {
+            throw new IllegalStateException("UserContext not set — interceptor missing or called outside request context");
+        }
+        return id;
     }
 
     /**
-     * 操作人名称，未设置时回退默认管理员名称。
+     * 操作人名称，未设置时抛异常。
      */
     public static String getUsername() {
         String name = USER_NAME.get();
-        return name != null ? name : DEFAULT_ADMIN_NAME;
+        if (name == null) {
+            throw new IllegalStateException("UserContext not set — interceptor missing or called outside request context");
+        }
+        return name;
     }
 }

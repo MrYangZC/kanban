@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.dto.workflow.WorkflowTransitionVO;
 import com.seven7m.kanban.entity.workflow.Workflow;
 import com.seven7m.kanban.entity.workflow.WorkflowTransition;
+import com.seven7m.kanban.entity.project.Project;
 import com.seven7m.kanban.mapper.workflow.WorkflowMapper;
 import com.seven7m.kanban.mapper.workflow.WorkflowTransitionMapper;
+import com.seven7m.kanban.mapper.project.ProjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +24,7 @@ public class WorkflowService {
 
     private final WorkflowMapper workflowMapper;
     private final WorkflowTransitionMapper workflowTransitionMapper;
+    private final ProjectMapper projectMapper;
 
     /** 项目默认工作流的全部流转规则；未配置默认工作流时返回空列表 */
     public List<WorkflowTransitionVO> listTransitions(UUID projectId) {
@@ -55,10 +58,10 @@ public class WorkflowService {
     }
 
     private Workflow defaultWorkflow(UUID projectId) {
-        return workflowMapper.selectOne(
-                Wrappers.<Workflow>lambdaQuery()
-                        .eq(Workflow::getProjectId, projectId)
-                        .eq(Workflow::getIsDefault, true)
-                        .last("LIMIT 1"));
+        Project project = projectMapper.selectById(projectId);
+        if (project == null || project.getWorkflowId() == null) {
+            return null;
+        }
+        return workflowMapper.selectById(project.getWorkflowId());
     }
 }

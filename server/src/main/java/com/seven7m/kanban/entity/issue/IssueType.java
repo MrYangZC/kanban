@@ -17,7 +17,6 @@ public class IssueType {
     @TableId(type = IdType.ASSIGN_UUID)
     private UUID id;
 
-    private UUID projectId;
     private String name;
     private String code;
     private String icon;

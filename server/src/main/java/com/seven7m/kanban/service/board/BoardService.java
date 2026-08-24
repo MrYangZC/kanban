@@ -68,8 +68,7 @@ public class BoardService {
         Map<UUID, List<Issue>> byStatus = issues.stream()
                 .collect(Collectors.groupingBy(Issue::getStatusId, LinkedHashMap::new, Collectors.toList()));
 
-        Map<UUID, IssueStatus> statusMap = issueStatusMapper.selectList(Wrappers.<IssueStatus>lambdaQuery()
-                        .eq(IssueStatus::getProjectId, projectId))
+        Map<UUID, IssueStatus> statusMap = issueStatusMapper.selectList(Wrappers.<IssueStatus>lambdaQuery())
                 .stream().collect(Collectors.toMap(IssueStatus::getId, s -> s));
 
         List<BoardColumnView> columnViews = new ArrayList<>();
@@ -78,6 +77,7 @@ public class BoardService {
             BeanUtils.copyProperties(col, cv);
             IssueStatus st = statusMap.get(col.getStatusId());
             if (st != null) {
+                cv.setName(st.getName());
                 cv.setCategory(st.getCategory());
                 cv.setColor(st.getColor());
             }
@@ -138,8 +138,7 @@ public class BoardService {
         List<BoardColumn> columns = boardColumnMapper.selectList(Wrappers.<BoardColumn>lambdaQuery()
                 .eq(BoardColumn::getBoardId, board.getId())
                 .orderByAsc(BoardColumn::getSortOrder));
-        Map<UUID, IssueStatus> statusMap = issueStatusMapper.selectList(Wrappers.<IssueStatus>lambdaQuery()
-                        .eq(IssueStatus::getProjectId, projectId))
+        Map<UUID, IssueStatus> statusMap = issueStatusMapper.selectList(Wrappers.<IssueStatus>lambdaQuery())
                 .stream().collect(Collectors.toMap(IssueStatus::getId, s -> s));
         Map<UUID, String> userMap = sysUserMapper.selectList(Wrappers.<SysUser>lambdaQuery())
                 .stream().collect(Collectors.toMap(SysUser::getId, u -> u.getDisplayName() != null ? u.getDisplayName() : u.getUsername()));

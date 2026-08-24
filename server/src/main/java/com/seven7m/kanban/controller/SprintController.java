@@ -27,42 +27,44 @@ public class SprintController {
 
     private final SprintService sprintService;
 
+    @ProjectRoleAnnotation(Permission.SPRINT_VIEW)
     @GetMapping
     public R<List<SprintVO>> list(@PathVariable UUID projectId) {
         return R.ok(sprintService.listByProject(projectId));
     }
 
+    @ProjectRoleAnnotation(Permission.SPRINT_VIEW)
     @GetMapping("/{id}")
     public R<SprintVO> detail(@PathVariable UUID projectId, @PathVariable UUID id) {
         return R.ok(sprintService.detail(projectId, id));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
     @PostMapping
     public R<SprintVO> create(@PathVariable UUID projectId, @RequestBody CreateSprintRequest req) {
         return R.ok(sprintService.create(projectId, req));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
     @PutMapping("/{id}")
     public R<SprintVO> update(@PathVariable UUID projectId, @PathVariable UUID id, @RequestBody UpdateSprintRequest req) {
         return R.ok(sprintService.update(projectId, id, req));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
     @DeleteMapping("/{id}")
     public R<Void> remove(@PathVariable UUID projectId, @PathVariable UUID id) {
         sprintService.remove(projectId, id);
         return R.ok();
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
     @PostMapping("/{id}/start")
     public R<SprintVO> start(@PathVariable UUID projectId, @PathVariable UUID id) {
         return R.ok(sprintService.start(projectId, id));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
     @PostMapping("/{id}/complete")
     public R<SprintVO> complete(@PathVariable UUID projectId, @PathVariable UUID id) {
         return R.ok(sprintService.complete(projectId, id));

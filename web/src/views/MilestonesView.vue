@@ -66,8 +66,8 @@ const dialogVisible = ref(false)
 const editing = ref<MilestoneVO | null>(null)
 const form = ref({ name: '', description: '', dueDate: '' })
 
-const { canWrite, refresh } = useProjectPermission(() => projectId)
-const canManage = computed(() => canWrite.value)
+const { hasPermission, refresh } = useProjectPermission(() => projectId)
+const canManage = computed(() => hasPermission('milestone:manage'))
 
 async function load() {
   loading.value = true

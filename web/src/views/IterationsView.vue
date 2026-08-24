@@ -88,8 +88,8 @@ const dialogVisible = ref(false)
 const editing = ref<SprintVO | null>(null)
 const form = ref({ name: '', goal: '', startDate: '', endDate: '' })
 
-const { canWrite, refresh } = useProjectPermission(() => projectId)
-const canManage = computed(() => canWrite.value)
+const { hasPermission, refresh } = useProjectPermission(() => projectId)
+const canManage = computed(() => hasPermission('sprint:manage'))
 
 async function load() {
   loading.value = true

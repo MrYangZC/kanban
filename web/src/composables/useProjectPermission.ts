@@ -1,11 +1,13 @@
-import { ref, type Ref } from 'vue'
-import { listProjectMembers } from '@/api'
+import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import { listProjectMembers, getMyPermissions } from '@/api'
 import type { ProjectMember } from '@/api/types'
 import { useUserStore } from '@/stores/user'
 
 export interface ProjectPermission {
   canWrite: Ref<boolean>
   canAdmin: Ref<boolean>
+  hasPermission: (code: string) => boolean
+  permissions: Ref<Set<string>>
   members: Ref<ProjectMember[]>
   refresh: () => Promise<void>
 }
@@ -18,18 +20,27 @@ export function useProjectPermission(projectId: () => string): ProjectPermission
   const canWrite = ref(true)
   const canAdmin = ref(false)
   const members = ref<ProjectMember[]>([])
+  const permissions = ref<Set<string>>(new Set())
 
   async function refresh() {
     try {
-      members.value = await listProjectMembers(projectId())
+      const pid = projectId()
+      members.value = await listProjectMembers(pid)
       const me = members.value.find((m) => m.userId === userStore.user?.id)
       canWrite.value = !me || WRITE_ROLES.some((r) => me.roles.includes(r))
       canAdmin.value = !!me && ADMIN_ROLES.some((r) => me.roles.includes(r))
+      const perms = await getMyPermissions(pid)
+      permissions.value = new Set(perms)
     } catch {
       canWrite.value = true
       canAdmin.value = false
+      permissions.value = new Set()
     }
   }
 
-  return { canWrite, canAdmin, members, refresh }
+  function hasPermission(code: string): boolean {
+    return permissions.value.has(code)
+  }
+
+  return { canWrite, canAdmin, hasPermission, permissions, members, refresh }
 }

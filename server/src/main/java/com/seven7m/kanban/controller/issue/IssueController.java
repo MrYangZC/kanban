@@ -24,32 +24,32 @@ public class IssueController {
 
     private final IssueService issueService;
 
-    @ProjectRoleAnnotation
+    @ProjectRoleAnnotation(Permission.ISSUE_CREATE)
     @PostMapping
     public R<IssueVO> create(@Valid @RequestBody CreateIssueRequest req) {
         return R.ok(issueService.create(req));
     }
 
-    @ProjectRoleAnnotation(Permission.READ)
+    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping("/{id}")
     public R<IssueVO> get(@PathVariable UUID id) {
         return R.ok(issueService.get(id));
     }
 
-    @ProjectRoleAnnotation
+    @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
     @PutMapping("/{id}")
     public R<IssueVO> update(@PathVariable UUID id, @Valid @RequestBody UpdateIssueRequest req) {
         return R.ok(issueService.update(id, req));
     }
 
     /** 拖拽：状态 + 位置一次提交（自由流转，仅校验目标状态属于本项目） */
-    @ProjectRoleAnnotation
+    @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
     @PatchMapping("/{id}/position")
     public R<IssueVO> move(@PathVariable UUID id, @Valid @RequestBody MoveIssueRequest req) {
         return R.ok(issueService.move(id, req));
     }
 
-    @ProjectRoleAnnotation
+    @ProjectRoleAnnotation(Permission.ISSUE_DELETE)
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable UUID id) {
         issueService.delete(id);
@@ -57,14 +57,14 @@ public class IssueController {
     }
 
     /** 列表过滤：左侧过滤器 + 顶部筛选，返回分页 IssueVO（只读，项目成员含 VIEWER 可读） */
-    @ProjectRoleAnnotation(Permission.READ)
+    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @PostMapping("/filter")
     public R<PageResult<IssueVO>> filter(@Valid @RequestBody IssueFilterRequest req) {
         return R.ok(issueService.listByFilter(req));
     }
 
     /** 获取某任务的子任务列表（只读） */
-    @ProjectRoleAnnotation(Permission.READ)
+    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping("/{id}/children")
     public R<List<IssueVO>> children(@PathVariable UUID id) {
         return R.ok(issueService.listChildren(id));

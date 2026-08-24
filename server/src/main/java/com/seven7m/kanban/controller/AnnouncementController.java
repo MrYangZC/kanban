@@ -21,19 +21,20 @@ public class AnnouncementController {
 
     private final AnnouncementService announcementService;
 
+    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping
     public R<List<AnnouncementVO>> list(@PathVariable UUID projectId) {
         return R.ok(announcementService.list(projectId));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.ANNOUNCEMENT_MANAGE)
     @PostMapping
     public R<AnnouncementVO> create(@PathVariable UUID projectId,
                                     @Valid @RequestBody CreateAnnouncementRequest req) {
         return R.ok(announcementService.create(projectId, req));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.ANNOUNCEMENT_MANAGE)
     @PutMapping("/{id}")
     public R<AnnouncementVO> update(@PathVariable UUID projectId,
                                     @PathVariable UUID id,
@@ -41,7 +42,7 @@ public class AnnouncementController {
         return R.ok(announcementService.update(projectId, id, req));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.ANNOUNCEMENT_MANAGE)
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable UUID projectId,
                           @PathVariable UUID id) {

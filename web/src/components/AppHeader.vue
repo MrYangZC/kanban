@@ -16,6 +16,7 @@ const userStore = useUserStore()
 
 const isInProject = computed(() => !!route.params.projectId)
 const projectId = computed(() => route.params.projectId as string)
+const isAdmin = computed(() => userStore.user?.username === 'admin')
 
 const showProjectDropdown = ref(false)
 const showUserDropdown = ref(false)
@@ -23,11 +24,16 @@ const showSearchDialog = ref(false)
 const searchKeyword = ref('')
 const notificationCount = ref(3)
 
-const navItems = [
-  { path: '/projects', label: '项目', icon: FolderKanban },
-  { path: '/users', label: '用户管理', icon: UserCog },
-  { path: '/rbac', label: '权限管理', icon: Shield }
-]
+const navItems = computed(() => {
+  const items: { path: string; label: string; icon: typeof FolderKanban }[] = [
+    { path: '/projects', label: '项目', icon: FolderKanban }
+  ]
+  if (isAdmin.value) {
+    items.push({ path: '/users', label: '用户管理', icon: UserCog })
+    items.push({ path: '/rbac', label: '权限管理', icon: Shield })
+  }
+  return items
+})
 
 function isActive(path: string): boolean {
   if (path === '/projects') return route.path === '/projects' || route.path.startsWith('/projects/')

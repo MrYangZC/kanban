@@ -11,9 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.HandlerMapping;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -57,7 +59,7 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        Permission[] required = ann.value();
+        String[] required = ann.value();
         boolean ok = java.util.Arrays.stream(required)
                 .allMatch(p -> permissionService.hasPermission(userId, resolvedProjectId, p));
         if (!ok) {
@@ -73,30 +75,20 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
      * 再通过 IssueMapper/缓存解析出所属 projectId。
      */
     private UUID resolveProjectId(HttpServletRequest request) {
-        String projectId = request.getAttribute("projectId") != null
-                ? request.getAttribute("projectId").toString() : null;
-        if (projectId != null) {
-            try {
-                return UUID.fromString(projectId);
-            } catch (IllegalArgumentException ignored) {
+        @SuppressWarnings("unchecked")
+        Map<String, String> pathVars = (Map<String, String>) request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+        if (pathVars != null) {
+            String projectId = pathVars.get("projectId");
+            if (projectId != null) {
+                try { return UUID.fromString(projectId); } catch (IllegalArgumentException ignored) {}
             }
-        }
-        String issueId = request.getAttribute("issueId") != null
-                ? request.getAttribute("issueId").toString() : null;
-        if (issueId != null) {
-            try {
-                UUID issueUUID = UUID.fromString(issueId);
-                return issueProjectCache.getProjectId(issueUUID);
-            } catch (IllegalArgumentException ignored) {
+            String issueId = pathVars.get("issueId");
+            if (issueId != null) {
+                try { return issueProjectCache.getProjectId(UUID.fromString(issueId)); } catch (IllegalArgumentException ignored) {}
             }
-        }
-        String id = request.getAttribute("id") != null
-                ? request.getAttribute("id").toString() : null;
-        if (id != null) {
-            try {
-                UUID idUUID = UUID.fromString(id);
-                return issueProjectCache.getProjectId(idUUID);
-            } catch (IllegalArgumentException ignored) {
+            String id = pathVars.get("id");
+            if (id != null) {
+                try { return issueProjectCache.getProjectId(UUID.fromString(id)); } catch (IllegalArgumentException ignored) {}
             }
         }
         return null;

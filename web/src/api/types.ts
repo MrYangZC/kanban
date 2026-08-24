@@ -16,6 +16,7 @@ export interface Project {
   stats?: ProjectStats
   favorited?: boolean
   canEdit?: boolean
+  canManage?: boolean
 }
 
 /** 项目分类筛选键 */
@@ -51,7 +52,6 @@ export interface LabelVO {
 
 export interface IssueStatusVO {
   id: string
-  projectId: string
   name: string
   code: string
   category: string
@@ -62,7 +62,7 @@ export interface IssueStatusVO {
 export interface Issue {
   id: string
   projectId: string
-  issueNumber: number
+  issueNumber: string
   issueKey: string
   issueTypeId: string
   statusId: string
@@ -87,8 +87,8 @@ export interface Issue {
   fixVersion: string | null
   source: string | null
   iteration: string | null
-  participants: string | null
-  ccUsers: string | null
+  participants: string[] | null
+  ccUsers: string[] | null
   planStart: string | null
   noFixReason: string | null
   labels: LabelVO[]
@@ -281,7 +281,7 @@ export interface ProjectActivityVO {
   actorName: string | null
   action: string
   issueId: string
-  issueNumber: number
+  issueNumber: string
   issueTitle: string
   oldValue: string | null
   newValue: string | null
@@ -332,6 +332,15 @@ export interface RbacMenu {
   code: string
   name: string
   parentId?: string
-  type: 'MENU' | 'BUTTON'
+  /** 当前仅 MENU，按钮权限已收敛至 permission 表 */
+  type?: string
   sortOrder?: number
+}
+
+export interface PermissionDef {
+  code: string
+  name: string
+  description?: string
+  module: string
+  sortOrder: number
 }

@@ -21,19 +21,20 @@ public class MilestoneController {
 
     private final MilestoneService milestoneService;
 
+    @ProjectRoleAnnotation(Permission.MILESTONE_VIEW)
     @GetMapping
     public R<List<MilestoneVO>> list(@PathVariable UUID projectId) {
         return R.ok(milestoneService.list(projectId));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.MILESTONE_MANAGE)
     @PostMapping
     public R<MilestoneVO> create(@PathVariable UUID projectId,
                                  @Valid @RequestBody CreateMilestoneRequest req) {
         return R.ok(milestoneService.create(projectId, req));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.MILESTONE_MANAGE)
     @PutMapping("/{id}")
     public R<MilestoneVO> update(@PathVariable UUID projectId,
                                  @PathVariable UUID id,
@@ -41,7 +42,7 @@ public class MilestoneController {
         return R.ok(milestoneService.update(projectId, id, req));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.MILESTONE_MANAGE)
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable UUID projectId,
                           @PathVariable UUID id) {

@@ -3,6 +3,7 @@ package com.seven7m.kanban.controller;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.RequireAdmin;
 import com.seven7m.kanban.entity.rbac.Menu;
+import com.seven7m.kanban.entity.rbac.PermissionDef;
 import com.seven7m.kanban.entity.rbac.Role;
 import com.seven7m.kanban.service.rbac.RbacAdminService;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +56,28 @@ public class RbacAdminController {
         return R.ok();
     }
 
-    // ---------------- 菜单 / 权限点 ----------------
+    // ---------------- 权限定义 + 角色-权限码 ----------------
+    @RequireAdmin
+    @GetMapping("/permissions")
+    public R<List<PermissionDef>> listPermissions() {
+        return R.ok(rbacAdminService.listAllPermissions());
+    }
+
+    @RequireAdmin
+    @GetMapping("/roles/{roleId}/permissions")
+    public R<List<String>> listRolePermissions(@PathVariable UUID roleId) {
+        return R.ok(rbacAdminService.listRolePermissions(roleId));
+    }
+
+    @RequireAdmin
+    @PostMapping("/roles/{roleId}/permissions")
+    public R<Void> assignRolePermissions(@PathVariable UUID roleId,
+                                         @RequestBody List<String> permissionCodes) {
+        rbacAdminService.assignRolePermissions(roleId, permissionCodes);
+        return R.ok();
+    }
+
+    // ---------------- 菜单（导航） ----------------
     @RequireAdmin
     @GetMapping("/menus")
     public R<List<Menu>> listMenus() {

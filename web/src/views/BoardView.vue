@@ -13,6 +13,7 @@ import { createBoardFilter } from '@/stores/boardFilter'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { useWorkflowTransition } from '@/composables/useWorkflowTransition'
+import { useProjectPermission } from '@/composables/useProjectPermission'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,17 +26,8 @@ const loading = ref(false)
 const allTags = ref<LabelVO[]>([])
 const filter = createBoardFilter()
 const filteredIds = ref<Set<string>>(new Set())
-const canWrite = ref(true)
-
-async function loadPermission() {
-  try {
-    const members = await listProjectMembers(projectId)
-    const me = (members as ProjectMember[]).find((m) => m.userId === userStore.user?.id)
-    canWrite.value = !me || ['OWNER', 'ADMIN', 'PM', 'DEV', 'QA', 'MEMBER'].some((r) => me.roles.includes(r))
-  } catch {
-    canWrite.value = true
-  }
-}
+const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId)
+const canWrite = computed(() => hasPermission('issue:create'))
 
 async function load() {
   loading.value = true
@@ -174,7 +166,7 @@ function switchView(v: 'board' | 'table' | 'defects') {
 }
 
 onMounted(() => {
-  loadPermission()
+  refreshPermission()
   load()
 })
 </script>

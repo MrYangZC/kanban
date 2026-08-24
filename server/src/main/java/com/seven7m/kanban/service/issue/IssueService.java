@@ -20,11 +20,15 @@ import com.seven7m.kanban.dto.issue.MoveIssueRequest;
 import com.seven7m.kanban.dto.issue.UpdateIssueRequest;
 import com.seven7m.kanban.entity.issue.Issue;
 import com.seven7m.kanban.entity.issue.IssueActivity;
+import com.seven7m.kanban.entity.issue.IssueCc;
+import com.seven7m.kanban.entity.issue.IssueParticipant;
 import com.seven7m.kanban.entity.issue.IssueType;
 import com.seven7m.kanban.entity.issue.link.IssueLink;
 import com.seven7m.kanban.mapper.issue.link.IssueLinkMapper;
 import com.seven7m.kanban.mapper.issue.IssueActivityMapper;
+import com.seven7m.kanban.mapper.issue.IssueCcMapper;
 import com.seven7m.kanban.mapper.issue.IssueMapper;
+import com.seven7m.kanban.mapper.issue.IssueParticipantMapper;
 import com.seven7m.kanban.mapper.issue.IssueTypeMapper;
 import com.seven7m.kanban.entity.issue.tag.IssueTag;
 import com.seven7m.kanban.mapper.issue.tag.IssueTagMapper;
@@ -60,6 +64,8 @@ public class IssueService {
     private final IssueMapper issueMapper;
     private final IssueStatusMapper issueStatusMapper;
     private final IssueTypeMapper issueTypeMapper;
+    private final IssueParticipantMapper issueParticipantMapper;
+    private final IssueCcMapper issueCcMapper;
     private final IssueActivityMapper issueActivityMapper;
     private final IssueTagMapper issueTagMapper;
     private final IssueCommentMapper issueCommentMapper;
@@ -97,18 +103,17 @@ public class IssueService {
             throw new ServiceException(404, "项目不存在");
         }
         IssueStatus status = issueStatusMapper.selectById(req.getStatusId());
-        if (status == null || !status.getProjectId().equals(req.getProjectId())) {
-            throw new ServiceException(400, "状态不属于该项目");
+        if (status == null) {
+            throw new ServiceException(400, "状态不存在");
         }
 
-        // 未传类型时取项目第一个默认类型（前端新建 Issue 的容错）
+        // 未传类型时取全局第一个类型（前端新建 Issue 的容错）
         UUID issueTypeId = req.getIssueTypeId();
         if (issueTypeId == null) {
             IssueType first = issueTypeMapper.selectOne(Wrappers.<IssueType>lambdaQuery()
-                    .eq(IssueType::getProjectId, req.getProjectId())
                     .orderByAsc(IssueType::getSortOrder).last("LIMIT 1"));
             if (first == null) {
-                throw new ServiceException(400, "项目未初始化 IssueType");
+                throw new ServiceException(400, "未初始化 IssueType");
             }
             issueTypeId = first.getId();
         }
@@ -164,8 +169,6 @@ public class IssueService {
         if (req.getArchived() != null) uw.set(Issue::getArchived, req.getArchived());
         // 缺陷详情页（云效风格）基础字段
         if (req.getIteration() != null) uw.set(Issue::getIteration, req.getIteration());
-        if (req.getParticipants() != null) uw.set(Issue::getParticipants, req.getParticipants());
-        if (req.getCcUsers() != null) uw.set(Issue::getCcUsers, req.getCcUsers());
         if (req.getPlanStart() != null) uw.set(Issue::getPlanStart, req.getPlanStart());
         if (req.getNoFixReason() != null) uw.set(Issue::getNoFixReason, req.getNoFixReason());
 
@@ -179,11 +182,11 @@ public class IssueService {
                     case "dueDate" -> uw.set(Issue::getDueDate, null);
                     case "planStart" -> uw.set(Issue::getPlanStart, null);
                     case "iteration" -> uw.set(Issue::getIteration, null);
-                    case "participants" -> uw.set(Issue::getParticipants, null);
-                    case "ccUsers" -> uw.set(Issue::getCcUsers, null);
                     case "noFixReason" -> uw.set(Issue::getNoFixReason, null);
                     case "module" -> uw.set(Issue::getModule, null);
                     case "fixVersion" -> uw.set(Issue::getFixVersion, null);
+                    // 参与者/抄送：关联表全量替换，在下方单独处理
+                    case "participants", "ccUsers" -> { }
                     default -> throw new ServiceException(400, "不支持清空字段: " + field);
                 }
             }
@@ -192,8 +195,8 @@ public class IssueService {
         if (req.getStatusId() != null && !req.getStatusId().equals(issue.getStatusId())) {
             // 状态变更：与看板 move 统一走工作流流转校验（不再自由流转）
             IssueStatus target = issueStatusMapper.selectById(req.getStatusId());
-            if (target == null || !target.getProjectId().equals(issue.getProjectId())) {
-                throw new ServiceException(400, "状态不属于该项目");
+            if (target == null) {
+                throw new ServiceException(400, "状态不存在");
             }
             if (!workflowService.canTransition(issue.getProjectId(), issue.getStatusId(), req.getStatusId())) {
                 String fromName = Optional.ofNullable(issueStatusMapper.selectById(issue.getStatusId()))
@@ -213,9 +216,43 @@ public class IssueService {
             issueMapper.update(null, uw);
         }
 
+        // 参与者/抄送：全量替换关联表（null 表示不改动；clearFields 含该字段表示清空）
+        boolean clearParticipants = req.getClearFields() != null && req.getClearFields().contains("participants");
+        boolean clearCc = req.getClearFields() != null && req.getClearFields().contains("ccUsers");
+        if (req.getParticipants() != null || clearParticipants) {
+            replaceParticipants(id, clearParticipants ? List.of() : req.getParticipants());
+        }
+        if (req.getCcUsers() != null || clearCc) {
+            replaceCcUsers(id, clearCc ? List.of() : req.getCcUsers());
+        }
+
         Issue updated = requireIssue(id);
         Project project = projectMapper.selectById(updated.getProjectId());
         return toVO(updated, project == null ? "" : project.getProjectKey());
+    }
+
+    /** 全量替换参与者关联：先删后插，保持与提交的 userId 列表一致 */
+    private void replaceParticipants(UUID issueId, List<String> userIds) {
+        issueParticipantMapper.delete(Wrappers.<IssueParticipant>lambdaQuery().eq(IssueParticipant::getIssueId, issueId));
+        for (String uid : userIds) {
+            if (uid == null || uid.isBlank()) continue;
+            IssueParticipant p = new IssueParticipant();
+            p.setIssueId(issueId);
+            p.setUserId(UUID.fromString(uid));
+            issueParticipantMapper.insert(p);
+        }
+    }
+
+    /** 全量替换抄送关联：先删后插，保持与提交的 userId 列表一致 */
+    private void replaceCcUsers(UUID issueId, List<String> userIds) {
+        issueCcMapper.delete(Wrappers.<IssueCc>lambdaQuery().eq(IssueCc::getIssueId, issueId));
+        for (String uid : userIds) {
+            if (uid == null || uid.isBlank()) continue;
+            IssueCc c = new IssueCc();
+            c.setIssueId(issueId);
+            c.setUserId(UUID.fromString(uid));
+            issueCcMapper.insert(c);
+        }
     }
 
     /**
@@ -239,7 +276,7 @@ public class IssueService {
         else if ("REPORTED".equals(req.getScope())) q.eq(Issue::getReporterId, me);
         else if ("VERIFIED".equals(req.getScope())) q.eq(Issue::getVerifierId, me);
         else if ("SHARED".equals(req.getScope()))
-            q.apply("participants @> {0}::jsonb", "[\"" + me + "\"]");
+            q.apply("id IN (SELECT issue_id FROM issue_participant WHERE user_id = {0})", me);
         else if ("ARCHIVED".equals(req.getScope())) q.eq(Issue::getArchived, 1);
         else if ("ACTIVE".equals(req.getScope())) q.eq(Issue::getArchived, 0);
 
@@ -298,8 +335,8 @@ public class IssueService {
         if (!fromStatus.equals(toStatus)) {
             // 跨状态：目标状态必须属于当前项目，且默认工作流存在 from→to 流转规则
             IssueStatus target = issueStatusMapper.selectById(toStatus);
-            if (target == null || !target.getProjectId().equals(issue.getProjectId())) {
-                throw new ServiceException(400, "状态不属于该项目");
+            if (target == null) {
+                throw new ServiceException(400, "状态不存在");
             }
             if (!workflowService.canTransition(issue.getProjectId(), fromStatus, toStatus)) {
                 String fromName = Optional.ofNullable(issueStatusMapper.selectById(fromStatus))
@@ -339,13 +376,17 @@ public class IssueService {
         collectDescendantIds(id, ids);
 
         // 主任务与子任务软删除（@TableLogic 自动补 deleted=0 条件）
-        issueMapper.deleteBatchIds(ids);
+        // 注意：不能使用 deleteBatchIds(List<UUID>)，其在逻辑删除下会对 UUID 反射 id 属性导致报错
+        issueMapper.delete(Wrappers.<Issue>lambdaQuery().in(Issue::getId, ids));
         // 评论逻辑删除
         issueCommentMapper.delete(Wrappers.<IssueComment>lambdaQuery().in(IssueComment::getIssueId, ids));
         // 附件物理删除
         issueAttachmentMapper.delete(Wrappers.<IssueAttachment>lambdaQuery().in(IssueAttachment::getIssueId, ids));
         // 标签关联物理删除
         issueTagMapper.deleteIssueLabelByIssueIds(ids);
+        // 参与者/抄送关联物理删除
+        issueParticipantMapper.delete(Wrappers.<IssueParticipant>lambdaQuery().in(IssueParticipant::getIssueId, ids));
+        issueCcMapper.delete(Wrappers.<IssueCc>lambdaQuery().in(IssueCc::getIssueId, ids));
         // 关联记录双向删除，避免树形视图出现孤儿节点
         issueLinkMapper.delete(Wrappers.<IssueLink>lambdaQuery()
                 .and(w -> w.in(IssueLink::getIssueId, ids).or().in(IssueLink::getTargetIssueId, ids)));
@@ -474,6 +515,17 @@ public class IssueService {
                 commentMap.put(UUID.fromString(issueId.toString()), cnt);
             }
         }
+        // 参与者/抄送：一次查出所有 issue 的关联，按 issueId 分组
+        Map<UUID, List<String>> participantMap = new HashMap<>();
+        for (IssueParticipant p : issueParticipantMapper.selectList(
+                Wrappers.<IssueParticipant>lambdaQuery().in(IssueParticipant::getIssueId, issueIds))) {
+            participantMap.computeIfAbsent(p.getIssueId(), k -> new ArrayList<>()).add(p.getUserId().toString());
+        }
+        Map<UUID, List<String>> ccMap = new HashMap<>();
+        for (IssueCc c : issueCcMapper.selectList(
+                Wrappers.<IssueCc>lambdaQuery().in(IssueCc::getIssueId, issueIds))) {
+            ccMap.computeIfAbsent(c.getIssueId(), k -> new ArrayList<>()).add(c.getUserId().toString());
+        }
 
         List<IssueVO> result = new ArrayList<>(issues.size());
         for (Issue i : issues) {
@@ -497,6 +549,8 @@ public class IssueService {
             vo.setVerifierName(v == null ? null : v.getDisplayName());
             vo.setLabels(labelMap.getOrDefault(i.getId(), List.of()));
             vo.setCommentCount(commentMap.getOrDefault(i.getId(), 0L));
+            vo.setParticipants(participantMap.getOrDefault(i.getId(), List.of()));
+            vo.setCcUsers(ccMap.getOrDefault(i.getId(), List.of()));
             result.add(vo);
         }
         return result;
@@ -553,6 +607,13 @@ public class IssueService {
                 .map(this::toLabelVO).collect(Collectors.toList()));
         // 评论数
         vo.setCommentCount(issueCommentMapper.countByIssue(issue.getId()));
+        // 参与者/抄送
+        vo.setParticipants(issueParticipantMapper.selectList(
+                        Wrappers.<IssueParticipant>lambdaQuery().eq(IssueParticipant::getIssueId, issue.getId()))
+                .stream().map(p -> p.getUserId().toString()).collect(Collectors.toList()));
+        vo.setCcUsers(issueCcMapper.selectList(
+                        Wrappers.<IssueCc>lambdaQuery().eq(IssueCc::getIssueId, issue.getId()))
+                .stream().map(c -> c.getUserId().toString()).collect(Collectors.toList()));
         return vo;
     }
 }

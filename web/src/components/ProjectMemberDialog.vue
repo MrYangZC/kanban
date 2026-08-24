@@ -15,7 +15,7 @@ import { Users, UserPlus, Trash2, Crown } from 'lucide-vue-next'
 const props = withDefaults(
   defineProps<{
     projectId: string
-    /** 当前用户是否可管理成员（OWNER/ADMIN）；未传则按成员列表中的当前用户角色推算 */
+    /** 当前用户是否可管理成员（OWNER/ADMIN/PM）；未传则按成员列表中的当前用户角色推算 */
     canManage?: boolean
   }>(),
   { canManage: undefined }
@@ -42,7 +42,7 @@ const canManageResolved = computed(() => {
   if (props.canManage !== undefined) return props.canManage
   const me = userStore.user?.id
   const rs = members.value.find((m) => m.userId === me)?.roles ?? []
-  return rs.includes('OWNER') || rs.includes('ADMIN')
+  return rs.includes('OWNER') || rs.includes('ADMIN') || rs.includes('PM')
 })
 
 const members = ref<ProjectMember[]>([])

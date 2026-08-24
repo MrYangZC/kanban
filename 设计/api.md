@@ -1,3 +1,18 @@
+> **【最新状态 · 2026-08-24 已落地】**
+>
+> 本文档为设计阶段 API 规范讨论稿，接口语义已按两次架构级重构调整，以当前 `server/src/main/java/com/seven7m/kanban/controller` 与 `web/src/api` 为准，本文档仅作设计演进记录。
+>
+> **接口语义关键变更：**
+> - Workspace 相关接口随 workspace 模块移除而废弃。
+> - 状态/类型/标签/工作流接口由「项目维度」改为「全局字典 + 项目选用」：全局字典由全局接口管理，项目通过 `workflow_id` 绑定模板、通过 `project_label` 选用标签。
+> - 标签选择器改为「全局标签库 + 项目选用关联」。
+> - 看板列不再返回冗余 `name`，由 `statusId → issue_status.name` 获取。
+> - 角色授权基于 `role_id`，菜单仅导航、按钮权限由 `permission` 承载。
+>
+> **权威参考：** 后端 `server/src/main/java/com/seven7m/kanban/controller`；前端 `web/src/api`。
+>
+> ---
+
 可以。API 这一层建议现在直接定成一套规范，后续前后端所有接口都严格遵循。你明确要求 `code / msg / data`，那我建议不要再用 `message`，统一就是：
 
 ```json

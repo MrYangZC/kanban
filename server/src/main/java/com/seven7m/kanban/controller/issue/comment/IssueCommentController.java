@@ -19,19 +19,19 @@ public class IssueCommentController {
 
     private final IssueCommentService commentService;
 
-    @ProjectRoleAnnotation(Permission.READ)
+    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping("/{issueId}/activities")
     public R<List<IssueActivityVO>> list(@PathVariable UUID issueId) {
         return R.ok(commentService.listActivities(issueId));
     }
 
-    @ProjectRoleAnnotation(Permission.WRITE)
+    @ProjectRoleAnnotation(Permission.ISSUE_COMMENT)
     @PostMapping("/{issueId}/comments")
     public R<IssueActivityVO> add(@PathVariable UUID issueId, @RequestBody AddCommentRequest body) {
         return R.ok(commentService.addComment(issueId, body.getContent(), body.getParentId()));
     }
 
-    @ProjectRoleAnnotation(Permission.WRITE)
+    @ProjectRoleAnnotation(Permission.ISSUE_COMMENT)
     @DeleteMapping("/{issueId}/comments/{commentId}")
     public R<Void> delete(@PathVariable UUID issueId, @PathVariable UUID commentId) {
         commentService.deleteComment(issueId, commentId);

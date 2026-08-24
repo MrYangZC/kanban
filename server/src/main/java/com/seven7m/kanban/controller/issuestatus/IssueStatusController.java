@@ -22,7 +22,7 @@ public class IssueStatusController {
     private final IssueStatusService issueStatusService;
 
     /** 项目状态列表（只读，供详情页状态下拉） */
-    @ProjectRoleAnnotation(Permission.READ)
+    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping("/{projectId}/statuses")
     public R<List<IssueStatus>> projectStatuses(@PathVariable UUID projectId) {
         return R.ok(issueStatusService.listByProject(projectId));

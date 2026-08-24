@@ -101,8 +101,9 @@ const form = ref<{
   dueDate: string
 }>({ title: '', description: '', level: 'MEDIUM', status: 'OPEN', ownerId: '', dueDate: '' })
 
-const { canWrite, canAdmin, refresh } = useProjectPermission(() => projectId)
-const canManage = computed(() => canWrite.value)
+const { hasPermission, refresh } = useProjectPermission(() => projectId)
+const canManage = computed(() => hasPermission('risk:manage'))
+const canAdmin = computed(() => hasPermission('risk:manage'))
 
 async function load() {
   loading.value = true

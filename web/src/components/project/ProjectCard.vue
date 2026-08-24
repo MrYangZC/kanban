@@ -57,6 +57,7 @@ async function onFavorite(p: Project) {
         class="rounded-md p-1.5 text-ink-secondary transition-all duration-200 hover:bg-surface-hover hover:text-primary"
         :class="{ 'cursor-not-allowed opacity-50': !project.canEdit }"
         title="编辑项目"
+        :disabled="!project.canEdit"
         @click.stop="emit('openEdit', project)"
       >
         <Pencil :size="15" />
@@ -107,6 +108,7 @@ async function onFavorite(p: Project) {
       </div>
       <div class="flex items-center gap-2">
         <button
+          v-if="project.canManage"
           class="rounded-md px-2.5 py-1 text-xs font-medium text-ink-secondary transition-all duration-200 hover:bg-surface-hover hover:text-ink"
           @click.stop="emit('openMembers', project)"
         >管理成员</button>

@@ -21,10 +21,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -61,13 +64,28 @@ public class ProjectMemberService {
         ProjectMember project = projectMemberMapper.selectOne(Wrappers.<ProjectMember>lambdaQuery()
                 .eq(ProjectMember::getProjectId, projectId).last("LIMIT 1"));
         if (project == null) {
-            // 项目可能被删除，直接返回空列表
             return List.of();
         }
-        return projectMemberMapper.selectList(Wrappers.<ProjectMember>lambdaQuery()
+        List<ProjectMember> memberList = projectMemberMapper.selectList(Wrappers.<ProjectMember>lambdaQuery()
                         .eq(ProjectMember::getProjectId, projectId)
-                        .orderByAsc(ProjectMember::getCreatedAt))
-                .stream().map(this::toVO).collect(Collectors.toList());
+                        .orderByAsc(ProjectMember::getCreatedAt));
+        Set<UUID> userIds = memberList.stream().map(ProjectMember::getUserId).collect(Collectors.toSet());
+        Map<UUID, SysUser> userMap = userIds.isEmpty() ? Map.of() :
+                userMapper.selectBatchIds(userIds).stream()
+                        .collect(Collectors.toMap(SysUser::getId, Function.identity()));
+        Map<UUID, Set<String>> roleMap = buildRoleMap(projectId);
+        return memberList.stream().map(m -> toVO(m, userMap, roleMap)).collect(Collectors.toList());
+    }
+
+    private Map<UUID, Set<String>> buildRoleMap(UUID projectId) {
+        Map<UUID, Set<String>> map = new HashMap<>();
+        List<Map<String, Object>> rows = userRoleMapper.selectRoleCodesByProject(projectId);
+        for (Map<String, Object> row : rows) {
+            UUID userId = (UUID) row.get("user_id");
+            String code = (String) row.get("code");
+            map.computeIfAbsent(userId, k -> new LinkedHashSet<>()).add(code);
+        }
+        return map;
     }
 
     @Transactional
@@ -155,6 +173,19 @@ public class ProjectMemberService {
         return roles;
     }
 
+    /**
+     * 查询用户在指定项目中的角色 id 集合（供 role_permission 按 role_id 联查权限）。
+     */
+    public Set<UUID> getRoleIds(UUID projectId, UUID userId) {
+        if (projectId == null || userId == null) {
+            return Set.of();
+        }
+        if (!projectService.isMember(projectId, userId)) {
+            return Set.of();
+        }
+        return new LinkedHashSet<>(userRoleMapper.selectRoleIdsByProjectAndUser(projectId, userId));
+    }
+
     /** 角色变更后使缓存失效，保证权限及时生效 */
     public void evictRoleCache(UUID projectId, UUID userId) {
         roleCache.remove(projectId + ":" + userId);
@@ -201,6 +232,22 @@ public class ProjectMemberService {
         if (!projectService.isOwner(projectId, UserContext.getUserId())) {
             throw new ServiceException(403, "仅项目所有者可管理成员");
         }
+    }
+
+    private ProjectMemberVO toVO(ProjectMember m, Map<UUID, SysUser> userMap, Map<UUID, Set<String>> roleMap) {
+        ProjectMemberVO vo = new ProjectMemberVO();
+        vo.setId(m.getId());
+        vo.setProjectId(m.getProjectId());
+        vo.setUserId(m.getUserId());
+        vo.setRoles(roleMap.getOrDefault(m.getUserId(), Set.of()).stream().toList());
+        vo.setCreatedAt(m.getCreatedAt());
+        SysUser u = userMap.get(m.getUserId());
+        if (u != null) {
+            vo.setUsername(u.getUsername());
+            vo.setDisplayName(u.getDisplayName());
+            vo.setAvatarUrl(u.getAvatarUrl());
+        }
+        return vo;
     }
 
     private ProjectMemberVO toVO(ProjectMember m) {

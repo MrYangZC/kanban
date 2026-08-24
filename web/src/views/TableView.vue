@@ -12,6 +12,7 @@ import { createBoardFilter } from '@/stores/boardFilter'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { ChevronUp, ChevronDown, Plus } from 'lucide-vue-next'
+import { useProjectPermission } from '@/composables/useProjectPermission'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,7 +29,8 @@ const allTags = ref<LabelVO[]>([])
 const members = ref<ProjectMember[]>([])
 const users = ref<UserVO[]>([])
 const filter = createBoardFilter()
-const canWrite = ref(true)
+const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId)
+const canWrite = computed(() => hasPermission('issue:edit'))
 
 // 状态列（来自看板分组），用于行内编辑下拉
 const statusOptions = ref<{ id: string; name: string; color: string }[]>([])
@@ -60,8 +62,7 @@ async function loadMeta() {
   allTags.value = await listProjectTags(projectId).catch(() => [])
   members.value = await listProjectMembers(projectId).catch(() => [])
   users.value = await listUsers().catch(() => [])
-  const me = members.value.find((m) => m.userId === userStore.user?.id)
-  canWrite.value = !me || ['OWNER', 'ADMIN', 'PM', 'DEV', 'QA', 'MEMBER'].some((r) => me.roles.includes(r))
+  refreshPermission()
 }
 
 async function load() {

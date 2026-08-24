@@ -21,6 +21,7 @@ import {
 import CommentThread from '@/components/CommentThread.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import { useUserStore } from '@/stores/user'
+import { useProjectPermission } from '@/composables/useProjectPermission'
 import { avatarChar, avatarColor } from '@/utils/avatar'
 import { fmtTime, fmtDate } from '@/utils/datetime'
 
@@ -54,7 +55,9 @@ const allTags = ref<LabelVO[]>([])
 const members = ref<ProjectMember[]>([])
 const users = ref<UserVO[]>([])
 const statuses = ref<IssueStatusVO[]>([])
-const canWrite = ref(true)
+const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => pid.value)
+const canWrite = computed(() => hasPermission('issue:edit'))
+const canComment = computed(() => hasPermission('issue:comment'))
 
 const currentIssue = ref<Issue | null>(null)
 const currentIndex = computed(() =>
@@ -164,8 +167,7 @@ async function loadMeta() {
   try { allTags.value = await listProjectTags(pid.value) } catch { /* ignore */ }
   try { members.value = await listProjectMembers(pid.value) } catch { /* ignore */ }
   try { users.value = await listUsers() } catch { /* ignore */ }
-  const me = members.value.find((m) => m.userId === currentUserId.value)
-  canWrite.value = !me || !me.roles.includes('VIEWER')
+  refreshPermission()
 }
 
 async function loadIssues() {
@@ -269,8 +271,8 @@ function cancelComment() {
   replyTo.value = null
 }
 async function sendComment() {
-  if (!currentIssue.value || !commentText.value.trim() || !canWrite.value) {
-    if (!canWrite.value) ElMessage.warning('无评论权限')
+  if (!currentIssue.value || !commentText.value.trim() || !canComment.value) {
+    if (!canComment.value) ElMessage.warning('无评论权限')
     return
   }
   try {
@@ -575,7 +577,7 @@ onMounted(() => {
                     v-if="a.type === 'COMMENT'"
                     :node="a"
                     :depth="0"
-                    :can-write="canWrite"
+                    :can-write="canComment"
                     :current-user-name="currentUserName"
                     @reply="startReply"
                     @remove="removeComment"

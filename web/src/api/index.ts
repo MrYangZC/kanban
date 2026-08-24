@@ -1,5 +1,5 @@
 import http, { req, type R } from './request'
-import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest, SprintVO, RiskVO, RbacRole, RbacMenu } from './types'
+import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest, SprintVO, RiskVO, RbacRole, RbacMenu, PermissionDef } from './types'
 
 // ---- user ----
 export function login(username: string, password: string) {
@@ -120,8 +120,8 @@ export function createIssue(payload: {
   fixVersion?: string
   source?: string
   iteration?: string
-  participants?: string
-  ccUsers?: string
+  participants?: string[]
+  ccUsers?: string[]
   planStart?: string
   noFixReason?: string
 }) {
@@ -149,8 +149,8 @@ export interface UpdateIssuePayload {
   source?: string
   archived?: number
   iteration?: string
-  participants?: string
-  ccUsers?: string
+  participants?: string[]
+  ccUsers?: string[]
   planStart?: string
   noFixReason?: string
   /** 需要显式置空的字段名集合（配合 assigneeId: null 等使用） */
@@ -246,6 +246,17 @@ export function addIssueTag(issueId: string, projectId: string, name: string, co
 export function removeIssueTag(issueId: string, labelId: string) {
   return req<void>(http.delete(`/v1/issues/${issueId}/tags/${labelId}`))
 }
+// 全局标签库
+export function listGlobalLabels() {
+  return req<LabelVO[]>(http.get(`/v1/labels`))
+}
+// 项目选用全局标签
+export function addProjectLabel(projectId: string, labelId: string) {
+  return req<void>(http.post(`/v1/projects/${projectId}/labels/${labelId}`))
+}
+export function removeProjectLabel(projectId: string, labelId: string) {
+  return req<void>(http.delete(`/v1/projects/${projectId}/labels/${labelId}`))
+}
 
 // ---- milestones ----
 export function listMilestones(projectId: string) {
@@ -321,6 +332,9 @@ export function deleteRisk(projectId: string, id: string) {
 }
 
 // ---- RBAC 全局管理 (系统管理员) ----
+export function getMyPermissions(projectId: string) {
+  return req<string[]>(http.get(`/v1/projects/${projectId}/my-permissions`))
+}
 export function listRoles() {
   return req<RbacRole[]>(http.get(`/v1/admin/roles`))
 }
@@ -356,4 +370,15 @@ export function listUserRoles(userId: string, projectId: string) {
 }
 export function assignUserRoles(userId: string, projectId: string, roleIds: string[]) {
   return req<void>(http.post(`/v1/admin/users/${userId}/roles?projectId=${projectId}`, roleIds))
+}
+
+// ---- 权限定义 + 角色-权限码 ----
+export function listPermissions() {
+  return req<PermissionDef[]>(http.get(`/v1/admin/permissions`))
+}
+export function listRolePermissions(roleId: string) {
+  return req<string[]>(http.get(`/v1/admin/roles/${roleId}/permissions`))
+}
+export function assignRolePermissions(roleId: string, permissionCodes: string[]) {
+  return req<void>(http.post(`/v1/admin/roles/${roleId}/permissions`, permissionCodes))
 }

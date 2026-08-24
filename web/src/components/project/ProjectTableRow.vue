@@ -99,6 +99,7 @@ async function onFavorite(p: Project) {
           class="rounded-md p-1.5 text-ink-secondary transition-all duration-200 hover:bg-surface-hover hover:text-primary"
           :class="{ 'cursor-not-allowed opacity-50': !project.canEdit }"
           title="编辑项目"
+          :disabled="!project.canEdit"
           @click.stop="emit('openEdit', project)"
         >
           <Pencil :size="15" />

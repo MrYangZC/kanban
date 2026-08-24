@@ -19,14 +19,14 @@ public class IssueStatusService {
     private final IssueStatusMapper issueStatusMapper;
     private final ProjectMapper projectMapper;
 
-    /** 项目下全部状态（供详情页状态下拉与看板列定义），按 sortOrder 升序 */
+    /** 全局状态字典（全局化后状态不再按项目隔离），按 sortOrder 升序 */
     public List<IssueStatus> listByProject(UUID projectId) {
+        // 仍校验项目存在（接口以项目为入口），但状态本身为全局字典
         Project project = projectMapper.selectById(projectId);
         if (project == null || project.getDeleted() != null && project.getDeleted() == 1) {
             throw new ServiceException(404, "项目不存在");
         }
         return issueStatusMapper.selectList(Wrappers.<IssueStatus>lambdaQuery()
-                .eq(IssueStatus::getProjectId, projectId)
                 .orderByAsc(IssueStatus::getSortOrder));
     }
 }

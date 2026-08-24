@@ -4,13 +4,16 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.entity.rbac.Menu;
+import com.seven7m.kanban.entity.rbac.PermissionDef;
 import com.seven7m.kanban.entity.rbac.Role;
 import com.seven7m.kanban.entity.rbac.RoleMenu;
 import com.seven7m.kanban.entity.rbac.UserRole;
 import com.seven7m.kanban.mapper.rbac.MenuMapper;
+import com.seven7m.kanban.mapper.rbac.PermissionMapper;
 import com.seven7m.kanban.mapper.rbac.RoleMapper;
 import com.seven7m.kanban.mapper.rbac.RoleMenuMapper;
 import com.seven7m.kanban.mapper.rbac.UserRoleMapper;
+import com.seven7m.kanban.common.security.PermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,7 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * RBAC 全局管理后台服务：角色、菜单/权限点、角色-菜单、用户-角色 的配置维护。
+ * RBAC 全局管理后台服务：角色、菜单（导航）、角色-菜单、用户-角色、角色-权限码 的配置维护。
  * 接口受 {@code @RequireAdmin} + AdminAuthInterceptor 保护。
  */
 @Slf4j
@@ -33,6 +36,8 @@ public class RbacAdminService {
     private final MenuMapper menuMapper;
     private final RoleMenuMapper roleMenuMapper;
     private final UserRoleMapper userRoleMapper;
+    private final PermissionMapper permissionMapper;
+    private final PermissionService permissionService;
 
     // ---------------- 角色 ----------------
     public List<Role> listRoles() {
@@ -66,7 +71,23 @@ public class RbacAdminService {
         roleMapper.deleteById(id);
     }
 
-    // ---------------- 菜单 / 权限点 ----------------
+    // ---------------- 权限定义 + 角色-权限码 ----------------
+    public List<PermissionDef> listAllPermissions() {
+        return permissionMapper.selectList(Wrappers.<PermissionDef>lambdaQuery()
+                .orderByAsc(PermissionDef::getModule)
+                .orderByAsc(PermissionDef::getSortOrder));
+    }
+
+    public List<String> listRolePermissions(UUID roleId) {
+        return permissionService.getPermissionsByRole(roleId);
+    }
+
+    @Transactional
+    public void assignRolePermissions(UUID roleId, List<String> permissionCodes) {
+        permissionService.setRolePermissions(roleId, permissionCodes);
+    }
+
+    // ---------------- 菜单（导航） ----------------
     public List<Menu> listMenus() {
         return menuMapper.selectList(Wrappers.<Menu>lambdaQuery().orderByAsc(Menu::getSortOrder));
     }
@@ -156,7 +177,7 @@ public class RbacAdminService {
     private Menu requireMenu(UUID id) {
         Menu menu = menuMapper.selectById(id);
         if (menu == null) {
-            throw new ServiceException(404, "菜单/权限点不存在");
+            throw new ServiceException(404, "菜单不存在");
         }
         return menu;
     }

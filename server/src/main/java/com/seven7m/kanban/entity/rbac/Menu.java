@@ -10,7 +10,8 @@ import lombok.Setter;
 import java.util.UUID;
 
 /**
- * 菜单 / 权限点。前端菜单树与后端接口鉴权共用。
+ * 菜单（导航）。仅承载前端导航树职责；按钮级权限已收敛至 permission 表，
+ * 由 role_permission 承载。历史 BUTTON 节点已随 V26 迁移删除。
  */
 @Getter
 @Setter
@@ -20,14 +21,14 @@ public class Menu extends BaseEntity {
     @TableId(type = IdType.ASSIGN_UUID)
     private UUID id;
 
-    /** 权限点编码，如 ISSUE_CREATE */
+    /** 菜单编码，仅作导航标识 */
     private String code;
 
     private String name;
 
     private UUID parentId;
 
-    /** MENU / BUTTON */
+    /** 菜单类型，当前仅 MENU（保留字段以兼容历史数据） */
     private String type;
 
     private Integer sortOrder;

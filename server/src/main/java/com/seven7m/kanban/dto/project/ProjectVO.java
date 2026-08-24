@@ -23,6 +23,9 @@ public class ProjectVO {
     /** 当前用户是否已收藏该项目（用于前端卡片展示收藏标记） */
     private boolean favorited;
 
-    /** 当前用户是否可编辑该项目（基于角色判定，OWNER/ADMIN/PM/DEV/QA/MEMBER 可编辑） */
+    /** 当前用户是否可编辑该项目设置（基于角色判定，OWNER/ADMIN/PM 可编辑） */
     private boolean canEdit;
+
+    /** 当前用户是否可管理该项目成员与设置（基于角色判定，OWNER/ADMIN/PM 可管理） */
+    private boolean canManage;
 }

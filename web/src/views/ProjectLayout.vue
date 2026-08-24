@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
+import { useProjectPermission } from '@/composables/useProjectPermission'
 import { ElMessage } from 'element-plus'
 import {
   LayoutDashboard, FileText, ListTodo, Bug,
@@ -14,6 +15,7 @@ const router = useRouter()
 const projectStore = useProjectStore()
 
 const projectId = computed(() => route.params.projectId as string)
+const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId.value)
 
 const showSearchDialog = ref(false)
 const searchKeyword = ref('')
@@ -23,19 +25,24 @@ interface NavItem {
   name: string
   label: string
   icon: typeof LayoutDashboard
+  perm?: string
 }
 
-const NAV_ITEMS: NavItem[] = [
+const ALL_NAV_ITEMS: NavItem[] = [
   { name: 'overview', label: '概览', icon: LayoutDashboard },
-  { name: 'requirements', label: '需求', icon: FileText },
-  { name: 'tasks', label: '任务', icon: ListTodo },
-  { name: 'defects', label: '缺陷', icon: Bug },
-  { name: 'iterations', label: '迭代', icon: Repeat },
-  { name: 'milestones', label: '里程碑', icon: Target },
-  { name: 'risks', label: '风险', icon: ShieldAlert },
+  { name: 'requirements', label: '需求', icon: FileText, perm: 'issue:view' },
+  { name: 'tasks', label: '任务', icon: ListTodo, perm: 'issue:view' },
+  { name: 'defects', label: '缺陷', icon: Bug, perm: 'issue:view' },
+  { name: 'iterations', label: '迭代', icon: Repeat, perm: 'sprint:view' },
+  { name: 'milestones', label: '里程碑', icon: Target, perm: 'milestone:view' },
+  { name: 'risks', label: '风险', icon: ShieldAlert, perm: 'risk:view' },
   { name: 'metrics', label: '度量', icon: BarChart3 },
-  { name: 'settings', label: '设置', icon: Settings }
+  { name: 'settings', label: '设置', icon: Settings, perm: 'project:setting' }
 ]
+
+const NAV_ITEMS = computed(() =>
+  ALL_NAV_ITEMS.filter((item) => !item.perm || hasPermission(item.perm))
+)
 
 const currentNav = computed(() => {
   const segments = route.path.split('/')
@@ -85,13 +92,14 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-watch(projectId, () => { loadCurrent() }, { immediate: false })
+watch(projectId, () => { loadCurrent().then(() => refreshPermission()) }, { immediate: false })
 
 onMounted(async () => {
   if (!projectStore.loaded) {
     try { await projectStore.loadList() } catch { /* ignore */ }
   }
   await loadCurrent()
+  await refreshPermission()
   window.addEventListener('keydown', onKeydown)
 })
 

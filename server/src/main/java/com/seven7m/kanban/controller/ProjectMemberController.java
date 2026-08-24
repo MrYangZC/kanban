@@ -20,26 +20,27 @@ public class ProjectMemberController {
 
     private final ProjectMemberService projectMemberService;
 
+    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping
     public R<List<ProjectMemberVO>> list(@PathVariable UUID projectId) {
         return R.ok(projectMemberService.list(projectId));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.PROJECT_MEMBER)
     @PostMapping
     public R<ProjectMemberVO> add(@PathVariable UUID projectId,
                                   @Valid @RequestBody AddMemberRequest req) {
         return R.ok(projectMemberService.add(projectId, req));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.PROJECT_MEMBER)
     @DeleteMapping("/{userId}")
     public R<Void> remove(@PathVariable UUID projectId, @PathVariable UUID userId) {
         projectMemberService.remove(projectId, userId);
         return R.ok();
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.PROJECT_MEMBER)
     @PutMapping("/{userId}/roles")
     public R<ProjectMemberVO> updateRoles(@PathVariable UUID projectId,
                                           @PathVariable UUID userId,

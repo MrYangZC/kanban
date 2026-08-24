@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.dto.issue.LabelVO;
 import com.seven7m.kanban.entity.issue.tag.IssueTag;
+import com.seven7m.kanban.entity.issue.tag.ProjectLabel;
 import com.seven7m.kanban.mapper.issue.tag.IssueTagMapper;
+import com.seven7m.kanban.mapper.issue.tag.ProjectLabelMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 public class IssueTagService {
 
     private final IssueTagMapper tagMapper;
+    private final ProjectLabelMapper projectLabelMapper;
 
     /** 项目下所有标签（用于给 issue 打标时选择） */
     public List<LabelVO> listForProject(UUID projectId) {
@@ -44,26 +47,68 @@ public class IssueTagService {
 
     @Transactional
     public void addToIssue(UUID projectId, UUID issueId, String name, String color) {
+        // 标签全局化：按 name 查全局标签库，不存在则创建
         IssueTag tag = tagMapper.selectOne(Wrappers.<IssueTag>lambdaQuery()
-                .eq(IssueTag::getProjectId, projectId)
                 .eq(IssueTag::getName, name));
         if (tag == null) {
             tag = new IssueTag();
             tag.setId(UUID.randomUUID());
-            tag.setProjectId(projectId);
             tag.setName(name);
             tag.setColor(color == null ? "#1677FF" : color);
             tag.setCreatedAt(LocalDateTime.now());
             tagMapper.insert(tag);
         }
+        // 建立项目选用关系，保证 listForProject 可见
+        ensureProjectLabel(projectId, tag.getId());
         if (tagMapper.countIssueLabel(issueId, tag.getId()) > 0) {
             return;
         }
         tagMapper.insertIssueLabel(issueId, tag.getId());
     }
 
+    private void ensureProjectLabel(UUID projectId, UUID labelId) {
+        Long exists = projectLabelMapper.selectCount(Wrappers.<ProjectLabel>lambdaQuery()
+                .eq(ProjectLabel::getProjectId, projectId)
+                .eq(ProjectLabel::getLabelId, labelId));
+        if (exists != null && exists > 0) {
+            return;
+        }
+        ProjectLabel pl = new ProjectLabel();
+        pl.setId(UUID.randomUUID());
+        pl.setProjectId(projectId);
+        pl.setLabelId(labelId);
+        pl.setCreatedAt(LocalDateTime.now());
+        projectLabelMapper.insert(pl);
+    }
+
     @Transactional
     public void removeFromIssue(UUID issueId, UUID labelId) {
         tagMapper.deleteIssueLabel(issueId, labelId);
+    }
+
+    /** 全局标签库（供标签管理界面选择） */
+    public List<LabelVO> listGlobal() {
+        return tagMapper.selectList(Wrappers.<IssueTag>lambdaQuery()
+                .orderByAsc(IssueTag::getName)).stream().map(t -> {
+            LabelVO vo = new LabelVO();
+            vo.setId(t.getId());
+            vo.setName(t.getName());
+            vo.setColor(t.getColor());
+            return vo;
+        }).collect(Collectors.toList());
+    }
+
+    /** 项目选用全局标签（建立 project_label 关系） */
+    @Transactional
+    public void addProjectLabel(UUID projectId, UUID labelId) {
+        ensureProjectLabel(projectId, labelId);
+    }
+
+    /** 项目取消选用标签（仅解除选用关系，不删除全局标签） */
+    @Transactional
+    public void removeProjectLabel(UUID projectId, UUID labelId) {
+        projectLabelMapper.delete(Wrappers.<ProjectLabel>lambdaQuery()
+                .eq(ProjectLabel::getProjectId, projectId)
+                .eq(ProjectLabel::getLabelId, labelId));
     }
 }

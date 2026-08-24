@@ -1,6 +1,7 @@
 package com.seven7m.kanban.controller;
 
 import com.seven7m.kanban.common.domain.R;
+import com.seven7m.kanban.common.security.RequireAdmin;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.service.dev.ExcelImportService;
 import lombok.RequiredArgsConstructor;
@@ -15,10 +16,10 @@ import java.util.UUID;
  * 以系统管理员身份在应用上下文内直接调用 service 层批量导入，
  * 避免 2500+ 次 HTTP 调用与逐条鉴权开销。
  *
- * 调用：POST /api/v1/dev/import-excel
+ * 调用：POST /api/v1/admin/dev/import-excel （需系统管理员权限）
  */
 @RestController
-@RequestMapping("/dev")
+@RequestMapping("/admin/dev")
 @RequiredArgsConstructor
 public class ExcelImportController {
 
@@ -28,6 +29,7 @@ public class ExcelImportController {
 
     private final ExcelImportService excelImportService;
 
+    @RequireAdmin
     @PostMapping("/import-excel")
     public R<ExcelImportService.ExcelImportResult> importExcel() {
         // 以管理员身份执行，满足项目 OWNER / createdBy / 成员校验

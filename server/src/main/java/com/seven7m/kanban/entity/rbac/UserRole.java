@@ -10,7 +10,8 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * 用户-角色关联（多对多）。用户在同一项目可挂多个角色。
+ * 用户-角色授权（多对多，按项目维度）。承载用户的角色授权边界；
+ * 用户在同一项目可挂多个角色。区别于 {@code project_member}（仅成员名册，不承载授权）。
  */
 @Getter
 @Setter

@@ -1,6 +1,7 @@
 package com.seven7m.kanban.controller;
 
 import com.seven7m.kanban.common.domain.R;
+import com.seven7m.kanban.common.security.RequireAdmin;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.common.security.UserContextInterceptor;
 import com.seven7m.kanban.dto.user.ChangePasswordRequest;
@@ -38,21 +39,25 @@ public class UserController {
     }
 
     /** 用户管理列表（含 username/email/enabled） */
+    @RequireAdmin
     @GetMapping
     public R<List<UserVO>> list() {
         return R.ok(userService.listForAdmin());
     }
 
+    @RequireAdmin
     @PostMapping
     public R<UserVO> create(@Valid @RequestBody CreateUserRequest req) {
         return R.ok(userService.create(req));
     }
 
+    @RequireAdmin
     @PutMapping("/{id}")
     public R<UserVO> update(@PathVariable UUID id, @RequestBody UpdateUserRequest req) {
         return R.ok(userService.update(id, req));
     }
 
+    @RequireAdmin
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable UUID id) {
         userService.delete(id);

@@ -65,7 +65,7 @@ async function onNewProject() {
 
 function openBoard(p: Project) {
   const last = localStorage.getItem(`kanban:lastView:${p.id}`)
-  const path = last === 'table' ? 'table' : last === 'defects' ? 'defects' : last === 'overview' ? 'overview' : 'board'
+  const path = last === 'table' ? 'table' : last === 'defects' ? 'defects' : last === 'overview' ? 'overview' : 'overview'
   router.push(`/projects/${p.id}/${path}`)
 }
 
@@ -76,7 +76,7 @@ function openMembers(p: Project) {
 
 function openEdit(p: Project) {
   if (!p.canEdit) {
-    ElMessage.warning('只有项目成员才能编辑')
+    ElMessage.warning('只有项目管理员才能编辑')
     return
   }
   editForm.value = { id: p.id, name: p.name, description: p.description }

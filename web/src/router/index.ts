@@ -38,6 +38,9 @@ router.beforeEach((to) => {
   if (to.path !== '/login' && !userStore.token) {
     return '/login'
   }
+  if ((to.path === '/users' || to.path === '/rbac') && userStore.user?.username !== 'admin') {
+    return '/projects'
+  }
   return true
 })
 

@@ -7,19 +7,20 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
- * 角色 -> 操作权限 映射。
+ * 角色 -> 操作权限 映射（全局化后按 role_id 关联）。
  */
 @Getter
 @Setter
 @TableName("role_permission")
 public class RolePermission {
 
-    @TableId(type = IdType.AUTO)
-    private Long id;
+    @TableId(type = IdType.ASSIGN_UUID)
+    private UUID id;
 
-    private String roleCode;
+    private UUID roleId;
 
     private String permissionCode;
 

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getDashboard, listProjectMembers, listUsers, listMilestones, listAnnouncements, listProjectActivities } from '@/api'
+import { getDashboard, listProjectMembers, listMilestones, listAnnouncements, listProjectActivities } from '@/api'
 import { useProjectStore } from '@/stores/project'
-import type { DashboardVO, ProjectMember, UserVO, MilestoneVO, AnnouncementVO, ProjectActivityVO } from '@/api/types'
+import type { DashboardVO, ProjectMember, MilestoneVO, AnnouncementVO, ProjectActivityVO } from '@/api/types'
 import { Clock, CheckCircle2, AlertTriangle, Bug, FileText, ListTodo } from 'lucide-vue-next'
 import ProjectInfoCard from '@/components/overview/ProjectInfoCard.vue'
 import StatCard from '@/components/overview/StatCard.vue'
@@ -18,7 +18,6 @@ const projectId = route.params.projectId as string
 
 const dashboard = ref<DashboardVO | null>(null)
 const members = ref<ProjectMember[]>([])
-const users = ref<UserVO[]>([])
 const milestones = ref<MilestoneVO[]>([])
 const announcements = ref<AnnouncementVO[]>([])
 const activities = ref<ProjectActivityVO[]>([])
@@ -26,24 +25,22 @@ const loading = ref(true)
 
 const leadName = computed(() => {
   if (!projectStore.current?.leadUserId) return ''
-  const u = users.value.find((x) => x.id === projectStore.current?.leadUserId)
-  return u?.displayName || ''
+  const m = members.value.find((x) => x.userId === projectStore.current?.leadUserId)
+  return m?.displayName || ''
 })
 
 onMounted(async () => {
   loading.value = true
   try {
-    const [dashRes, memRes, userRes, msRes, annRes, actRes] = await Promise.all([
+    const [dashRes, memRes, msRes, annRes, actRes] = await Promise.all([
       getDashboard(projectId).catch(() => null),
       listProjectMembers(projectId).catch(() => []),
-      listUsers().catch(() => []),
       listMilestones(projectId).catch(() => []),
       listAnnouncements(projectId).catch(() => []),
       listProjectActivities(projectId, 10).catch(() => [])
     ])
     dashboard.value = dashRes
     members.value = memRes as ProjectMember[]
-    users.value = userRes as UserVO[]
     milestones.value = msRes as MilestoneVO[]
     announcements.value = annRes as AnnouncementVO[]
     activities.value = actRes as ProjectActivityVO[]

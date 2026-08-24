@@ -2,6 +2,8 @@ package com.seven7m.kanban.controller;
 
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.domain.R;
+import com.seven7m.kanban.common.security.Permission;
+import com.seven7m.kanban.common.security.PermissionService;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
 import com.seven7m.kanban.entity.project.ProjectCategoryKey;
@@ -17,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -26,6 +29,7 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final ProjectFavoriteService projectFavoriteService;
+    private final PermissionService permissionService;
 
     @PostMapping
     public R<ProjectVO> create(@Valid @RequestBody CreateProjectRequest req) {
@@ -61,8 +65,13 @@ public class ProjectController {
         return R.ok(projectService.get(id));
     }
 
+    @GetMapping("/{id}/my-permissions")
+    public R<Set<String>> getMyPermissions(@PathVariable UUID id) {
+        return R.ok(permissionService.getPermissions(UserContext.getUserId(), id));
+    }
+
     @PutMapping("/{id}")
-    @ProjectRoleAnnotation
+    @ProjectRoleAnnotation(Permission.PROJECT_SETTING)
     public R<ProjectVO> update(@PathVariable UUID id, @Valid @RequestBody UpdateProjectRequest req) {
         return R.ok(projectService.update(id, req));
     }

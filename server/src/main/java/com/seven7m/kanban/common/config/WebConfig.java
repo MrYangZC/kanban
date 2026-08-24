@@ -60,9 +60,10 @@ public class WebConfig implements WebMvcConfigurer {
                         apiPrefix + "/users/**",
                         apiPrefix + "/projects",
                         apiPrefix + "/upload/**");
-        // 系统管理员后台（RBAC 配置等）：标注 @RequireAdmin 的接口由本拦截器校验管理员身份
+        // 系统管理员后台：标注 @RequireAdmin 的接口由本拦截器校验管理员身份
+        // 拦截 /admin/** 和 /users/**（用户管理接口），无 @RequireAdmin 注解的方法自动放行
         registry.addInterceptor(adminAuthInterceptor)
-                .addPathPatterns(apiPrefix + "/admin/**");
+                .addPathPatterns(apiPrefix + "/admin/**", apiPrefix + "/users/**");
     }
 
     @Override

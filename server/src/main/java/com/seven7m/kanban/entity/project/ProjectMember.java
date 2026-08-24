@@ -9,6 +9,10 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * 项目成员名册。仅记录用户在某项目中的成员身份，不承载角色授权；
+ * 角色授权由 {@code user_role} 表承载。
+ */
 @Getter
 @Setter
 @TableName("project_member")

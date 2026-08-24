@@ -24,4 +24,7 @@ public class Project extends BaseEntity {
     private String status;
     private UUID leadUserId;
     private UUID createdBy;
+
+    /** 引用的全局工作流模板 id（workflow.id，全局化后项目不再持有私有工作流）。 */
+    private UUID workflowId;
 }

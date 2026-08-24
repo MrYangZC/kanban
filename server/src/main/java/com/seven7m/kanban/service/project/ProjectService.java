@@ -161,7 +161,8 @@ public class ProjectService {
             ProjectVO vo = toVO(p);
             vo.setStats(statsMap.getOrDefault(p.getId(), new ProjectStats()));
             vo.setFavorited(favoritedIds.contains(p.getId()));
-            vo.setCanEdit(canWrite(p.getId(), currentUser));
+            vo.setCanEdit(canManage(p.getId(), currentUser));
+            vo.setCanManage(canManage(p.getId(), currentUser));
             return vo;
         }).collect(Collectors.toList());
     }
@@ -219,7 +220,8 @@ public class ProjectService {
             ProjectVO vo = toVO(p);
             vo.setStats(statsMap.getOrDefault(p.getId(), new ProjectStats()));
             vo.setFavorited(favoritedIds.contains(p.getId()));
-            vo.setCanEdit(canWrite(p.getId(), currentUser));
+            vo.setCanEdit(canManage(p.getId(), currentUser));
+            vo.setCanManage(canManage(p.getId(), currentUser));
             return vo;
         }).collect(Collectors.toList());
 
@@ -293,7 +295,8 @@ public class ProjectService {
         vo.setFavorited(projectFavoriteMapper.selectCount(Wrappers.<ProjectFavorite>lambdaQuery()
                 .eq(ProjectFavorite::getProjectId, id)
                 .eq(ProjectFavorite::getUserId, currentUser)) > 0);
-        vo.setCanEdit(canWrite(id, currentUser));
+        vo.setCanEdit(canManage(id, currentUser));
+        vo.setCanManage(canManage(id, currentUser));
         return vo;
     }
 
@@ -339,17 +342,26 @@ public class ProjectService {
     }
 
     public boolean isMember(UUID projectId, UUID userId) {
+        if (userId != null && userId.equals(com.seven7m.kanban.common.security.UserContext.DEFAULT_ADMIN_ID)) {
+            return true;
+        }
         return projectMemberMapper.selectCount(Wrappers.<ProjectMember>lambdaQuery()
                 .eq(ProjectMember::getProjectId, projectId)
                 .eq(ProjectMember::getUserId, userId)) > 0;
     }
 
     public boolean isOwner(UUID projectId, UUID userId) {
+        if (userId != null && userId.equals(com.seven7m.kanban.common.security.UserContext.DEFAULT_ADMIN_ID)) {
+            return true;
+        }
         return projectMemberService.getRoles(projectId, userId).contains(ProjectRole.OWNER);
     }
 
     /** 判断当前用户是否为项目管理员（OWNER 或 ADMIN） */
     public boolean isAdmin(UUID projectId, UUID userId) {
+        if (userId != null && userId.equals(com.seven7m.kanban.common.security.UserContext.DEFAULT_ADMIN_ID)) {
+            return true;
+        }
         Set<String> roles = projectMemberService.getRoles(projectId, userId);
         return roles.contains(ProjectRole.OWNER) || roles.contains(ProjectRole.ADMIN);
     }
@@ -361,8 +373,20 @@ public class ProjectService {
     }
 
     public boolean canWrite(UUID projectId, UUID userId) {
+        if (userId != null && userId.equals(com.seven7m.kanban.common.security.UserContext.DEFAULT_ADMIN_ID)) {
+            return true;
+        }
         return projectMemberService.getRoles(projectId, userId).stream()
                 .anyMatch(ProjectRole::isMember);
+    }
+
+    /** 判断当前用户是否为项目管理员（OWNER/ADMIN/PM，可管理成员与项目设置） */
+    public boolean canManage(UUID projectId, UUID userId) {
+        if (userId != null && userId.equals(com.seven7m.kanban.common.security.UserContext.DEFAULT_ADMIN_ID)) {
+            return true;
+        }
+        Set<String> roles = projectMemberService.getRoles(projectId, userId);
+        return roles.contains(ProjectRole.OWNER) || roles.contains(ProjectRole.ADMIN) || roles.contains(ProjectRole.PM);
     }
 
     /** 查询当前用户在指定项目集合中已收藏的项目 ID 集合 */

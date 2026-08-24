@@ -1,6 +1,8 @@
 package com.seven7m.kanban.controller;
 
 import com.seven7m.kanban.common.domain.R;
+import com.seven7m.kanban.common.security.Permission;
+import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
 import com.seven7m.kanban.dto.project.ProjectActivityVO;
 import com.seven7m.kanban.service.project.ProjectActivityService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ public class ProjectActivityController {
 
     private final ProjectActivityService projectActivityService;
 
+    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping
     public R<List<ProjectActivityVO>> list(@PathVariable UUID projectId,
                                            @RequestParam(defaultValue = "20") int limit) {

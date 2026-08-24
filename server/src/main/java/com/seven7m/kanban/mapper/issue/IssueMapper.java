@@ -24,8 +24,8 @@ public interface IssueMapper extends BaseMapper<Issue> {
     List<Issue> selectByProjectForBoard(@Param("projectId") UUID projectId);
 
     /**
-     * 从全局序列取下一个 issue_number，避免应用层 selectCount+1 的并发重复。
+     * 从全局序列取下一个 issue_number（字符串类型），避免应用层 selectCount+1 的并发重复。
      */
-    @Select("SELECT nextval('issue_number_seq')")
-    long nextIssueNumber();
+    @Select("SELECT nextval('issue_number_seq')::text")
+    String nextIssueNumber();
 }

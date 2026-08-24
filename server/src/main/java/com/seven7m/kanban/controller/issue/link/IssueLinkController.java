@@ -19,19 +19,19 @@ public class IssueLinkController {
 
     private final IssueLinkService linkService;
 
-    @ProjectRoleAnnotation(Permission.READ)
+    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping("/{issueId}/links")
     public R<List<LinkVO>> list(@PathVariable UUID issueId) {
         return R.ok(linkService.list(issueId));
     }
 
-    @ProjectRoleAnnotation
+    @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
     @PostMapping("/{issueId}/links")
     public R<LinkVO> add(@PathVariable UUID issueId, @RequestBody AddLinkRequest body) {
         return R.ok(linkService.add(issueId, body.getTargetIssueId(), body.getRelationType()));
     }
 
-    @ProjectRoleAnnotation
+    @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
     @DeleteMapping("/{issueId}/links/{linkId}")
     public R<Void> delete(@PathVariable UUID issueId, @PathVariable UUID linkId) {
         linkService.delete(issueId, linkId);

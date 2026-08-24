@@ -54,7 +54,8 @@ public interface IssueTagMapper extends BaseMapper<IssueTag> {
 
     @Select("""
             SELECT l.* FROM label l
-            WHERE l.project_id = #{projectId}
+            JOIN project_label pl ON pl.label_id = l.id
+            WHERE pl.project_id = #{projectId}
             ORDER BY l.name
             """)
     List<IssueTag> selectByProject(@Param("projectId") UUID projectId);

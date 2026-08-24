@@ -30,17 +30,39 @@ public class IssueTagController {
         return R.ok(tagService.listForIssue(issueId));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.PROJECT_LABEL)
     @PostMapping("/issues/{issueId}/tags")
     public R<Void> add(@PathVariable UUID issueId, @RequestBody AddTagRequest body) {
         tagService.addToIssue(body.getProjectId(), issueId, body.getName(), body.getColor());
         return R.ok();
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.PROJECT_LABEL)
     @DeleteMapping("/issues/{issueId}/tags/{labelId}")
     public R<Void> remove(@PathVariable UUID issueId, @PathVariable UUID labelId) {
         tagService.removeFromIssue(issueId, labelId);
+        return R.ok();
+    }
+
+    /** 全局标签库（供标签管理界面选择） */
+    @GetMapping("/labels")
+    public R<List<LabelVO>> globalTags() {
+        return R.ok(tagService.listGlobal());
+    }
+
+    /** 项目选用标签 */
+    @ProjectRoleAnnotation(Permission.PROJECT_LABEL)
+    @PostMapping("/projects/{projectId}/labels/{labelId}")
+    public R<Void> addProjectLabel(@PathVariable UUID projectId, @PathVariable UUID labelId) {
+        tagService.addProjectLabel(projectId, labelId);
+        return R.ok();
+    }
+
+    /** 项目取消选用标签 */
+    @ProjectRoleAnnotation(Permission.PROJECT_LABEL)
+    @DeleteMapping("/projects/{projectId}/labels/{labelId}")
+    public R<Void> removeProjectLabel(@PathVariable UUID projectId, @PathVariable UUID labelId) {
+        tagService.removeProjectLabel(projectId, labelId);
         return R.ok();
     }
 }

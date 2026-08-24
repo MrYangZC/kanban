@@ -27,29 +27,31 @@ public class RiskController {
 
     private final RiskService riskService;
 
+    @ProjectRoleAnnotation(Permission.RISK_VIEW)
     @GetMapping
     public R<List<RiskVO>> list(@PathVariable UUID projectId) {
         return R.ok(riskService.listByProject(projectId));
     }
 
+    @ProjectRoleAnnotation(Permission.RISK_VIEW)
     @GetMapping("/{id}")
     public R<RiskVO> detail(@PathVariable UUID projectId, @PathVariable UUID id) {
         return R.ok(riskService.detail(projectId, id));
     }
 
-    @ProjectRoleAnnotation(Permission.WRITE)
+    @ProjectRoleAnnotation(Permission.RISK_MANAGE)
     @PostMapping
     public R<RiskVO> create(@PathVariable UUID projectId, @RequestBody CreateRiskRequest req) {
         return R.ok(riskService.create(projectId, req));
     }
 
-    @ProjectRoleAnnotation(Permission.WRITE)
+    @ProjectRoleAnnotation(Permission.RISK_MANAGE)
     @PutMapping("/{id}")
     public R<RiskVO> update(@PathVariable UUID projectId, @PathVariable UUID id, @RequestBody UpdateRiskRequest req) {
         return R.ok(riskService.update(projectId, id, req));
     }
 
-    @ProjectRoleAnnotation(Permission.MANAGE)
+    @ProjectRoleAnnotation(Permission.RISK_MANAGE)
     @DeleteMapping("/{id}")
     public R<Void> remove(@PathVariable UUID projectId, @PathVariable UUID id) {
         riskService.remove(projectId, id);
