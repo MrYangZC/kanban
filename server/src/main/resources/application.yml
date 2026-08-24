@@ -28,7 +28,9 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
-    baseline-version: 0
+    # v1.0.0 为固化基线：现有库清空 flyway_schema_history 后，Flyway 会基线到 1.0.0，
+    # 跳过 V1.0.0__baseline.sql（避免重复建表）；全新空库则正常执行该脚本初始化。
+    baseline-version: 1.0.0
     validate-on-migrate: false
   servlet:
     multipart:
