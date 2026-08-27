@@ -1,26 +1,29 @@
-package com.seven7m.kanban.entity.issue;
+package com.seven7m.kanban.entity.workitem;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import com.seven7m.kanban.common.entity.BaseEntity;
+import com.seven7m.kanban.common.enums.ItemCategory;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.UUID;
 
+/**
+ * 工作项抽象基类：task / requirement / bug 三张表的通用字段。
+ * 子类提供真实表名（@TableName）与 category() 实现，保证物理隔离。
+ */
 @Getter
 @Setter
-@TableName("issue")
-public class Issue extends BaseEntity {
+public abstract class AbstractWorkItem extends BaseEntity {
 
     @TableId(type = IdType.ASSIGN_UUID)
     private UUID id;
 
     private UUID projectId;
-    /** 问题编号：字符串类型（全局序号），如 "1001" */
+    /** 项目内序号，如 "1001" */
     private String issueNumber;
     private UUID parentId;
     private UUID issueTypeId;
@@ -33,19 +36,10 @@ public class Issue extends BaseEntity {
     private UUID verifierId;
     private UUID sprintId;
     private BigDecimal estimate;
-    private LocalDateTime dueDate;
+    private LocalDate dueDate;
     private String sortKey;
-    private String severity;
-    private String module;
-    private String fixVersion;
-    private String source;
-    private Integer archived;
-    private UUID createdBy;
+    private Boolean archived;
 
-    // 缺陷详情页（云效风格）扩展字段
-    private String iteration;
-    /** 计划开始时间 */
-    private LocalDateTime planStart;
-    /** 不修复理由 */
-    private String noFixReason;
+    /** 子类返回所属物理表对应的类别，用于路由与子表隔离。 */
+    public abstract ItemCategory category();
 }

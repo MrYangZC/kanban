@@ -5,6 +5,7 @@ import draggable from 'vuedraggable'
 import { getBoardGrouped, createIssue, moveIssue, filterIssues, listProjectTags, listProjectMembers, listTransitions } from '@/api'
 import { Plus } from 'lucide-vue-next'
 import type { BoardGroupView, Issue, GroupColumnView, LabelVO, ProjectMember, WorkflowTransitionVO } from '@/api/types'
+import { TASK_TYPE_CODES, REQUIREMENT_TYPE_CODES, DEFECT_TYPE_CODES } from '@/api/types'
 import IssueCard from '@/components/IssueCard.vue'
 import BoardFilterBar, { type FilterPayload } from '@/components/BoardFilterBar.vue'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
@@ -19,6 +20,19 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const projectId = route.params.projectId as string
+
+// 看板类型过滤：通过 ?type=task/requirement/defect 限定工作项类型
+const TYPE_CODE_MAP: Record<string, string[]> = {
+  task: TASK_TYPE_CODES,
+  requirement: REQUIREMENT_TYPE_CODES,
+  defect: DEFECT_TYPE_CODES
+}
+const TYPE_LABEL: Record<string, string> = {
+  task: '任务看板',
+  requirement: '需求看板',
+  defect: '缺陷看板'
+}
+const typeKey = computed(() => (route.query.type as string) || '')
 
 const board = ref<BoardGroupView | null>(null)
 const boardName = ref('')
@@ -38,7 +52,7 @@ async function load() {
       listTransitions(projectId).catch(() => [] as WorkflowTransitionVO[])
     ])
     board.value = boardRes
-    boardName.value = boardRes.name || '任务看板'
+    boardName.value = TYPE_LABEL[typeKey.value] || boardRes.name || '任务看板'
     transitionMap.value = buildTransitionMap(transitions)
     allTags.value = await listProjectTags(projectId).catch(() => [])
     await applyFilter()
@@ -56,6 +70,7 @@ async function applyFilter() {
     severity: filter.severity || undefined,
     statusId: filter.statusId || undefined,
     labelId: filter.labelId || undefined,
+    issueTypeCodes: (TYPE_CODE_MAP[typeKey.value] || []).length ? TYPE_CODE_MAP[typeKey.value] : undefined,
     // 看板需要全量分组渲染，不能走默认分页（否则只看得到前 20 条）
     size: 1000
   })
@@ -64,13 +79,17 @@ async function applyFilter() {
 
 const renderGroups = computed(() => {
   if (!board.value) return []
-  return board.value.groups.map((g) => ({
-    ...g,
-    columns: g.columns.map((c: GroupColumnView) => ({
+  return board.value.groups.map((g) => {
+    const columns = g.columns.map((c: GroupColumnView) => ({
       ...c,
       issues: c.issues.filter((i) => filteredIds.value.has(i.id))
     }))
-  }))
+    return {
+      ...g,
+      columns,
+      issueCount: columns.reduce((s, c) => s + c.issues.length, 0)
+    }
+  })
 })
 
 const totalCount = computed(() =>

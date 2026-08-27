@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { filterIssues, createIssue, listProjectStatuses } from '@/api'
+import { REQUIREMENT_TYPE_CODES } from '@/api/types'
 import type { Issue, PageResult, IssueStatusVO } from '@/api/types'
 import { FileText } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -21,9 +22,10 @@ async function load() {
     const res: PageResult<Issue> = await filterIssues({
       projectId,
       keyword: keyword.value || undefined,
+      issueTypeCodes: REQUIREMENT_TYPE_CODES,
       size: 50
     })
-    list.value = res.list.filter((i) => i.issueTypeCode === 'REQUIREMENT' || i.issueTypeCode === 'STORY')
+    list.value = res.list
   } catch {
     list.value = []
   } finally {
@@ -42,7 +44,8 @@ async function onCreate() {
       projectId,
       title: value.trim(),
       statusId: statuses.value[0]?.id || '',
-      priority: 'P2'
+      priority: 'P2',
+      issueTypeCode: 'STORY'
     })
     ElMessage.success('需求已创建')
     await load()

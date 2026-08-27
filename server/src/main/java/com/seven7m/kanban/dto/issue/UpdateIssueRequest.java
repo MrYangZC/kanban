@@ -2,7 +2,7 @@ package com.seven7m.kanban.dto.issue;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -17,12 +17,12 @@ public class UpdateIssueRequest {
     private UUID assigneeId;
     private UUID verifierId;
     private UUID sprintId;
-    private LocalDateTime dueDate;
+    private LocalDate dueDate;
     private String severity;
     private String module;
     private String fixVersion;
     private String source;
-    private Integer archived;
+    private Boolean archived;
     private UUID statusId;
 
     // 缺陷详情页（云效风格）基础字段
@@ -31,7 +31,7 @@ public class UpdateIssueRequest {
     private List<String> participants;
     /** 抄送人用户 ID 列表（全量替换 issue_cc） */
     private List<String> ccUsers;
-    private LocalDateTime planStart;
+    private LocalDate planStart;
     private String noFixReason;
 
     /**

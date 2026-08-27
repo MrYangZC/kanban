@@ -27,9 +27,8 @@ public class IssueCommentService {
     private final IssueActivityMapper activityMapper;
     private final SysUserMapper userMapper;
 
-    /** 评论列表（动态&评论 Tab 用，含评论 + 状态变更等活动） */
+    /** 评论列表 */
     public List<IssueActivityVO> listActivities(UUID issueId) {
-        // 评论（保留已逻辑删除的父评论，供前端渲染「已删除」占位；子回复不受影响）
         List<IssueActivityVO> comments = commentMapper.selectList(Wrappers.<IssueComment>lambdaQuery()
                         .eq(IssueComment::getIssueId, issueId)
                         .orderByAsc(IssueComment::getCreatedAt))
@@ -41,7 +40,6 @@ public class IssueCommentService {
                     vo.setActorId(c.getUserId());
                     vo.setActorName(u == null ? "未知" : u.getDisplayName());
                     vo.setParentId(c.getParentId());
-                    vo.setDeleted(c.getDeleted());
                     vo.setContent(c.getContent() == null ? "" : c.getContent());
                     vo.setCreatedAt(c.getCreatedAt());
                     return vo;
@@ -83,7 +81,6 @@ public class IssueCommentService {
         c.setContent(content);
         c.setCreatedAt(LocalDateTime.now());
         c.setUpdatedAt(LocalDateTime.now());
-        c.setDeleted(0);
         commentMapper.insert(c);
 
         SysUser u = userMapper.selectById(c.getUserId());
@@ -93,7 +90,6 @@ public class IssueCommentService {
         vo.setActorId(c.getUserId());
         vo.setActorName(u == null ? "未知" : u.getDisplayName());
         vo.setParentId(c.getParentId());
-        vo.setDeleted(0);
         vo.setContent(c.getContent());
         vo.setCreatedAt(c.getCreatedAt());
         return vo;

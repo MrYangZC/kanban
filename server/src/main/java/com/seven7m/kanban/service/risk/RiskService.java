@@ -49,6 +49,7 @@ public class RiskService {
     @Transactional
     public RiskVO create(UUID projectId, CreateRiskRequest req) {
         Risk risk = new Risk();
+        risk.setId(UUID.randomUUID());
         risk.setProjectId(projectId);
         risk.setTitle(req.getTitle());
         risk.setDescription(req.getDescription());

@@ -25,11 +25,14 @@ export function useProjectPermission(projectId: () => string): ProjectPermission
   async function refresh() {
     try {
       const pid = projectId()
-      members.value = await listProjectMembers(pid)
-      const me = members.value.find((m) => m.userId === userStore.user?.id)
+      const [memberList, perms] = await Promise.all([
+        listProjectMembers(pid),
+        getMyPermissions(pid)
+      ])
+      members.value = memberList
+      const me = memberList.find((m) => m.userId === userStore.user?.id)
       canWrite.value = !me || WRITE_ROLES.some((r) => me.roles.includes(r))
       canAdmin.value = !!me && ADMIN_ROLES.some((r) => me.roles.includes(r))
-      const perms = await getMyPermissions(pid)
       permissions.value = new Set(perms)
     } catch {
       canWrite.value = true

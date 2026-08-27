@@ -10,7 +10,6 @@ import java.util.UUID;
 
 /**
  * 审计字段自动填充：created_at / created_by / updated_at / updated_by。
- * 软删除由 MyBatis-Plus 逻辑删除配置处理。
  */
 @Component
 public class AuditMetaObjectHandler implements MetaObjectHandler {
@@ -23,7 +22,6 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
         strictInsertFill(metaObject, "updatedAt", LocalDateTime.class, now);
         strictInsertFill(metaObject, "createdBy", UUID.class, operator);
         strictInsertFill(metaObject, "updatedBy", UUID.class, operator);
-        strictInsertFill(metaObject, "deleted", Integer.class, 0);
     }
 
     @Override

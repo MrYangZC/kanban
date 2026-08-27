@@ -3,6 +3,7 @@ package com.seven7m.kanban.dto.issue;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -18,6 +19,9 @@ public class IssueFilterRequest {
     private String severity;
     private UUID labelId;
     private String keyword;
+
+    /** 工作项类型编码过滤（如 ["STORY","FEATURE"]），为空表示不过滤 */
+    private List<String> issueTypeCodes;
 
     /** 分组维度（可选）：STATUS / ASSIGNEE / PRIORITY / SPRINT。为空时按状态列展示。 */
     private String groupBy;

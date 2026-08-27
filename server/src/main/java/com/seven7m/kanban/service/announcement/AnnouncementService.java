@@ -46,10 +46,11 @@ public class AnnouncementService {
     @Transactional
     public AnnouncementVO create(UUID projectId, CreateAnnouncementRequest req) {
         Announcement a = new Announcement();
+        a.setId(UUID.randomUUID());
         a.setProjectId(projectId);
         a.setTitle(req.getTitle());
         a.setContent(req.getContent());
-        a.setPinned(req.getPinned() != null ? req.getPinned() : 0);
+        a.setPinned(req.getPinned() != null ? req.getPinned() : false);
         announcementMapper.insert(a);
         return toVO(a);
     }

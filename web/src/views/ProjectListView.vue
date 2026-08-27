@@ -2,7 +2,7 @@
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { createProject, updateProject } from '@/api'
+import { createProject, updateProject, deleteProject } from '@/api'
 import type { Project } from '@/api/types'
 import { useProjectCategoryStore } from '@/stores/projectCategory'
 import ProjectCategorySidebar from '@/components/project/ProjectCategorySidebar.vue'
@@ -104,6 +104,31 @@ async function submitEdit() {
   }
 }
 
+async function onDelete(p: Project) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除项目「${p.name}」吗？此操作将删除项目下所有任务、看板等数据，且不可恢复。`,
+      '删除项目',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger'
+      }
+    )
+  } catch {
+    return
+  }
+  try {
+    await deleteProject(p.id)
+    ElMessage.success('项目已删除')
+    await store.loadCategoryCounts()
+    await store.loadProjects()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '删除失败')
+  }
+}
+
 async function onRetry() {
   await store.loadCategoryCounts()
   await store.loadProjects()
@@ -129,18 +154,8 @@ onMounted(async () => {
         ? 'fixed inset-y-0 left-0 z-40 shadow-xl md:static md:translate-x-0 md:shadow-none'
         : 'fixed inset-y-0 left-0 z-40 -translate-x-full md:static md:translate-x-0 md:shadow-none'"
     >
-      <div class="flex items-center gap-3 border-b border-line-light px-5 py-5">
-        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-sm">
-          <FolderKanban :size="18" class="text-white" />
-        </div>
-        <div>
-          <div class="text-sm font-semibold tracking-tight text-ink">项目协作</div>
-          <div class="text-xs text-ink-secondary">Kanban Pro</div>
-        </div>
-      </div>
-      <div class="px-5 pt-4 pb-1">
-        <span class="text-xs font-semibold uppercase tracking-wider text-ink-secondary">项目分类</span>
-      </div>
+
+
       <ProjectCategorySidebar />
       <div class="border-t border-line-light px-5 py-4">
         <div class="flex items-center gap-2 rounded-lg bg-primary-50/60 px-3 py-2.5">
@@ -153,8 +168,8 @@ onMounted(async () => {
       </div>
     </aside>
 
-    <main class="flex-1 overflow-auto bg-gradient-page">
-      <div class="px-8 py-7">
+    <main class="flex flex-1 flex-col overflow-hidden bg-gradient-page">
+      <div class="flex-1 overflow-auto px-8 py-7">
         <div class="mb-7 flex items-start justify-between gap-4">
           <div class="flex items-start gap-3">
             <button
@@ -234,7 +249,7 @@ onMounted(async () => {
         <EmptyState v-else-if="!projects.length" :category="selectedCategory" />
         <div
           v-else-if="viewMode === 'card'"
-          class="grid animate-fade-in-up grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
+          class="grid animate-fade-in-up grid-cols-1 items-start gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
         >
           <ProjectCard
             v-for="p in projects"
@@ -243,6 +258,7 @@ onMounted(async () => {
             @open-board="openBoard"
             @open-members="openMembers"
             @open-edit="openEdit"
+            @delete="onDelete"
           />
         </div>
         <ProjectTableList
@@ -253,15 +269,6 @@ onMounted(async () => {
           @open-edit="openEdit"
         />
 
-        <Pagination
-          v-if="!loading && !error && projects.length"
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          :total="total"
-          :page-size="pageSize"
-          @update:page="store.setPage"
-          @update:page-size="store.setPageSize"
-        />
 
         <el-dialog v-model="editDialogVisible" title="编辑项目" width="460px">
           <div class="space-y-4">
@@ -283,6 +290,20 @@ onMounted(async () => {
         </el-dialog>
 
         <ProjectMemberDialog v-model:visible="memberDialogVisible" :project-id="memberProjectId" />
+      </div>
+
+      <div
+        v-if="!loading && !error && projects.length"
+        class="flex shrink-0 items-center justify-center border-t border-line-light bg-white px-8 py-2"
+      >
+        <Pagination
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total="total"
+          :page-size="pageSize"
+          @update:page="store.setPage"
+          @update:page-size="store.setPageSize"
+        />
       </div>
     </main>
   </div>

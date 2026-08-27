@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { filterIssues, listProjectStatuses } from '@/api'
+import { TASK_TYPE_CODES } from '@/api/types'
 import type { Issue, PageResult, IssueStatusVO } from '@/api/types'
 import { ListTodo } from 'lucide-vue-next'
 import SimpleListView from '@/components/SimpleListView.vue'
@@ -24,9 +25,10 @@ async function load() {
     const res: PageResult<Issue> = await filterIssues({
       projectId,
       keyword: keyword.value || undefined,
+      issueTypeCodes: TASK_TYPE_CODES,
       size: 50
     })
-    list.value = res.list.filter((i) => i.issueTypeCode === 'TASK' || i.issueTypeCode === 'EPIC')
+    list.value = res.list
   } catch {
     list.value = []
   } finally {
@@ -46,7 +48,7 @@ function onCreated() {
 }
 
 function toBoard() {
-  router.push(`/projects/${projectId}/board`)
+  router.push(`/projects/${projectId}/board?type=task`)
 }
 
 onMounted(load)

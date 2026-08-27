@@ -16,23 +16,23 @@ public interface IssueCommentMapper extends BaseMapper<IssueComment> {
 
     @Select("""
             SELECT COUNT(*) FROM issue_comment
-            WHERE issue_id = #{issueId} AND deleted = 0
+            WHERE issue_id = #{issueId} AND category = #{category}
             """)
-    Long countByIssue(@Param("issueId") UUID issueId);
+    Long countByIssue(@Param("issueId") UUID issueId, @Param("category") String category);
 
     /**
-     * 批量统计多个 Issue 的评论数，返回 [{issue_id, cnt}]。
+     * 批量统计多个工作项的评论数（按 category 隔离），返回 [{issue_id, cnt}]。
      */
     @Select("""
             <script>
             SELECT issue_id, COUNT(*) AS cnt FROM issue_comment
-            WHERE issue_id IN
+            WHERE category = #{category} AND issue_id IN
             <foreach collection="issueIds" item="iid" open="(" separator="," close=")">
                 #{iid}
             </foreach>
-            AND deleted = 0
+
             GROUP BY issue_id
             </script>
             """)
-    List<Map<String, Object>> countByIssueIds(@Param("issueIds") Collection<UUID> issueIds);
+    List<Map<String, Object>> countByIssueIds(@Param("issueIds") Collection<UUID> issueIds, @Param("category") String category);
 }

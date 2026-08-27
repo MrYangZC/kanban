@@ -1,5 +1,6 @@
 import axios, { type AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
+import { clearAllCaches } from '@/utils/cache'
 
 /**
  * 统一响应结构（与后端 R<T> 一致）：
@@ -33,6 +34,7 @@ http.interceptors.response.use(
     if (error.response?.status === 401) {
       // 登录态失效：清理本地凭证并跳转登录页
       localStorage.removeItem('kanban_user')
+      clearAllCaches()
       if (window.location.pathname !== '/login') {
         window.location.href = '/login'
       }

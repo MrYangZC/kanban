@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { Project } from '@/api/types'
 import { useProjectCategoryStore } from '@/stores/projectCategory'
-import { FolderKanban, Users, Star, Pencil, FileText, Paperclip, Calendar, ArrowRight } from 'lucide-vue-next'
+import { Users, Star, UserPlus, Lock, ListTodo, Lightbulb, Trash2 } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
-import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 
 const props = defineProps<{
   project: Project
@@ -13,23 +13,11 @@ const emit = defineEmits<{
   (e: 'openBoard', p: Project): void
   (e: 'openMembers', p: Project): void
   (e: 'openEdit', p: Project): void
+  (e: 'delete', p: Project): void
 }>()
 
 const store = useProjectCategoryStore()
-
-const statusConfig = computed(() => {
-  const s = (props.project.status || '').toUpperCase()
-  if (s === 'ARCHIVED') return { label: '已归档', cls: 'bg-surface-light text-ink-secondary', dot: 'bg-ink-secondary' }
-  if (s === 'COMPLETED' || s === 'DONE') return { label: '已完成', cls: 'bg-success-light text-success', dot: 'bg-success' }
-  if (s === 'IN_PROGRESS' || s === 'ACTIVE' || s === 'ONGOING') return { label: '进行中', cls: 'bg-primary-50 text-primary-600', dot: 'bg-primary-500' }
-  if (s === 'NOT_STARTED' || s === 'PENDING' || s === 'TODO') return { label: '未开始', cls: 'bg-warning-light text-warning', dot: 'bg-warning' }
-  return { label: '进行中', cls: 'bg-primary-50 text-primary-600', dot: 'bg-primary-500' }
-})
-
-const formattedDate = computed(() => {
-  if (!props.project.createdAt) return ''
-  return props.project.createdAt.slice(0, 10)
-})
+const router = useRouter()
 
 async function onFavorite(p: Project) {
   const wasFavorited = p.favorited || false
@@ -40,85 +28,90 @@ async function onFavorite(p: Project) {
     ElMessage.error(e?.message || '操作失败')
   }
 }
+
+function goTasks() {
+  router.push(`/projects/${props.project.id}/tasks`)
+}
+
+function goRequirements() {
+  router.push(`/projects/${props.project.id}/requirements`)
+}
 </script>
 
 <template>
-  <div class="group card-interactive relative flex flex-col p-5">
-    <div class="absolute right-3 top-3 flex items-center gap-1 opacity-0 transition-all duration-200 group-hover:opacity-100">
-      <button
-        class="rounded-md p-1.5 transition-all duration-200 hover:bg-surface-hover"
-        :class="project.favorited ? 'text-warning' : 'text-ink-secondary hover:text-warning'"
-        title="收藏"
-        @click.stop="onFavorite(project)"
-      >
-        <Star :size="15" :fill="project.favorited ? 'currentColor' : 'none'" />
-      </button>
-      <button
-        class="rounded-md p-1.5 text-ink-secondary transition-all duration-200 hover:bg-surface-hover hover:text-primary"
-        :class="{ 'cursor-not-allowed opacity-50': !project.canEdit }"
-        title="编辑项目"
-        :disabled="!project.canEdit"
-        @click.stop="emit('openEdit', project)"
-      >
-        <Pencil :size="15" />
-      </button>
-    </div>
+  <div
+    class="group relative flex h-[160px] cursor-pointer flex-col overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-100 transition-all duration-[400ms] ease-spring hover:shadow-card-hover-lg hover:ring-primary-200"
+    @click="emit('openBoard', project)"
+  >
+    <!-- 顶部渐变封面区：默认 88px，悬停收缩到 52px -->
+    <div class="h-[88px] shrink-0 bg-gradient-to-br from-blue-300 via-blue-100 to-blue-50 transition-all duration-[400ms] ease-spring group-hover:h-[52px]" />
 
-    <div class="mb-4 flex items-start justify-between">
-      <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 text-primary-500 shadow-sm transition-all duration-300 group-hover:from-primary-500 group-hover:to-primary-600 group-hover:text-white">
-        <FolderKanban :size="22" />
-      </div>
-      <span
-        class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-        :class="statusConfig.cls"
-      >
-        <span class="h-1.5 w-1.5 rounded-full" :class="statusConfig.dot"></span>
-        {{ statusConfig.label }}
-      </span>
-    </div>
+    <!-- 右上角收藏按钮 -->
+    <button
+      class="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur-sm transition-all duration-[400ms] ease-spring hover:scale-110 hover:bg-white"
+      :class="project.favorited ? 'text-yellow-500' : 'text-slate-400 hover:text-yellow-500'"
+      title="收藏"
+      @click.stop="onFavorite(project)"
+    >
+      <Star :size="16" :fill="project.favorited ? 'currentColor' : 'none'" />
+    </button>
 
-    <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-primary-500">{{ project.projectKey }}</div>
+    <!-- 白色内容区：默认 72px（仅名称），悬停展开到 108px 并显示统计 + 操作 -->
     <div
-      class="cursor-pointer text-base font-semibold leading-snug text-ink transition-colors duration-200 hover:text-primary-600"
-      @click="emit('openBoard', project)"
-    >{{ project.name }}</div>
-    <div class="mt-2 line-clamp-2 text-sm leading-relaxed text-ink-secondary">{{ project.description || '暂无描述' }}</div>
-
-    <div class="mt-4 flex items-center gap-3 text-xs text-ink-secondary">
-      <span class="flex items-center gap-1" :title="`${project.stats?.memberCount || 0} 名成员`">
-        <Users :size="14" class="text-ink-secondary" />
-        <span class="font-medium">{{ project.stats?.memberCount || 0 }}</span>
-      </span>
-      <span class="h-3 w-px bg-line-light"></span>
-      <span class="flex items-center gap-1" :title="`${project.stats?.issueCount || 0} 个任务`">
-        <FileText :size="14" class="text-ink-secondary" />
-        <span class="font-medium">{{ project.stats?.issueCount || 0 }}</span>
-      </span>
-      <span class="h-3 w-px bg-line-light"></span>
-      <span class="flex items-center gap-1" :title="`${project.stats?.attachmentCount || 0} 个附件`">
-        <Paperclip :size="14" class="text-ink-secondary" />
-        <span class="font-medium">{{ project.stats?.attachmentCount || 0 }}</span>
-      </span>
-    </div>
-
-    <div class="mt-4 flex items-center justify-between border-t border-line-lighter pt-3">
-      <div class="flex items-center gap-1.5 text-xs text-ink-secondary">
-        <Calendar :size="13" />
-        <span>{{ formattedDate || '—' }}</span>
-      </div>
+      class="flex h-[72px] shrink-0 flex-col overflow-hidden px-5 pt-3 transition-all duration-[400ms] ease-spring group-hover:h-[108px] group-hover:pt-4"
+    >
+      <!-- 项目名称 -->
       <div class="flex items-center gap-2">
-        <button
-          v-if="project.canManage"
-          class="rounded-md px-2.5 py-1 text-xs font-medium text-ink-secondary transition-all duration-200 hover:bg-surface-hover hover:text-ink"
-          @click.stop="emit('openMembers', project)"
-        >管理成员</button>
-        <button
-          class="flex items-center gap-1 rounded-md bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-600 transition-all duration-200 hover:bg-primary-500 hover:text-white"
-          @click.stop="emit('openBoard', project)"
-        >
-          进入
-          <ArrowRight :size="12" />
-        </button>
+        <Lock :size="15" class="shrink-0 text-slate-400 transition-colors duration-[400ms] ease-spring group-hover:text-primary-400" />
+        <span class="truncate text-sm font-semibold text-slate-800 transition-colors duration-[400ms] ease-spring group-hover:text-primary-600">{{ project.name }}</span>
+      </div>
+
+      <!-- 展开内容：统计数据 + 操作栏 -->
+      <div class="mt-3 flex flex-1 flex-col justify-between">
+        <div class="flex items-center gap-4">
+          <button
+            class="flex items-center gap-1 text-xs text-slate-600 transition hover:text-primary"
+            title="成员"
+            @click.stop="emit('openMembers', project)"
+          >
+            <Users :size="14" class="text-emerald-500" />
+            <span class="font-medium">{{ project.stats?.memberCount ?? 0 }}</span>
+          </button>
+          <button
+            class="flex items-center gap-1 text-xs text-slate-600 transition hover:text-primary"
+            title="任务"
+            @click.stop="goTasks"
+          >
+            <ListTodo :size="14" class="text-rose-500" />
+            <span class="font-medium">{{ project.stats?.issueCount ?? 0 }}</span>
+          </button>
+          <button
+            class="flex items-center gap-1 text-xs text-slate-600 transition hover:text-primary"
+            title="需求"
+            @click.stop="goRequirements"
+          >
+            <Lightbulb :size="14" class="text-indigo-500" />
+            <span class="font-medium">0</span>
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between border-t border-slate-100 pt-2.5">
+          <button
+            class="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-slate-500 transition hover:bg-primary-50 hover:text-primary"
+            title="添加成员"
+            @click.stop="emit('openMembers', project)"
+          >
+            <UserPlus :size="15" />
+            <span>添加成员</span>
+          </button>
+          <button
+            class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
+            title="删除项目"
+            @click.stop="emit('delete', project)"
+          >
+            <Trash2 :size="15" />
+          </button>
+        </div>
       </div>
     </div>
   </div>

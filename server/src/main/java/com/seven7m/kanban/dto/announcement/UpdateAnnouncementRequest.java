@@ -6,5 +6,5 @@ import lombok.Data;
 public class UpdateAnnouncementRequest {
     private String title;
     private String content;
-    private Integer pinned;
+    private Boolean pinned;
 }

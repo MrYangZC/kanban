@@ -51,7 +51,7 @@ function onPageSize(e: Event) {
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center justify-between gap-4 px-1 py-4 text-sm">
+  <div class="flex flex-wrap items-center justify-between gap-4 px-1 py-1.5 text-sm">
     <div class="flex items-center gap-4 text-ink-secondary">
       <span>共 <span class="font-semibold text-ink">{{ total }}</span> 条</span>
       <span v-if="total > 0" class="hidden sm:inline">

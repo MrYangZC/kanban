@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
@@ -14,6 +14,9 @@ public class CreateIssueRequest {
     private UUID projectId;
 
     private UUID issueTypeId;
+
+    /** 工作项类型编码（如 STORY/TASK/BUG），优先于 issueTypeId 解析 */
+    private String issueTypeCode;
 
     @NotNull
     private UUID statusId;
@@ -27,10 +30,10 @@ public class CreateIssueRequest {
     private String priority;
     private UUID assigneeId;
     private UUID verifierId;
-    private LocalDateTime dueDate;
+    private LocalDate dueDate;
     private String severity;
     private String module;
     private String fixVersion;
     private String source;
-    private Integer archived;
+    private Boolean archived;
 }

@@ -33,21 +33,19 @@ public interface ProjectMapper extends BaseMapper<Project> {
             LEFT JOIN (
                 SELECT project_id, COUNT(*) AS issue_count
                 FROM issue
-                WHERE deleted = 0
                 GROUP BY project_id
             ) i ON i.project_id = p.id
             LEFT JOIN (
                 SELECT i2.project_id, COUNT(*) AS attachment_count
                 FROM attachment a
                 JOIN issue i2 ON i2.id = a.issue_id
-                WHERE i2.deleted = 0
                 GROUP BY i2.project_id
             ) a ON a.project_id = p.id
             WHERE p.id IN
             <foreach collection="ids" item="id" open="(" separator="," close=")">
                 #{id}
             </foreach>
-            AND p.deleted = 0
+
             </script>
             """)
     List<ProjectStats> selectStatsByProjectIds(@Param("ids") List<UUID> ids);

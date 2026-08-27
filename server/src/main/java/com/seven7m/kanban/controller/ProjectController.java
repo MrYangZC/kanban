@@ -111,4 +111,14 @@ public class ProjectController {
         projectService.unarchive(id, UserContext.getUserId());
         return R.ok();
     }
+
+    /**
+     * 删除项目（仅 OWNER/ADMIN 可操作）。
+     */
+    @DeleteMapping("/{id}")
+    @ProjectRoleAnnotation(Permission.PROJECT_SETTING)
+    public R<Void> delete(@PathVariable UUID id) {
+        projectService.delete(id, UserContext.getUserId());
+        return R.ok();
+    }
 }

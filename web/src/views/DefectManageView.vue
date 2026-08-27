@@ -7,6 +7,7 @@ import {
   listProjectTags, listProjectMembers, listUsers, getProject,
   createIssue, moveIssue, listIssueChildren, listTransitions
 } from '@/api'
+import { DEFECT_TYPE_CODES } from '@/api/types'
 import type {
   Issue, LabelVO, ProjectMember, UserVO, IssueStatusVO,
   BoardGroupView, GroupColumnView, Project, PageResult, WorkflowTransitionVO
@@ -146,6 +147,7 @@ async function loadList() {
       projectId,
       scope: scope.value || undefined,
       keyword: keyword.value || undefined,
+      issueTypeCodes: DEFECT_TYPE_CODES,
       page: page.value,
       size: size.value,
     })
@@ -157,7 +159,7 @@ async function loadList() {
 }
 
 async function loadAllIssues() {
-  const res = await filterIssues({ projectId, scope: scope.value || undefined, keyword: keyword.value || undefined, page: 1, size: 1000 })
+  const res = await filterIssues({ projectId, scope: scope.value || undefined, keyword: keyword.value || undefined, issueTypeCodes: DEFECT_TYPE_CODES, page: 1, size: 1000 })
   allIssues.value = res.list
   total.value = res.total
 }
@@ -175,6 +177,7 @@ async function loadBoard() {
       projectId,
       scope: scope.value || undefined,
       keyword: keyword.value || undefined,
+      issueTypeCodes: DEFECT_TYPE_CODES,
       size: 1000,
     })
     filteredIds.value = new Set(issues.list.map((i: Issue) => i.id))

@@ -2,11 +2,11 @@ package com.seven7m.kanban.service.issue.link;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.exception.ServiceException;
+import com.seven7m.kanban.dto.issue.IssueVO;
 import com.seven7m.kanban.dto.issue.LinkVO;
-import com.seven7m.kanban.entity.issue.Issue;
 import com.seven7m.kanban.entity.issue.link.IssueLink;
-import com.seven7m.kanban.mapper.issue.IssueMapper;
 import com.seven7m.kanban.mapper.issue.link.IssueLinkMapper;
+import com.seven7m.kanban.service.workitem.WorkItemRouter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 public class IssueLinkService {
 
     private final IssueLinkMapper linkMapper;
-    private final IssueMapper issueMapper;
+    private final WorkItemRouter workItemRouter;
 
     /** 关联类型枚举（与前端下拉选项一致） */
     private static final Set<String> VALID_RELATION_TYPES = Set.of("关联", "阻塞", "重复", "修复");
@@ -35,7 +35,7 @@ public class IssueLinkService {
                 .stream().map(l -> {
                     LinkVO vo = new LinkVO();
                     BeanUtils.copyProperties(l, vo);
-                    Issue target = issueMapper.selectById(l.getTargetIssueId());
+                    IssueVO target = workItemRouter.getBriefById(l.getTargetIssueId());
                     if (target != null) {
                         vo.setTargetKey(target.getIssueNumber() == null ? "" : "ISSUE-" + target.getIssueNumber());
                         vo.setTargetTitle(target.getTitle());
@@ -52,13 +52,13 @@ public class IssueLinkService {
         if (relationType == null || !VALID_RELATION_TYPES.contains(relationType)) {
             throw new ServiceException(400, "关联类型不合法");
         }
-        Issue source = issueMapper.selectById(issueId);
-        if (source == null || source.getDeleted() != null && source.getDeleted() == 1) {
-            throw new ServiceException(404, "缺陷不存在");
+        IssueVO source = workItemRouter.getBriefById(issueId);
+        if (source == null) {
+            throw new ServiceException(404, "工作项不存在");
         }
-        Issue target = issueMapper.selectById(targetIssueId);
-        if (target == null || target.getDeleted() != null && target.getDeleted() == 1) {
-            throw new ServiceException(404, "关联缺陷不存在");
+        IssueVO target = workItemRouter.getBriefById(targetIssueId);
+        if (target == null) {
+            throw new ServiceException(404, "关联工作项不存在");
         }
         if (!source.getProjectId().equals(target.getProjectId())) {
             throw new ServiceException(400, "不能跨项目关联");

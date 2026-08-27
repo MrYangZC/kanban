@@ -9,6 +9,6 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface SysUserMapper extends BaseMapper<SysUser> {
 
-    @Select("SELECT * FROM sys_user WHERE display_name = #{displayName} AND deleted = 0 LIMIT 1")
+    @Select("SELECT * FROM sys_user WHERE display_name = #{displayName} LIMIT 1")
     SysUser selectByDisplayName(@Param("displayName") String displayName);
 }

@@ -9,7 +9,7 @@
       <!-- 角色管理 -->
       <el-tab-pane label="角色" name="roles">
         <div class="toolbar">
-          <el-button type="primary" @click="openRole">新建角色</el-button>
+          <el-button type="primary" @click="openRole()">新建角色</el-button>
         </div>
         <el-table :data="roles" v-loading="roleLoading" border>
           <el-table-column prop="code" label="编码" width="160" />
@@ -32,7 +32,7 @@
       <!-- 菜单（导航） -->
       <el-tab-pane label="菜单（导航）" name="menus">
         <div class="toolbar">
-          <el-button type="primary" @click="openMenu">新建菜单</el-button>
+          <el-button type="primary" @click="openMenu()">新建菜单</el-button>
         </div>
         <el-table :data="menus" v-loading="menuLoading" border row-key="id" default-expand-all :tree-props="{ children: 'children' }">
           <el-table-column prop="name" label="名称" />

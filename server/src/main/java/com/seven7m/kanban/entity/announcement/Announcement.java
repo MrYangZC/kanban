@@ -20,5 +20,5 @@ public class Announcement extends BaseEntity {
     private UUID projectId;
     private String title;
     private String content;
-    private Integer pinned;
+    private Boolean pinned;
 }

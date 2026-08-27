@@ -32,3 +32,6 @@ Skill.iml
 /截图/
 *.log
 /uploads/
+/.playwright-cli/
+/测试报告/
+*.yaml

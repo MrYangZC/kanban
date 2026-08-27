@@ -19,7 +19,7 @@ public interface DashboardMapper extends BaseMapper<Object> {
             SELECT s.name AS name, COUNT(i.id) AS count
             FROM issue i
             JOIN issue_status s ON s.id = i.status_id
-            WHERE i.project_id = #{projectId} AND i.deleted = 0
+            WHERE i.project_id = #{projectId}
             GROUP BY s.name, s.sort_order
             ORDER BY s.sort_order
             """)
@@ -29,7 +29,7 @@ public interface DashboardMapper extends BaseMapper<Object> {
     @Select("""
             SELECT COALESCE(i.priority, 'NONE') AS name, COUNT(i.id) AS count
             FROM issue i
-            WHERE i.project_id = #{projectId} AND i.deleted = 0
+            WHERE i.project_id = #{projectId}
             GROUP BY i.priority
             ORDER BY i.priority
             """)
@@ -40,7 +40,7 @@ public interface DashboardMapper extends BaseMapper<Object> {
             SELECT COALESCE(u.username, '未分配') AS name, COUNT(i.id) AS count
             FROM issue i
             LEFT JOIN sys_user u ON u.id = i.assignee_id
-            WHERE i.project_id = #{projectId} AND i.deleted = 0
+            WHERE i.project_id = #{projectId}
             GROUP BY u.username
             ORDER BY count DESC
             """)
@@ -54,7 +54,7 @@ public interface DashboardMapper extends BaseMapper<Object> {
                 COUNT(*) FILTER (WHERE i.due_date IS NOT NULL AND i.due_date < now() AND s.category <> 'DONE') AS overdue
             FROM issue i
             JOIN issue_status s ON s.id = i.status_id
-            WHERE i.project_id = #{projectId} AND i.deleted = 0
+            WHERE i.project_id = #{projectId}
             """)
     DashboardSummaryView summary(@Param("projectId") java.util.UUID projectId);
 
@@ -65,7 +65,7 @@ public interface DashboardMapper extends BaseMapper<Object> {
                 COALESCE(MAX(EXTRACT(EPOCH FROM (i.updated_at - i.created_at)) / 3600), 0) AS max_hours
             FROM issue i
             JOIN issue_status s ON s.id = i.status_id
-            WHERE i.project_id = #{projectId} AND i.deleted = 0 AND s.category = 'DONE'
+            WHERE i.project_id = #{projectId} AND s.category = 'DONE'
             """)
     CycleTimeView cycleTime(@Param("projectId") java.util.UUID projectId);
 
@@ -74,7 +74,7 @@ public interface DashboardMapper extends BaseMapper<Object> {
             SELECT TO_CHAR(i.updated_at, 'YYYY-MM-DD') AS date, COUNT(*) AS completed
             FROM issue i
             JOIN issue_status s ON s.id = i.status_id
-            WHERE i.project_id = #{projectId} AND i.deleted = 0
+            WHERE i.project_id = #{projectId}
               AND s.category = 'DONE'
               AND i.updated_at >= NOW() - INTERVAL '14 days'
             GROUP BY TO_CHAR(i.updated_at, 'YYYY-MM-DD')
@@ -86,7 +86,7 @@ public interface DashboardMapper extends BaseMapper<Object> {
     @Select("""
             SELECT TO_CHAR(i.created_at, 'YYYY-MM-DD') AS date, COUNT(*) AS created
             FROM issue i
-            WHERE i.project_id = #{projectId} AND i.deleted = 0
+            WHERE i.project_id = #{projectId}
               AND i.created_at >= NOW() - INTERVAL '14 days'
             GROUP BY TO_CHAR(i.created_at, 'YYYY-MM-DD')
             ORDER BY date
@@ -98,7 +98,7 @@ public interface DashboardMapper extends BaseMapper<Object> {
             SELECT COUNT(*) AS count
             FROM issue i
             JOIN issue_status s ON s.id = i.status_id
-            WHERE i.project_id = #{projectId} AND i.deleted = 0 AND s.category = 'DONE'
+            WHERE i.project_id = #{projectId} AND s.category = 'DONE'
             """)
     long totalDone(@Param("projectId") java.util.UUID projectId);
 

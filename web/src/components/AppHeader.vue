@@ -147,11 +147,21 @@ onBeforeUnmount(() => {
       </button>
     </nav>
 
-    <div v-if="isInProject" class="relative" @click.stop>
-      <button class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-ink transition hover:bg-surface-hover" @click="toggleProjectDropdown">
+    <div v-if="isInProject" class="relative flex items-center" @click.stop>
+      <button
+        class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-ink transition hover:bg-surface-hover"
+        title="返回项目列表"
+        @click="router.push('/projects')"
+      >
         <FolderKanban :size="15" class="text-ink-secondary" />
         <span class="max-w-[160px] truncate">{{ projectStore.current?.name || '选择项目' }}</span>
-        <ChevronDown :size="14" class="text-ink-secondary" />
+      </button>
+      <button
+        class="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition hover:bg-surface-hover"
+        title="切换项目"
+        @click="toggleProjectDropdown"
+      >
+        <ChevronDown :size="14" />
       </button>
       <div v-if="showProjectDropdown" class="absolute left-0 top-full z-50 mt-1 w-64 rounded-lg border border-line-light bg-white py-1 shadow-modal">
         <div class="px-3 py-1.5 text-xs text-ink-secondary">切换项目</div>

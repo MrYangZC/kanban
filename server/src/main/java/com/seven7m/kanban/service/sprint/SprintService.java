@@ -44,6 +44,7 @@ public class SprintService {
     @Transactional
     public SprintVO create(UUID projectId, CreateSprintRequest req) {
         Sprint sprint = new Sprint();
+        sprint.setId(UUID.randomUUID());
         sprint.setProjectId(projectId);
         sprint.setName(req.getName());
         sprint.setGoal(req.getGoal());

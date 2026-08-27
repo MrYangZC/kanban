@@ -11,6 +11,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -34,6 +35,10 @@ public class PermissionService {
      */
     @Cacheable(cacheNames = "projectPermissions", key = "#userId.toString() + ':' + #projectId.toString()")
     public Set<String> getPermissions(UUID userId, UUID projectId) {
+        // 超级管理员（种子 admin）直接返回全部权限码，避免其在项目中无角色导致 UI 权限被误判为空
+        if (isSuperAdmin(userId)) {
+            return new HashSet<>(Permission.allCodes());
+        }
         Set<UUID> roleIds = projectMemberService.getRoleIds(projectId, userId);
         if (roleIds == null || roleIds.isEmpty()) {
             return Set.of();

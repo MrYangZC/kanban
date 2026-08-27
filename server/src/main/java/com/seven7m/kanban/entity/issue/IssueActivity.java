@@ -20,6 +20,8 @@ public class IssueActivity {
     private UUID id;
 
     private UUID issueId;
+    /** 隔离维度：TASK / REQUIREMENT / BUG，防止跨表串数据 */
+    private String category;
     private UUID actorId;
     private String action;
 

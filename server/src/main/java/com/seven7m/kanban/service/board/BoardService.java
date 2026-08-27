@@ -1,34 +1,30 @@
 package com.seven7m.kanban.service.board;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.dto.board.BoardColumnView;
 import com.seven7m.kanban.dto.board.BoardGroupView;
 import com.seven7m.kanban.dto.board.BoardView;
-import com.seven7m.kanban.dto.board.GroupColumnView;
+import com.seven7m.kanban.dto.issue.IssueVO;
 import com.seven7m.kanban.entity.board.Board;
 import com.seven7m.kanban.entity.board.BoardColumn;
+import com.seven7m.kanban.entity.issuestatus.IssueStatus;
 import com.seven7m.kanban.mapper.board.BoardColumnMapper;
 import com.seven7m.kanban.mapper.board.BoardMapper;
-import com.seven7m.kanban.common.exception.ServiceException;
-import com.seven7m.kanban.dto.issue.IssueVO;
-import com.seven7m.kanban.entity.issue.Issue;
-import com.seven7m.kanban.mapper.issue.IssueMapper;
-import com.seven7m.kanban.service.issue.IssueService;
-import com.seven7m.kanban.entity.issuestatus.IssueStatus;
 import com.seven7m.kanban.mapper.issuestatus.IssueStatusMapper;
-import com.seven7m.kanban.entity.project.Project;
-import com.seven7m.kanban.mapper.project.ProjectMapper;
-import com.seven7m.kanban.entity.user.SysUser;
-import com.seven7m.kanban.mapper.user.SysUserMapper;
+import com.seven7m.kanban.service.workitem.BugService;
+import com.seven7m.kanban.service.workitem.RequirementService;
+import com.seven7m.kanban.service.workitem.TaskService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,170 +33,101 @@ public class BoardService {
 
     private final BoardMapper boardMapper;
     private final BoardColumnMapper boardColumnMapper;
-    private final IssueMapper issueMapper;
     private final IssueStatusMapper issueStatusMapper;
-    private final ProjectMapper projectMapper;
-    private final IssueService issueService;
-    private final SysUserMapper sysUserMapper;
+    private final TaskService taskService;
+    private final RequirementService requirementService;
+    private final BugService bugService;
 
     /**
-     * 看板聚合：一次 SQL 拉全量未删除 Issue，Java 内存按 board_column.status_id 分组。
+     * 按类别（缺陷/需求/任务）分区隔离的看板。
+     * 不传 category 时默认返回 TASK，避免任何跨类别数据混入。
      */
-    public BoardView getBoard(UUID projectId) {
-        Project project = projectMapper.selectById(projectId);
-        if (project == null || project.getDeleted() != null && project.getDeleted() == 1) {
-            throw new ServiceException(404, "项目不存在");
-        }
-        Board board = boardMapper.selectOne(Wrappers.<Board>lambdaQuery()
-                .eq(Board::getProjectId, projectId)
-                .orderByAsc(Board::getId).last("LIMIT 1"));
-        if (board == null) {
-            throw new ServiceException(404, "项目尚未初始化看板");
-        }
+    private List<IssueVO> selectForBoard(UUID projectId, ItemCategory category) {
+        return switch (category) {
+            case TASK -> taskService.selectByProjectForBoard(projectId);
+            case REQUIREMENT -> requirementService.selectByProjectForBoard(projectId);
+            case BUG -> bugService.selectByProjectForBoard(projectId);
+        };
+    }
 
-        // 列（含 status 信息）
-        List<BoardColumn> columns = boardColumnMapper.selectList(Wrappers.<BoardColumn>lambdaQuery()
-                .eq(BoardColumn::getBoardId, board.getId())
-                .orderByAsc(BoardColumn::getSortOrder));
+    public BoardView getBoard(UUID projectId, ItemCategory category) {
+        List<IssueVO> issues = selectForBoard(projectId, category);
+        Map<UUID, List<IssueVO>> byStatus = issues.stream()
+                .collect(Collectors.groupingBy(i -> i.getStatusId() == null ? null : UUID.fromString(i.getStatusId().toString())));
 
-        // 一次拉取全量 Issue 并分组
-        List<Issue> issues = issueMapper.selectByProjectForBoard(projectId);
-        Map<UUID, List<Issue>> byStatus = issues.stream()
-                .collect(Collectors.groupingBy(Issue::getStatusId, LinkedHashMap::new, Collectors.toList()));
-
-        Map<UUID, IssueStatus> statusMap = issueStatusMapper.selectList(Wrappers.<IssueStatus>lambdaQuery())
-                .stream().collect(Collectors.toMap(IssueStatus::getId, s -> s));
+        Board board = boardMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Board>().eq("project_id", projectId).last("LIMIT 1"));
+        List<BoardColumn> columns = board == null ? List.of()
+                : boardColumnMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<BoardColumn>().eq("board_id", board.getId())
+                                .orderByAsc("sort_order"));
 
         List<BoardColumnView> columnViews = new ArrayList<>();
         for (BoardColumn col : columns) {
-            BoardColumnView cv = new BoardColumnView();
-            BeanUtils.copyProperties(col, cv);
-            IssueStatus st = statusMap.get(col.getStatusId());
-            if (st != null) {
-                cv.setName(st.getName());
-                cv.setCategory(st.getCategory());
-                cv.setColor(st.getColor());
-            }
-            List<Issue> colIssues = byStatus.getOrDefault(col.getStatusId(), List.of());
-            cv.setIssues(colIssues.stream()
-                    .map(i -> issueService.toVO(i, project.getProjectKey()))
-                    .collect(Collectors.toList()));
-            columnViews.add(cv);
+            List<IssueVO> colIssues = byStatus.getOrDefault(col.getStatusId(), List.of());
+            columnViews.add(new BoardColumnView(col.getStatusId(), colIssues));
         }
-
         BoardView view = new BoardView();
-        view.setId(board.getId());
-        view.setProjectId(projectId);
-        view.setName(board.getName());
         view.setColumns(columnViews);
         return view;
     }
 
-    /**
-     * 分组（Swimlane）看板：在状态列之上按 groupBy 维度（ASSIGNEE/PRIORITY/SPRINT）再切分。
-     * 沿用既有「一次 SQL + 内存分组」策略，不新增数据库查询。
-     */
-    public BoardGroupView getBoard(UUID projectId, String groupBy) {
-        if (groupBy == null || groupBy.isBlank() || "STATUS".equalsIgnoreCase(groupBy)) {
-            BoardView v = getBoard(projectId);
-            BoardGroupView gv = new BoardGroupView();
-            gv.setGroupBy("STATUS");
-            gv.setName(v.getName());
-            BoardGroupView.GroupItem all = new BoardGroupView.GroupItem();
-            all.setGroupKey("ALL");
-            all.setGroupName("全部");
-            all.setIssueCount(v.getColumns().stream().mapToLong(c -> c.getIssues().size()).sum());
-            all.setColumns(v.getColumns().stream().map(c -> {
-                GroupColumnView gc = new GroupColumnView();
-                gc.setStatusId(c.getStatusId());
-                gc.setName(c.getName());
-                gc.setCategory(c.getCategory());
-                gc.setColor(c.getColor());
-                gc.setSortOrder(c.getSortOrder());
-                gc.setIssues(c.getIssues());
-                return gc;
-            }).collect(Collectors.toList()));
-            gv.getGroups().add(all);
-            return gv;
+    public BoardView getBoard(UUID projectId) {
+        return getBoard(projectId, ItemCategory.TASK);
+    }
+
+    public BoardGroupView getBoard(UUID projectId, String groupBy, ItemCategory category) {
+        List<IssueVO> issues = selectForBoard(projectId, category);
+        Map<String, List<IssueVO>> grouped;
+        if (groupBy == null) groupBy = "STATUS";
+
+        switch (groupBy.toUpperCase()) {
+            case "ASSIGNEE" -> grouped = issues.stream()
+                    .collect(Collectors.groupingBy(i -> i.getAssigneeName() == null ? "未指派" : i.getAssigneeName(),
+                            LinkedHashMap::new, Collectors.toList()));
+            case "PRIORITY" -> grouped = issues.stream()
+                    .collect(Collectors.groupingBy(i -> i.getPriority() == null ? "P2" : i.getPriority(),
+                            LinkedHashMap::new, Collectors.toList()));
+            case "SPRINT" -> grouped = issues.stream()
+                    .collect(Collectors.groupingBy(i -> i.getSprintId() == null ? "未规划" : i.getSprintId().toString(),
+                            LinkedHashMap::new, Collectors.toList()));
+            case "STATUS":
+            default -> grouped = issues.stream()
+                    .collect(Collectors.groupingBy(i -> i.getStatusId() == null ? "UNKNOWN" : i.getStatusId().toString(),
+                            LinkedHashMap::new, Collectors.toList()));
         }
 
-        Project project = projectMapper.selectById(projectId);
-        if (project == null || project.getDeleted() != null && project.getDeleted() == 1) {
-            throw new ServiceException(404, "项目不存在");
-        }
-        Board board = boardMapper.selectOne(Wrappers.<Board>lambdaQuery()
-                .eq(Board::getProjectId, projectId)
-                .orderByAsc(Board::getId).last("LIMIT 1"));
-        if (board == null) {
-            throw new ServiceException(404, "项目尚未初始化看板");
-        }
-
-        List<BoardColumn> columns = boardColumnMapper.selectList(Wrappers.<BoardColumn>lambdaQuery()
-                .eq(BoardColumn::getBoardId, board.getId())
-                .orderByAsc(BoardColumn::getSortOrder));
-        Map<UUID, IssueStatus> statusMap = issueStatusMapper.selectList(Wrappers.<IssueStatus>lambdaQuery())
-                .stream().collect(Collectors.toMap(IssueStatus::getId, s -> s));
-        Map<UUID, String> userMap = sysUserMapper.selectList(Wrappers.<SysUser>lambdaQuery())
-                .stream().collect(Collectors.toMap(SysUser::getId, u -> u.getDisplayName() != null ? u.getDisplayName() : u.getUsername()));
-
-        List<Issue> issues = issueMapper.selectByProjectForBoard(projectId);
-
-        // 按 groupBy 计算分组 key
-        Map<String, List<Issue>> byGroup = new LinkedHashMap<>();
-        for (Issue it : issues) {
-            String key = groupKeyOf(it, groupBy, userMap);
-            byGroup.computeIfAbsent(key, k -> new ArrayList<>()).add(it);
-        }
+        List<IssueStatus> statuses = issueStatusMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<IssueStatus>().eq("project_id", projectId));
+        Map<String, IssueStatus> statusMap = statuses.stream()
+                .collect(Collectors.toMap(s -> s.getId().toString(), Function.identity(), (a, b) -> a));
 
         BoardGroupView view = new BoardGroupView();
-        view.setName(board.getName());
-        view.setGroupBy(groupBy.toUpperCase());
-        for (Map.Entry<String, List<Issue>> e : byGroup.entrySet()) {
-            BoardGroupView.GroupItem item = new BoardGroupView.GroupItem();
-            item.setGroupKey(e.getKey());
-            item.setGroupName(e.getKey());
-            item.setIssueCount(e.getValue().size());
-            item.setColumns(columns.stream().map(col -> {
-                GroupColumnView gc = new GroupColumnView();
-                gc.setStatusId(col.getStatusId());
-                IssueStatus st = statusMap.get(col.getStatusId());
-                if (st != null) {
-                    gc.setName(st.getName());
-                    gc.setColor(st.getColor());
-                    gc.setCategory(st.getCategory());
-                }
-                gc.setSortOrder(col.getSortOrder());
-                List<Issue> colIssues = e.getValue().stream()
-                        .filter(i -> i.getStatusId().equals(col.getStatusId()))
-                        .sorted((a, b) -> compareSortKey(a.getSortKey(), b.getSortKey()))
-                        .collect(Collectors.toList());
-                gc.setIssues(colIssues.stream()
-                        .map(i -> issueService.toVO(i, project.getProjectKey()))
-                        .collect(Collectors.toList()));
-                return gc;
-            }).collect(Collectors.toList()));
-            view.getGroups().add(item);
+        List<BoardGroupView.Group> groups = new ArrayList<>();
+        for (Map.Entry<String, List<IssueVO>> e : grouped.entrySet()) {
+            BoardGroupView.Group g = new BoardGroupView.Group();
+            g.setKey(e.getKey());
+            IssueStatus st = statusMap.get(e.getKey());
+            g.setName(st == null ? e.getKey() : st.getName());
+            g.setColor(st == null ? null : st.getColor());
+            g.setIssues(e.getValue());
+            groups.add(g);
         }
+        groups.sort(Comparator.comparing(BoardGroupView.Group::getKey));
+        view.setGroups(groups);
         return view;
     }
 
-    private String groupKeyOf(Issue it, String groupBy, Map<UUID, String> userMap) {
-        switch (groupBy.toUpperCase()) {
-            case "ASSIGNEE":
-                if (it.getAssigneeId() == null) return "未分配";
-                return userMap.getOrDefault(it.getAssigneeId(), "未分配");
-            case "PRIORITY":
-                return it.getPriority() == null ? "NONE" : it.getPriority();
-            case "SPRINT":
-                return it.getSprintId() == null ? "未分配" : "Sprint";
-            default:
-                return "ALL";
-        }
+    public BoardGroupView getBoard(UUID projectId, String groupBy) {
+        return getBoard(projectId, groupBy, ItemCategory.TASK);
     }
 
-    private int compareSortKey(String a, String b) {
-        if (a == null) a = "";
-        if (b == null) b = "";
-        return a.compareTo(b);
+    public ItemCategory resolveCategory(String categoryStr) {
+        if (!StringUtils.hasText(categoryStr)) return ItemCategory.TASK;
+        try {
+            return ItemCategory.valueOf(categoryStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ItemCategory.TASK;
+        }
     }
 }

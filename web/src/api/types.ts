@@ -344,3 +344,11 @@ export interface PermissionDef {
   module: string
   sortOrder: number
 }
+
+// ---- 工作项类型编码分类（与后端 issue_type 表 seed 数据一致） ----
+/** 需求类（故事 + 特性） */
+export const REQUIREMENT_TYPE_CODES: string[] = ['STORY', 'FEATURE']
+/** 任务类 */
+export const TASK_TYPE_CODES: string[] = ['TASK']
+/** 缺陷类 */
+export const DEFECT_TYPE_CODES: string[] = ['BUG', 'FUNC_DEFECT', 'PERF_DEFECT', 'SEC_DEFECT', 'COMPAT_DEFECT', 'UI_DEFECT']

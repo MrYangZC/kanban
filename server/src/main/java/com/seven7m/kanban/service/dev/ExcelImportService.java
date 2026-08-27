@@ -4,24 +4,23 @@ import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.dto.dev.ExcelRow;
 import com.seven7m.kanban.dto.issue.CreateIssueRequest;
 import com.seven7m.kanban.dto.issue.IssueVO;
-import com.seven7m.kanban.entity.issue.Issue;
-import com.seven7m.kanban.mapper.dev.ImportMapper;
-import com.seven7m.kanban.mapper.issue.IssueMapper;
-import com.seven7m.kanban.service.issue.IssueService;
 import com.seven7m.kanban.entity.issuestatus.IssueStatus;
 import com.seven7m.kanban.mapper.issuestatus.IssueStatusMapper;
+import com.seven7m.kanban.mapper.dev.ImportMapper;
+import com.seven7m.kanban.mapper.project.ProjectMapper;
+import com.seven7m.kanban.mapper.workitem.TaskMapper;
 import com.seven7m.kanban.dto.project.AddMemberRequest;
 import com.seven7m.kanban.dto.project.CreateProjectRequest;
 import com.seven7m.kanban.dto.project.ProjectVO;
-import com.seven7m.kanban.entity.project.ProjectRole;
 import com.seven7m.kanban.entity.project.Project;
-import com.seven7m.kanban.mapper.project.ProjectMapper;
+import com.seven7m.kanban.entity.workitem.Task;
 import com.seven7m.kanban.service.project.ProjectMemberService;
 import com.seven7m.kanban.service.project.ProjectService;
+import com.seven7m.kanban.service.user.UserService;
+import com.seven7m.kanban.service.workitem.TaskService;
 import com.seven7m.kanban.dto.user.CreateUserRequest;
 import com.seven7m.kanban.entity.user.SysUser;
 import com.seven7m.kanban.mapper.user.SysUserMapper;
-import com.seven7m.kanban.service.user.UserService;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
@@ -56,26 +55,26 @@ public class ExcelImportService {
 
     private final ProjectService projectService;
     private final ProjectMemberService projectMemberService;
-    private final IssueService issueService;
+    private final TaskService taskService;
     private final IssueStatusMapper issueStatusMapper;
-    private final IssueMapper issueMapper;
+    private final TaskMapper taskMapper;
     private final UserService userService;
     private final SysUserMapper sysUserMapper;
     private final ProjectMapper projectMapper;
 
     public ExcelImportService(ProjectService projectService,
                               ProjectMemberService projectMemberService,
-                              IssueService issueService,
+                              TaskService taskService,
                               IssueStatusMapper issueStatusMapper,
-                              IssueMapper issueMapper,
+                              TaskMapper taskMapper,
                               UserService userService,
                               SysUserMapper sysUserMapper,
                               ProjectMapper projectMapper) {
         this.projectService = projectService;
         this.projectMemberService = projectMemberService;
-        this.issueService = issueService;
+        this.taskService = taskService;
         this.issueStatusMapper = issueStatusMapper;
-        this.issueMapper = issueMapper;
+        this.taskMapper = taskMapper;
         this.userService = userService;
         this.sysUserMapper = sysUserMapper;
         this.projectMapper = projectMapper;
@@ -174,13 +173,15 @@ public class ExcelImportService {
                 CreateIssueRequest req = new CreateIssueRequest();
                 req.setProjectId(projectId);
                 req.setStatusId(statusId);
+                req.setIssueTypeCode("TASK");
                 req.setTitle(r.title());
                 req.setPriority(normalizePriority(r.priority()));
                 req.setAssigneeId(assigneeId);
-                req.setDueDate(r.dueDate() == null ? null : r.dueDate().atStartOfDay());
+//                req.setDueDate(r.dueDate() == null ? null : r.dueDate().atStartOfDay());
+                req.setDueDate(r.dueDate() == null ? null : r.dueDate());
                 req.setDescription(buildDescription(r));
 
-                IssueVO vo = issueService.create(req);
+                IssueVO vo = taskService.create(req);
                 sr.incIssue();
                 if (r.title() != null && !r.title().isBlank()) {
                     titleToId.put(r.title().trim(), vo.getId());
@@ -205,10 +206,10 @@ public class ExcelImportService {
                 parentId = issueNoToId.get(ctx.parentNo());
             }
             if (parentId != null && !parentId.equals(ctx.issueId())) {
-                Issue issue = issueMapper.selectById(ctx.issueId());
-                if (issue != null) {
-                    issue.setParentId(parentId);
-                    issueMapper.updateById(issue);
+                Task task = taskMapper.selectById(ctx.issueId());
+                if (task != null) {
+                    task.setParentId(parentId);
+                    taskMapper.updateById(task);
                 }
             }
         }

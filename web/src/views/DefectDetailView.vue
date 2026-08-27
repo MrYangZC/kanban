@@ -12,14 +12,17 @@ import type {
   Issue, LabelVO, ProjectMember, UserVO, IssueStatusVO,
   IssueActivity, AttachmentVO, LinkVO, Project
 } from '@/api/types'
+import { REQUIREMENT_TYPE_CODES, TASK_TYPE_CODES, DEFECT_TYPE_CODES } from '@/api/types'
 import { ElMessage } from 'element-plus'
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Plus, X,
   Paperclip, Link2, Trash2,
-  AlertTriangle, Send, MoreHorizontal
+  AlertTriangle, Send, MoreHorizontal, Search, Check
 } from 'lucide-vue-next'
 import CommentThread from '@/components/CommentThread.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
+import IssueBasicFields from '@/components/IssueBasicFields.vue'
+import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import { useUserStore } from '@/stores/user'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { avatarChar, avatarColor } from '@/utils/avatar'
@@ -93,10 +96,27 @@ const commenting = ref(false)
 const replyTo = ref<IssueActivity | null>(null)   // 当前回复目标评论（嵌套回复）
 const commentEditorRef = ref<InstanceType<typeof RichTextEditor> | null>(null)
 const attachInputRef = ref<HTMLInputElement | null>(null)
-const linkTarget = ref('')
 const linkType = ref('关联')
-const tagInput = ref('')
+const linkFilter = ref<'all' | 'requirement' | 'task' | 'defect'>('all')
+const linkKeyword = ref('')
+const linkOptions = ref<Issue[]>([])
+const linkLoading = ref(false)
+const linkSelected = ref<string[]>([])
+const createDialogVisible = ref(false)
+const LINK_TYPE_MAP: Record<string, string[]> = {
+  all: [],
+  requirement: REQUIREMENT_TYPE_CODES,
+  task: TASK_TYPE_CODES,
+  defect: DEFECT_TYPE_CODES
+}
+const linkFilters: { k: 'all' | 'requirement' | 'task' | 'defect'; label: string }[] = [
+  { k: 'all', label: '全部' },
+  { k: 'requirement', label: '需求' },
+  { k: 'task', label: '任务' },
+  { k: 'defect', label: '缺陷' }
+]
 const attachName = ref('')
+const fieldsRef = ref<InstanceType<typeof IssueBasicFields> | null>(null)
 
 const form = reactive({
   title: '',
@@ -109,14 +129,16 @@ const form = reactive({
   verifierId: '',
   fixVersion: '',
   source: '',
-  dueDate: '',
-  planStart: '',
+  dueDate: '' as string | null,
+  planStart: '' as string | null,
   planEnd: '',
   noFixReason: '',
   iteration: '',
   ccUsers: [] as string[],
   participants: [] as string[]
 })
+
+const editingDescription = ref(false)
 
 const filteredActivities = computed(() => {
   if (subTab.value === 'comment') return activities.value.filter((a) => a.type === 'COMMENT')
@@ -201,6 +223,10 @@ async function loadDetail(issueId: string) {
   try { activities.value = await listActivities(issueId) } catch { /* ignore */ }
   try { attachments.value = await listAttachments(issueId) } catch { /* ignore */ }
   try { links.value = await listLinks(issueId) } catch { /* ignore */ }
+  // 重置关联区临时状态，确保不同工作项之间数据隔离
+  linkFilter.value = 'all'
+  linkOptions.value = []
+  linkSelected.value = []
   try { tags.value = await listIssueTags(issueId) } catch { /* ignore */ }
   const issue = allIssues.value.find((i) => i.id === issueId)
   if (issue) {
@@ -215,6 +241,11 @@ async function loadDetail(issueId: string) {
     form.fixVersion = issue.fixVersion || ''
     form.source = issue.source || ''
     form.dueDate = issue.dueDate || ''
+    form.iteration = issue.iteration || ''
+    form.planStart = issue.planStart || ''
+    form.noFixReason = issue.noFixReason || ''
+    form.ccUsers = issue.ccUsers || []
+    form.participants = issue.participants || []
   }
 }
 
@@ -234,23 +265,45 @@ watch(() => route.params.issueId, (id) => {
   }
 })
 
-async function saveField(field: string, payload: Record<string, unknown>) {
+async function saveField(field: string, payload: Record<string, unknown>, clearFields?: string[]): Promise<boolean> {
   if (!currentIssue.value || !canWrite.value) {
     ElMessage.warning('无编辑权限')
-    return
+    return false
   }
   try {
-    const updated = await updateIssue(currentIssue.value.id, payload)
+    const body: Record<string, unknown> = { ...payload }
+    if (clearFields && clearFields.length) body.clearFields = clearFields
+    const updated = await updateIssue(currentIssue.value.id, body)
     Object.assign(currentIssue.value, updated)
     const idx = allIssues.value.findIndex((i) => i.id === updated.id)
     if (idx >= 0) Object.assign(allIssues.value[idx], updated)
     ElMessage.success(`${field}已更新`)
-  } catch { /* ignore */ }
+    return true
+  } catch {
+    ElMessage.error(`${field}更新失败`)
+    return false
+  }
 }
 
 async function saveTitle() {
   if (!form.title.trim()) return
   await saveField('标题', { title: form.title })
+}
+
+function startEditDescription() {
+  if (!canWrite.value) return
+  editingDescription.value = true
+}
+function cancelEditDescription() {
+  editingDescription.value = false
+  if (currentIssue.value) form.description = currentIssue.value.description || ''
+}
+async function saveDescription() {
+  const ok = await saveField('描述', { description: form.description })
+  if (ok) {
+    editingDescription.value = false
+    if (currentIssue.value) form.description = currentIssue.value.description || ''
+  }
 }
 
 function startComment() {
@@ -360,23 +413,78 @@ async function removeAttach(id: string) {
   attachments.value = await listAttachments(currentIssue.value.id)
 }
 
-async function addLinkItem() {
-  if (!currentIssue.value || !linkTarget.value.trim()) return
-  await addLink(currentIssue.value.id, linkTarget.value.trim(), linkType.value)
-  linkTarget.value = ''
-  links.value = await listLinks(currentIssue.value.id)
+async function searchLinks(keyword?: string) {
+  if (!currentIssue.value) return
+  linkLoading.value = true
+  try {
+    const codes = LINK_TYPE_MAP[linkFilter.value]
+    const res = await filterIssues({
+      projectId: currentIssue.value.projectId,
+      keyword: keyword?.trim() || undefined,
+      issueTypeCodes: codes.length ? codes : undefined,
+      page: 1,
+      size: 200,
+    })
+    const linkedIds = new Set(links.value.map((l) => l.targetIssueId))
+    linkOptions.value = res.list.filter((i) => i.id !== currentIssue.value!.id && !linkedIds.has(i.id))
+  } finally {
+    linkLoading.value = false
+  }
+}
+
+// 下拉展开时：若尚未加载过选项，则加载一次
+function onLinkSelectVisible(visible: boolean) {
+  if (visible && linkOptions.value.length === 0) {
+    searchLinks()
+  }
+}
+
+// 下拉远程搜索
+async function remoteSearchLinks(keyword: string) {
+  await searchLinks(keyword)
+}
+
+// 切换工作项类型筛选
+async function onLinkFilterChange(k: 'all' | 'requirement' | 'task' | 'defect') {
+  linkFilter.value = k
+  linkOptions.value = []
+  linkSelected.value = []
+  await searchLinks()
+}
+
+// 选中变化：只处理「新增关联」。移除统一由已关联列表的删除按钮按 link id 精确处理，
+// 避免下拉只展示当前筛选类型（如任务）时，把其他类型（需求/缺陷）已关联项误判为移除而误删。
+async function onLinkSelectionChange(val: string[]) {
+  if (!currentIssue.value) return
+  const linkedIds = new Set(links.value.map((l) => l.targetIssueId))
+  const added = val.filter((id) => !linkedIds.has(id))
+  if (added.length) {
+    await Promise.all(added.map((t) => addLink(currentIssue.value!.id, t, linkType.value)))
+    links.value = await listLinks(currentIssue.value.id)
+  }
+  // 选中后立即清空临时选择，便于下次再选，且不会触发误删
+  linkSelected.value = []
 }
 
 async function removeLink(id: string) {
   if (!currentIssue.value) return
   await deleteLink(currentIssue.value.id, id)
   links.value = await listLinks(currentIssue.value.id)
+  await searchLinks()
 }
 
-async function addTag() {
-  if (!currentIssue.value || !tagInput.value.trim()) return
-  await addIssueTag(currentIssue.value.id, pid.value, tagInput.value.trim(), PRIMARY)
-  tagInput.value = ''
+watch(() => mainTab.value, (v) => {
+  if (v === 'link') {
+    linkSelected.value = []
+    searchLinks()
+  }
+})
+
+async function onAddTag() {
+  const input = fieldsRef.value?.tagInput?.trim()
+  if (!currentIssue.value || !input) return
+  await addIssueTag(currentIssue.value.id, pid.value, input, PRIMARY)
+  fieldsRef.value?.clearTagInput()
   tags.value = await listIssueTags(currentIssue.value.id)
 }
 
@@ -397,6 +505,7 @@ function goNext() { if (nextIssue.value) selectIssue(nextIssue.value) }
 
 const statusColor = (id: string) => statuses.value.find((s) => s.id === id)?.color || PRIMARY
 const userName = (id: string | null) => users.value.find((u) => u.id === id)?.displayName || '—'
+const memberName = (m: ProjectMember) => m.displayName || m.username
 
 
 onMounted(() => {
@@ -501,29 +610,58 @@ onMounted(() => {
             </div>
           </section>
 
-          <!-- 描述卡片（只读展示） -->
+          <!-- 描述卡片（支持编辑） -->
           <section class="rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
             <div class="mb-3 flex items-center justify-between">
               <h3 class="text-sm font-medium" style="color:#303133">描述</h3>
-            </div>
-            <!-- 描述正文：只读渲染，支持 ![alt](url) 图片语法 -->
-            <div
-              v-if="currentIssue"
-              class="description-content whitespace-pre-wrap rounded px-3 py-2 text-sm"
-              style="background:#f5f7fa;color:#606266"
-              v-html="renderDescription(currentIssue.description)"
-            ></div>
-            <!-- 描述中若含图片，在此以缩略图形式回显（只读） -->
-            <div v-if="descriptionImages.length" class="mt-3 grid grid-cols-2 gap-3">
-              <div
-                v-for="img in descriptionImages"
-                :key="img.url"
-                class="overflow-hidden rounded-lg border"
-                style="border-color:#e4e7ed"
-              >
-                <img :src="img.url" :alt="img.name" class="h-44 w-full object-cover" />
+              <div v-if="canWrite" class="flex items-center gap-2">
+                <button
+                  v-if="!editingDescription"
+                  class="text-xs transition hover:opacity-75"
+                  style="color:#409EFF"
+                  @click="startEditDescription"
+                >编辑</button>
+                <template v-else>
+                  <button
+                    class="rounded px-3 py-1 text-xs text-white transition hover:opacity-90"
+                    style="background:#409EFF"
+                    @click="saveDescription"
+                  >保存</button>
+                  <button
+                    class="rounded px-3 py-1 text-xs transition"
+                    style="background:#f5f7fa;color:#606266"
+                    @click="cancelEditDescription"
+                  >取消</button>
+                </template>
               </div>
             </div>
+            <!-- 编辑态：富文本编辑器，支持 Markdown 与粘贴截图 -->
+            <RichTextEditor
+              v-if="editingDescription"
+              v-model="form.description"
+              :rows="8"
+              placeholder="请输入缺陷描述，支持 Markdown，可 Ctrl+V 粘贴截图"
+            />
+            <!-- 只读态：渲染描述正文，支持 ![alt](url) 图片语法 -->
+            <template v-else>
+              <div
+                v-if="currentIssue"
+                class="description-content whitespace-pre-wrap rounded px-3 py-2 text-sm"
+                style="background:#f5f7fa;color:#606266"
+                v-html="renderDescription(currentIssue.description)"
+              ></div>
+              <!-- 描述中若含图片，在此以缩略图形式回显（只读） -->
+              <div v-if="descriptionImages.length" class="mt-3 grid grid-cols-2 gap-3">
+                <div
+                  v-for="img in descriptionImages"
+                  :key="img.url"
+                  class="overflow-hidden rounded-lg border"
+                  style="border-color:#e4e7ed"
+                >
+                  <img :src="img.url" :alt="img.name" class="h-44 w-full object-cover" />
+                </div>
+              </div>
+            </template>
           </section>
 
           <!-- 评论区（动态&评论 / 关联项 / 其他）→ 描述卡片下方，flex-1 拉伸填满至底部 -->
@@ -618,34 +756,94 @@ onMounted(() => {
 
             <!-- 关联项 -->
             <div v-else-if="mainTab === 'link'">
-              <div class="mb-4 flex gap-2">
-                <input
-                  v-model="linkTarget"
-                  placeholder="任务编号，如 12"
-                  class="flex-1 rounded border px-3 py-1.5 text-sm outline-none"
-                  style="border-color:#dcdfe6"
-                />
-                <select v-model="linkType" class="rounded border px-2 text-sm outline-none" style="border-color:#dcdfe6">
-                  <option>关联</option><option>阻塞</option><option>重复</option><option>修复</option>
-                </select>
-                <button
-                  class="flex items-center gap-1 rounded px-3 text-sm text-white hover:opacity-90"
-                  :style="{ background: PRIMARY }"
-                  @click="addLinkItem"
-                ><Plus :size="14" /> 添加</button>
+              <!-- 下拉搜索选择 + 关联类型 -->
+              <div class="mb-3 flex gap-2">
+                <el-select
+                  v-model="linkSelected"
+                  multiple
+                  filterable
+                  remote
+                  reserve-keyword
+                  :remote-method="remoteSearchLinks"
+                  :loading="linkLoading"
+                  clearable
+                  collapse-tags
+                  collapse-tags-tooltip
+                  placeholder="点击选择并搜索关联工作项"
+                  class="flex-1"
+                  popper-class="issue-link-popper"
+                  @visible-change="onLinkSelectVisible"
+                  @change="onLinkSelectionChange"
+                >
+                  <template #prefix><Search :size="14" style="color:#c0c4cc" /></template>
+                  <template #header>
+                    <div class="flex items-center gap-2 border-b px-3 py-2" style="border-color:#e4e7ed">
+                      <span class="text-xs" style="color:#909399">类型</span>
+                      <button
+                        v-for="f in linkFilters"
+                        :key="f.k"
+                        class="rounded-full px-3 py-0.5 text-xs transition"
+                        :style="linkFilter === f.k ? { background: PRIMARY_LIGHTER, color: PRIMARY } : { background: '#f5f7fa', color: '#909399' }"
+                        @click="onLinkFilterChange(f.k)"
+                      >{{ f.label }}</button>
+                    </div>
+                  </template>
+                  <el-option
+                    v-for="opt in linkOptions"
+                    :key="opt.id"
+                    :label="`${opt.issueKey} ${opt.title}`"
+                    :value="opt.id"
+                  >
+                    <span class="shrink-0 text-base leading-none">{{ opt.issueTypeIcon }}</span>
+                    <span class="shrink-0 font-mono text-xs" style="color:#909399">{{ opt.issueKey }}</span>
+                    <span class="min-w-0 flex-1 truncate">{{ opt.title }}</span>
+                    <span class="shrink-0 items-center gap-1 text-xs" style="color:#909399">
+                      {{ opt.assigneeName || '未分配' }}
+                    </span>
+                  </el-option>
+                </el-select>
+                <el-select
+                  v-model="linkType"
+                  class="w-28 shrink-0"
+                  placeholder="关联类型"
+                >
+                  <el-option label="关联" value="关联" />
+                  <el-option label="阻塞" value="阻塞" />
+                  <el-option label="重复" value="重复" />
+                  <el-option label="修复" value="修复" />
+                </el-select>
               </div>
-              <div class="space-y-2">
-                <div v-for="l in links" :key="l.id" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm" style="background:#f5f7fa">
-                  <div class="flex items-center gap-2">
-                    <Link2 :size="14" style="color:#909399" />
-                    <span class="rounded px-1.5 py-0.5 text-xs text-white" :style="{ background: PRIMARY }">{{ l.relationType }}</span>
-                    <span class="font-mono" style="color:#303133">{{ l.targetKey }}</span>
-                    <span style="color:#909399">{{ l.targetTitle }}</span>
+
+              <!-- 新建工作项入口 -->
+              <button class="mt-2 flex items-center gap-1 text-sm transition hover:opacity-80" style="color: PRIMARY" @click="createDialogVisible = true">
+                <Plus :size="14" /> 新建工作项
+              </button>
+
+              <!-- 已关联列表 -->
+              <div class="mt-4 border-t pt-3" style="border-color:#e4e7ed">
+                <div class="mb-2 text-xs" style="color:#909399">已关联</div>
+                <div class="space-y-2">
+                  <div v-for="l in links" :key="l.id" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm" style="background:#f5f7fa">
+                    <div class="flex items-center gap-2">
+                      <Link2 :size="14" style="color:#909399" />
+                      <span class="rounded px-1.5 py-0.5 text-xs text-white" :style="{ background: PRIMARY }">{{ l.relationType }}</span>
+                      <span class="font-mono" style="color:#303133">{{ l.targetKey }}</span>
+                      <span style="color:#909399">{{ l.targetTitle }}</span>
+                    </div>
+                    <button class="hover:text-[#F56C6C]" style="color:#c0c4cc" @click="removeLink(l.id)"><Trash2 :size="14" /></button>
                   </div>
-                  <button class="hover:text-[#F56C6C]" style="color:#c0c4cc" @click="removeLink(l.id)"><Trash2 :size="14" /></button>
+                  <div v-if="!links.length" class="py-8 text-center text-sm" style="color:#c0c4cc">暂无关联</div>
                 </div>
-                <div v-if="!links.length" class="py-8 text-center text-sm" style="color:#c0c4cc">暂无关联</div>
               </div>
+
+              <!-- 新建工作项弹窗 -->
+              <CreateIssueDialog
+                v-model="createDialogVisible"
+                :project-id="pid"
+                title="新建工作项"
+                default-issue-type-code="BUG"
+                @created="createDialogVisible = false; searchLinks()"
+              />
             </div>
 
             <!-- 其他：附件 -->
@@ -767,207 +965,51 @@ onMounted(() => {
         <aside class="flex w-[380px] shrink-0 flex-col self-start">
           <div class="rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
             <h3 class="mb-4 text-sm font-medium" style="color:#303133">基础字段</h3>
-            <div class="space-y-4">
-              <!-- 工作项类型 -->
-              <div class="flex items-center justify-between">
-                <label class="text-sm" style="color:#606266">工作项类型</label>
-                <div class="flex items-center gap-1.5 text-sm" style="color:#303133">
-                  <AlertTriangle :size="14" style="color:#F56C6C" />
-                  {{ currentIssue.issueTypeName || '缺陷' }}
-                </div>
-              </div>
 
-              <!-- 状态 -->
-              <div class="flex items-center justify-between">
-                <label class="text-sm" style="color:#606266">状态</label>
-                <select
-                  v-model="form.statusId"
-                  class="cursor-pointer rounded border-none px-2.5 py-1 text-sm outline-none"
-                  :style="{ background: statusColor(form.statusId) + '1A', color: statusColor(form.statusId), border: '1px solid ' + statusColor(form.statusId) + '40' }"
-                  :disabled="!canWrite"
-                  @change="saveField('状态', { statusId: form.statusId })"
-                >
-                  <option v-for="s in statuses" :key="s.id" :value="s.id">{{ s.name }}</option>
-                </select>
+            <!-- 工作项类型 -->
+            <div class="mb-4 flex items-center justify-between">
+              <label class="text-sm" style="color:#606266">工作项类型</label>
+              <div class="flex items-center gap-1.5 text-sm" style="color:#303133">
+                <AlertTriangle :size="14" style="color:#F56C6C" />
+                {{ currentIssue.issueTypeName || '缺陷' }}
               </div>
+            </div>
 
-              <!-- 负责人 -->
-              <div class="flex items-center justify-between">
-                <label class="text-sm" style="color:#606266">负责人<span style="color:#F56C6C">*</span></label>
-                <select
-                  v-model="form.assigneeId"
-                  class="cursor-pointer rounded border bg-transparent px-2 py-1 text-sm outline-none"
-                  style="border-color:#dcdfe6;color:#303133"
-                  :disabled="!canWrite"
-                  @change="saveField('负责人', { assigneeId: form.assigneeId || null })"
-                >
-                  <option value="">未分配</option>
-                  <option v-for="m in members" :key="m.userId" :value="m.userId">{{ m.displayName }}</option>
-                </select>
-              </div>
+            <IssueBasicFields
+              ref="fieldsRef"
+              :model-value="form"
+              @update:model-value="(e) => Object.assign(form, e)"
+              :statuses="statuses"
+              :members="members"
+              :priority-options="priorityOptions"
+              :severity-options="severityOptions"
+              :tags="tags"
+              :can-write="canWrite"
+              :show-severity="true"
+              @field-change="(e) => saveField(e.field, e.payload.patch, e.payload.clear)"
+              @add-tag="onAddTag"
+              @remove-tag="(id) => removeTag(id)"
+            />
 
-              <!-- 验证者 -->
-              <div class="flex items-center justify-between">
-                <label class="text-sm" style="color:#606266">验证者</label>
-                <select
-                  v-model="form.verifierId"
-                  class="cursor-pointer rounded border bg-transparent px-2 py-1 text-sm outline-none"
-                  style="border-color:#dcdfe6;color:#303133"
-                  :disabled="!canWrite"
-                  @change="saveField('验证者', { verifierId: form.verifierId || null })"
-                >
-                  <option value="">未指派</option>
-                  <option v-for="m in members" :key="m.userId" :value="m.userId">{{ m.displayName }}</option>
-                </select>
+            <!-- 归属项目（缺陷专属，新建走 props） -->
+            <div class="mt-4">
+              <label class="mb-1 block text-sm" style="color:#606266">归属项目<span style="color:#F56C6C">*</span></label>
+              <div class="truncate rounded border px-2 py-1 text-sm" style="border-color:#dcdfe6;color:#303133" :title="project?.name">
+                {{ project?.name || '—' }}
               </div>
+            </div>
 
-              <!-- 优先级（单选按钮风格） -->
-              <div>
-                <label class="mb-1.5 block text-sm" style="color:#606266">优先级<span style="color:#F56C6C">*</span></label>
-                <div class="flex flex-wrap gap-1.5">
-                  <button
-                    v-for="p in priorityOptions"
-                    :key="p.v"
-                    class="flex items-center gap-1 rounded border px-2 py-1 text-xs transition"
-                    :style="form.priority === p.v
-                      ? { background: PRIMARY_LIGHT, color: PRIMARY, borderColor: PRIMARY }
-                      : { background: '#fff', color: '#909399', borderColor: '#dcdfe6' }"
-                    :disabled="!canWrite"
-                    @click="form.priority = p.v; saveField('优先级', { priority: p.v })"
-                  >
-                    <span
-                      class="h-1.5 w-1.5 rounded-full"
-                      :style="{ background: form.priority === p.v ? PRIMARY : '#c0c4cc' }"
-                    />
-                    {{ p.label }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- 归属项目 -->
-              <div>
-                <label class="mb-1 block text-sm" style="color:#606266">归属项目<span style="color:#F56C6C">*</span></label>
-                <div class="truncate rounded border px-2 py-1 text-sm" style="border-color:#dcdfe6;color:#303133" :title="project?.name">
-                  {{ project?.name || '—' }}
-                </div>
-              </div>
-
-              <!-- 迭代 -->
-              <div class="flex items-center justify-between">
-                <label class="text-sm" style="color:#606266">迭代</label>
-                <input
-                  v-model="form.iteration"
-                  placeholder="请选择"
-                  class="w-40 rounded border bg-transparent px-2 py-1 text-right text-sm outline-none"
-                  style="border-color:#dcdfe6;color:#303133"
-                />
-              </div>
-
-              <!-- 严重程度 -->
-              <div class="flex items-center justify-between">
-                <label class="text-sm" style="color:#606266">严重程度<span style="color:#F56C6C">*</span></label>
-                <select
-                  v-model="form.severity"
-                  class="cursor-pointer rounded border bg-transparent px-2 py-1 text-sm outline-none"
-                  style="border-color:#dcdfe6;color:#303133"
-                  :disabled="!canWrite"
-                  @change="saveField('严重程度', { severity: form.severity })"
-                >
-                  <option v-for="s in severityOptions" :key="s.v" :value="s.v">{{ s.label }}</option>
-                </select>
-              </div>
-
-              <!-- 参与者 -->
-              <div class="flex items-center justify-between">
-                <label class="text-sm" style="color:#606266">参与者</label>
-                <input
-                  placeholder="请选择"
-                  class="w-40 rounded border bg-transparent px-2 py-1 text-right text-sm outline-none"
-                  style="border-color:#dcdfe6;color:#c0c4cc"
-                />
-              </div>
-
-              <!-- 抄送 -->
-              <div>
-                <label class="mb-1.5 block text-sm" style="color:#606266">抄送</label>
-                <div class="flex flex-wrap items-center gap-1.5 rounded border px-2 py-1.5" style="border-color:#dcdfe6">
-                  <span
-                    v-for="(u, i) in form.ccUsers"
-                    :key="i"
-                    class="flex items-center gap-1 rounded px-2 py-0.5 text-xs"
-                    :style="{ background: PRIMARY_LIGHT, color: PRIMARY }"
-                  >
-                    {{ u }}
-                    <button class="hover:opacity-70" @click="form.ccUsers.splice(i, 1)"><X :size="11" /></button>
-                  </span>
-                  <input
-                    placeholder="请选择"
-                    class="min-w-[60px] flex-1 bg-transparent text-sm outline-none"
-                    style="color:#c0c4cc"
-                    @keyup.enter="(e: any) => { if (e.target.value.trim()) { form.ccUsers.push(e.target.value.trim()); e.target.value = '' } }"
-                  />
-                </div>
-              </div>
-
-              <!-- 标签 -->
-              <div>
-                <label class="mb-1.5 block text-sm" style="color:#606266">标签</label>
-                <div class="flex flex-wrap items-center gap-1.5 rounded border px-2 py-1.5" style="border-color:#dcdfe6">
-                  <span
-                    v-for="t in tags"
-                    :key="t.id"
-                    class="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-white"
-                    :style="{ background: t.color || PRIMARY }"
-                  >
-                    {{ t.name }}
-                    <button class="hover:opacity-70" @click="removeTag(t.id)"><X :size="11" /></button>
-                  </span>
-                  <input
-                    v-model="tagInput"
-                    placeholder="加标签"
-                    class="min-w-[60px] flex-1 bg-transparent text-sm outline-none"
-                    style="color:#c0c4cc"
-                    @keyup.enter="addTag"
-                  />
-                </div>
-              </div>
-
-              <!-- 计划开始时间 -->
-              <div class="flex items-center justify-between">
-                <label class="text-sm" style="color:#606266">计划开始时间</label>
-                <input
-                  v-model="form.planStart"
-                  type="date"
-                  placeholder="请选择日期"
-                  class="w-40 rounded border bg-transparent px-2 py-1 text-right text-sm outline-none"
-                  style="border-color:#dcdfe6;color:#303133"
-                />
-              </div>
-
-              <!-- 计划完成时间 -->
-              <div class="flex items-center justify-between">
-                <label class="text-sm" style="color:#606266">计划完成时间</label>
-                <input
-                  v-model="form.dueDate"
-                  type="date"
-                  placeholder="请选择日期"
-                  class="w-40 rounded border bg-transparent px-2 py-1 text-right text-sm outline-none"
-                  style="border-color:#dcdfe6;color:#303133"
-                  :disabled="!canWrite"
-                  @change="saveField('截止时间', { dueDate: form.dueDate || null })"
-                />
-              </div>
-
-              <!-- 不修复理由 -->
-              <div>
-                <label class="mb-1 block text-sm" style="color:#606266">不修复理由</label>
-                <input
-                  v-model="form.noFixReason"
-                  placeholder="请输入"
-                  class="w-full rounded border bg-transparent px-2 py-1 text-sm outline-none"
-                  style="border-color:#dcdfe6;color:#303133"
-                />
-              </div>
+            <!-- 迭代 -->
+            <div class="mt-4 flex items-center justify-between">
+              <label class="text-sm" style="color:#606266">迭代</label>
+              <input
+                v-model="form.iteration"
+                placeholder="请选择"
+                class="w-44 rounded border bg-transparent px-2 py-1 text-sm outline-none"
+                style="border-color:#dcdfe6;color:#303133"
+                :disabled="!canWrite"
+                @blur="saveField('迭代', { iteration: form.iteration || null }, form.iteration ? [] : ['iteration'])"
+              />
             </div>
           </div>
 

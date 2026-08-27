@@ -15,12 +15,19 @@ import com.seven7m.kanban.dto.project.ProjectFilterRequest;
 import com.seven7m.kanban.dto.project.ProjectStats;
 import com.seven7m.kanban.dto.project.ProjectVO;
 import com.seven7m.kanban.dto.project.UpdateProjectRequest;
+import com.seven7m.kanban.entity.announcement.Announcement;
+import com.seven7m.kanban.entity.board.Board;
+import com.seven7m.kanban.entity.milestone.Milestone;
 import com.seven7m.kanban.entity.project.Project;
 import com.seven7m.kanban.entity.project.ProjectFavorite;
 import com.seven7m.kanban.entity.project.ProjectMember;
+import com.seven7m.kanban.mapper.announcement.AnnouncementMapper;
+import com.seven7m.kanban.mapper.board.BoardMapper;
+import com.seven7m.kanban.mapper.milestone.MilestoneMapper;
 import com.seven7m.kanban.mapper.project.ProjectFavoriteMapper;
 import com.seven7m.kanban.mapper.project.ProjectMapper;
 import com.seven7m.kanban.mapper.project.ProjectMemberMapper;
+import com.seven7m.kanban.service.workitem.WorkItemRouter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -43,6 +50,10 @@ public class ProjectService {
     private final ProjectFavoriteMapper projectFavoriteMapper;
     private final ProjectMemberService projectMemberService;
     private final ProjectInitializer projectInitializer;
+    private final WorkItemRouter workItemRouter;
+    private final BoardMapper boardMapper;
+    private final AnnouncementMapper announcementMapper;
+    private final MilestoneMapper milestoneMapper;
 
     @Transactional
     public ProjectVO create(CreateProjectRequest req) {
@@ -78,7 +89,7 @@ public class ProjectService {
     @Transactional
     public ProjectVO update(UUID id, UpdateProjectRequest req) {
         Project p = projectMapper.selectById(id);
-        if (p == null || p.getDeleted() != null && p.getDeleted() == 1) {
+        if (p == null) {
             throw new ServiceException(404, "项目不存在");
         }
         UUID currentUser = UserContext.getUserId();
@@ -131,7 +142,6 @@ public class ProjectService {
                 : ProjectStatus.ACTIVE.name();
 
         var query = Wrappers.<Project>lambdaQuery()
-                .eq(Project::getDeleted, 0)
                 .eq(Project::getStatus, statusFilter)
                 .orderByDesc(Project::getCreatedAt);
 
@@ -179,7 +189,6 @@ public class ProjectService {
                 : ProjectStatus.ACTIVE.name();
 
         var query = Wrappers.<Project>lambdaQuery()
-                .eq(Project::getDeleted, 0)
                 .eq(Project::getStatus, statusFilter);
 
         switch (category) {
@@ -252,12 +261,10 @@ public class ProjectService {
         ProjectCategoryCountsVO vo = new ProjectCategoryCountsVO();
 
         vo.setAll(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
-                .eq(Project::getDeleted, 0)
                 .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
                 .apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser)));
 
         vo.setManaged(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
-                .eq(Project::getDeleted, 0)
                 .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
                 .apply("id IN (SELECT ur.project_id FROM user_role ur " +
                         "JOIN role r ON r.id = ur.role_id " +
@@ -268,12 +275,11 @@ public class ProjectService {
         vo.setParticipated(vo.getAll());
 
         vo.setFavorited(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
-                .eq(Project::getDeleted, 0)
                 .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
                 .apply("id IN (SELECT project_id FROM project_favorite WHERE user_id = {0})", currentUser)));
 
         vo.setArchived(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
-                .eq(Project::getDeleted, 0)
+
                 .eq(Project::getStatus, ProjectStatus.ARCHIVED.name())
                 .apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser)));
 
@@ -282,7 +288,7 @@ public class ProjectService {
 
     public ProjectVO get(UUID id) {
         Project p = projectMapper.selectById(id);
-        if (p == null || p.getDeleted() != null && p.getDeleted() == 1) {
+        if (p == null) {
             throw new ServiceException(404, "项目不存在");
         }
         if (!isMember(id, UserContext.getUserId())) {
@@ -339,6 +345,34 @@ public class ProjectService {
     public boolean existsByKey(String projectKey) {
         return projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
                 .eq(Project::getProjectKey, projectKey)) > 0;
+    }
+
+    /**
+     * 删除项目：仅 OWNER/ADMIN 可操作。
+     * 删除顺序（遵守外键 RESTRICT 约束）：
+     *   1. announcement（无外键）
+     *   2. milestone（无外键）
+     *   3. issue（RESTRICT，级联清理 attachment/issue_activity/issue_cc/issue_comment/issue_label/issue_participant/issue_relation）
+     *   4. board（RESTRICT，级联清理 board_column）
+     *   5. project（CASCADE 自动清理 project_member/project_favorite/project_label/risk/sprint/user_role）
+     */
+    @Transactional
+    public void delete(UUID projectId, UUID userId) {
+        Project p = requireProject(projectId);
+        if (!isAdmin(projectId, userId)) {
+            throw new ServiceException(403, "仅项目管理员可删除");
+        }
+
+        announcementMapper.delete(Wrappers.<Announcement>lambdaQuery()
+                .eq(Announcement::getProjectId, projectId));
+        milestoneMapper.delete(Wrappers.<Milestone>lambdaQuery()
+                .eq(Milestone::getProjectId, projectId));
+        workItemRouter.deleteByProject(projectId);
+        boardMapper.delete(Wrappers.<Board>lambdaQuery()
+                .eq(Board::getProjectId, projectId));
+        projectMapper.deleteById(projectId);
+
+        projectMemberService.evictRoleCache(projectId, null);
     }
 
     public boolean isMember(UUID projectId, UUID userId) {
@@ -402,7 +436,7 @@ public class ProjectService {
 
     private Project requireProject(UUID projectId) {
         Project p = projectMapper.selectById(projectId);
-        if (p == null || p.getDeleted() != null && p.getDeleted() == 1) {
+        if (p == null) {
             throw new ServiceException(404, "项目不存在");
         }
         return p;

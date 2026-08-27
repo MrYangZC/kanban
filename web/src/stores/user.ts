@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { LoginVO } from '@/api/types'
+import { clearAllCaches } from '@/utils/cache'
 
 export const useUserStore = defineStore('user', () => {
   const user = ref<LoginVO | null>(null)
@@ -24,6 +25,7 @@ export const useUserStore = defineStore('user', () => {
     user.value = null
     token.value = ''
     localStorage.removeItem('kanban_user')
+    clearAllCaches()
   }
 
   return { user, token, setLogin, restore, logout }

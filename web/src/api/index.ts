@@ -1,12 +1,22 @@
 import http, { req, type R } from './request'
+import { cached, invalidate, readMyPermissions, writeMyPermissions, clearMyPermissions } from '@/utils/cache'
 import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest, SprintVO, RiskVO, RbacRole, RbacMenu, PermissionDef } from './types'
+
+// 内存缓存 key（项目类数据按 projectId 隔离，会话内仅请求一次）
+const C = {
+  users: 'users',
+  project: (id: string) => `project:${id}`,
+  members: (id: string) => `members:${id}`,
+  statuses: (id: string) => `statuses:${id}`,
+  tags: (id: string) => `tags:${id}`
+}
 
 // ---- user ----
 export function login(username: string, password: string) {
   return req<LoginVO>(http.post('/v1/users/login', { username, password }))
 }
 export function listUsers() {
-  return req<UserVO[]>(http.get('/v1/users'))
+  return cached<UserVO[]>(C.users, () => req<UserVO[]>(http.get('/v1/users')))
 }
 export function createUser(payload: {
   username: string
@@ -15,7 +25,10 @@ export function createUser(payload: {
   avatarUrl?: string
   password?: string
 }) {
-  return req<UserVO>(http.post('/v1/users', payload))
+  return req<UserVO>(http.post('/v1/users', payload)).then((r) => {
+    invalidate(C.users)
+    return r
+  })
 }
 export function updateUser(id: string, payload: {
   displayName?: string
@@ -24,10 +37,16 @@ export function updateUser(id: string, payload: {
   enabled?: boolean
   password?: string
 }) {
-  return req<UserVO>(http.put(`/v1/users/${id}`, payload))
+  return req<UserVO>(http.put(`/v1/users/${id}`, payload)).then((r) => {
+    invalidate(C.users)
+    return r
+  })
 }
 export function deleteUser(id: string) {
-  return req<void>(http.delete(`/v1/users/${id}`))
+  return req<void>(http.delete(`/v1/users/${id}`)).then((r) => {
+    invalidate(C.users)
+    return r
+  })
 }
 
 // ---- profile（当前登录用户个人中心） ----
@@ -55,7 +74,7 @@ export function createProject(projectKey: string, name: string, description = ''
   return req<Project>(http.post('/v1/projects', { projectKey, name, description }))
 }
 export function getProject(id: string) {
-  return req<Project>(http.get(`/v1/projects/${id}`))
+  return cached<Project>(C.project(id), () => req<Project>(http.get(`/v1/projects/${id}`)))
 }
 export function updateProject(id: string, payload: {
   name?: string
@@ -64,7 +83,10 @@ export function updateProject(id: string, payload: {
   status?: string
   leadUserId?: string
 }) {
-  return req<Project>(http.put(`/v1/projects/${id}`, payload))
+  return req<Project>(http.put(`/v1/projects/${id}`, payload)).then((r) => {
+    invalidate(C.project(id))
+    return r
+  })
 }
 export function favoriteProject(id: string) {
   return req<void>(http.post(`/v1/projects/${id}/favorite`))
@@ -78,19 +100,34 @@ export function archiveProject(id: string) {
 export function unarchiveProject(id: string) {
   return req<void>(http.put(`/v1/projects/${id}/unarchive`))
 }
+export function deleteProject(id: string) {
+  return req<void>(http.delete(`/v1/projects/${id}`))
+}
 
 // ---- project members ----
 export function listProjectMembers(projectId: string) {
-  return req<ProjectMember[]>(http.get(`/v1/projects/${projectId}/members`))
+  return cached<ProjectMember[]>(C.members(projectId), () => req<ProjectMember[]>(http.get(`/v1/projects/${projectId}/members`)))
 }
 export function addProjectMember(projectId: string, userId: string, roles: string[] = ['MEMBER']) {
-  return req<ProjectMember>(http.post(`/v1/projects/${projectId}/members`, { userId, roles }))
+  return req<ProjectMember>(http.post(`/v1/projects/${projectId}/members`, { userId, roles })).then((r) => {
+    invalidate(C.members(projectId))
+    clearMyPermissions(projectId)
+    return r
+  })
 }
 export function removeProjectMember(projectId: string, userId: string) {
-  return req<void>(http.delete(`/v1/projects/${projectId}/members/${userId}`))
+  return req<void>(http.delete(`/v1/projects/${projectId}/members/${userId}`)).then((r) => {
+    invalidate(C.members(projectId))
+    clearMyPermissions(projectId)
+    return r
+  })
 }
 export function updateProjectMemberRoles(projectId: string, userId: string, roles: string[]) {
-  return req<ProjectMember>(http.put(`/v1/projects/${projectId}/members/${userId}/roles`, roles))
+  return req<ProjectMember>(http.put(`/v1/projects/${projectId}/members/${userId}/roles`, roles)).then((r) => {
+    invalidate(C.members(projectId))
+    clearMyPermissions(projectId)
+    return r
+  })
 }
 
 // ---- board ----
@@ -108,6 +145,7 @@ export function getDashboard(projectId: string) {
 export function createIssue(payload: {
   projectId: string
   issueTypeId?: string
+  issueTypeCode?: string
   statusId: string
   sprintId?: string
   title: string
@@ -169,6 +207,7 @@ export function filterIssues(payload: {
   severity?: string
   labelId?: string
   keyword?: string
+  issueTypeCodes?: string[]
   page?: number
   size?: number
   sortField?: string
@@ -225,7 +264,7 @@ export function deleteLink(issueId: string, linkId: string) {
 
 // ---- status ----
 export function listProjectStatuses(projectId: string) {
-  return req<IssueStatusVO[]>(http.get(`/v1/projects/${projectId}/statuses`))
+  return cached<IssueStatusVO[]>(C.statuses(projectId), () => req<IssueStatusVO[]>(http.get(`/v1/projects/${projectId}/statuses`)))
 }
 
 // ---- workflow ----
@@ -235,7 +274,7 @@ export function listTransitions(projectId: string) {
 
 // ---- tags ----
 export function listProjectTags(projectId: string) {
-  return req<LabelVO[]>(http.get(`/v1/projects/${projectId}/tags`))
+  return cached<LabelVO[]>(C.tags(projectId), () => req<LabelVO[]>(http.get(`/v1/projects/${projectId}/tags`)))
 }
 export function listIssueTags(issueId: string) {
   return req<LabelVO[]>(http.get(`/v1/issues/${issueId}/tags`))
@@ -252,10 +291,16 @@ export function listGlobalLabels() {
 }
 // 项目选用全局标签
 export function addProjectLabel(projectId: string, labelId: string) {
-  return req<void>(http.post(`/v1/projects/${projectId}/labels/${labelId}`))
+  return req<void>(http.post(`/v1/projects/${projectId}/labels/${labelId}`)).then((r) => {
+    invalidate(C.tags(projectId))
+    return r
+  })
 }
 export function removeProjectLabel(projectId: string, labelId: string) {
-  return req<void>(http.delete(`/v1/projects/${projectId}/labels/${labelId}`))
+  return req<void>(http.delete(`/v1/projects/${projectId}/labels/${labelId}`)).then((r) => {
+    invalidate(C.tags(projectId))
+    return r
+  })
 }
 
 // ---- milestones ----
@@ -332,8 +377,16 @@ export function deleteRisk(projectId: string, id: string) {
 }
 
 // ---- RBAC 全局管理 (系统管理员) ----
-export function getMyPermissions(projectId: string) {
-  return req<string[]>(http.get(`/v1/projects/${projectId}/my-permissions`))
+// 当前用户在某项目下的权限码，持久化到 localStorage：登录后仅首次请求，之后（含刷新页面）均从缓存读取
+export function getMyPermissions(projectId: string, force = false) {
+  if (!force) {
+    const cachedPerms = readMyPermissions(projectId)
+    if (cachedPerms) return Promise.resolve(cachedPerms)
+  }
+  return req<string[]>(http.get(`/v1/projects/${projectId}/my-permissions`)).then((perms) => {
+    writeMyPermissions(projectId, perms)
+    return perms
+  })
 }
 export function listRoles() {
   return req<RbacRole[]>(http.get(`/v1/admin/roles`))

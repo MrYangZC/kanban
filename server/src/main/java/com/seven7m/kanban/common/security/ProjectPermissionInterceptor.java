@@ -72,7 +72,7 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
     /**
      * 从路径变量中解析 projectId。
      * 直接挂在项目下的资源使用 projectId；挂在 issue 下的资源使用 issueId，
-     * 再通过 IssueMapper/缓存解析出所属 projectId。
+     * 再通过 WorkItemRouter/缓存解析出所属 projectId。
      */
     private UUID resolveProjectId(HttpServletRequest request) {
         @SuppressWarnings("unchecked")
@@ -88,7 +88,11 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
             }
             String id = pathVars.get("id");
             if (id != null) {
-                try { return issueProjectCache.getProjectId(UUID.fromString(id)); } catch (IllegalArgumentException ignored) {}
+                try {
+                    UUID idVal = UUID.fromString(id);
+                    UUID pid = issueProjectCache.getProjectId(idVal);
+                    return pid != null ? pid : idVal;
+                } catch (IllegalArgumentException ignored) {}
             }
         }
         return null;

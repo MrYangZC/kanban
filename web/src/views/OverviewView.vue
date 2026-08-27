@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { getDashboard, listProjectMembers, listMilestones, listAnnouncements, listProjectActivities } from '@/api'
 import { useProjectStore } from '@/stores/project'
 import type { DashboardVO, ProjectMember, MilestoneVO, AnnouncementVO, ProjectActivityVO } from '@/api/types'
-import { Clock, CheckCircle2, AlertTriangle, Bug, FileText, ListTodo } from 'lucide-vue-next'
+import { Clock, CheckCircle2, AlertTriangle, FileText } from 'lucide-vue-next'
 import ProjectInfoCard from '@/components/overview/ProjectInfoCard.vue'
 import StatCard from '@/components/overview/StatCard.vue'
 import MilestoneCard from '@/components/overview/MilestoneCard.vue'
@@ -57,10 +57,10 @@ onMounted(async () => {
       <ProjectInfoCard v-if="projectStore.current" :project="projectStore.current" :lead-name="leadName" />
 
       <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="进行中需求" :value="dashboard?.summary.inProgress ?? 0" :icon="FileText" color="#1677FF" />
-        <StatCard label="活动缺陷" :value="dashboard?.summary.total ?? 0" :icon="Bug" color="#DC3545" />
-        <StatCard label="未完成任务" :value="dashboard?.summary.inProgress ?? 0" :icon="ListTodo" color="#FFC107" />
-        <StatCard label="逾期任务" :value="dashboard?.summary.overdue ?? 0" :icon="AlertTriangle" color="#DC3545" />
+        <StatCard label="工作项总数" :value="dashboard?.summary.total ?? 0" :icon="FileText" color="#1677FF" />
+        <StatCard label="进行中" :value="dashboard?.summary.inProgress ?? 0" :icon="Clock" color="#FFC107" />
+        <StatCard label="已完成" :value="dashboard?.summary.done ?? 0" :icon="CheckCircle2" color="#22C55E" />
+        <StatCard label="逾期" :value="dashboard?.summary.overdue ?? 0" :icon="AlertTriangle" color="#DC3545" />
       </div>
 
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">

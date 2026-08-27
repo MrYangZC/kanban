@@ -2,6 +2,7 @@ package com.seven7m.kanban.dto.issue;
 
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,8 +28,8 @@ public class IssueVO {
     private String module;
     private String fixVersion;
     private String source;
-    private Integer archived;
-    private LocalDateTime dueDate;
+    private Boolean archived;
+    private LocalDate dueDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -39,7 +40,7 @@ public class IssueVO {
     private List<String> participants;
     /** 抄送人用户 ID 列表（来自 issue_cc 关联表） */
     private List<String> ccUsers;
-    private LocalDateTime planStart;
+    private LocalDate planStart;
     private String noFixReason;
 
     // 关联展示字段（看板/卡片用）

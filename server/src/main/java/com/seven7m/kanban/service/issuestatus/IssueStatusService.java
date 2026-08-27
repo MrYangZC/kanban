@@ -23,7 +23,7 @@ public class IssueStatusService {
     public List<IssueStatus> listByProject(UUID projectId) {
         // 仍校验项目存在（接口以项目为入口），但状态本身为全局字典
         Project project = projectMapper.selectById(projectId);
-        if (project == null || project.getDeleted() != null && project.getDeleted() == 1) {
+        if (project == null) {
             throw new ServiceException(404, "项目不存在");
         }
         return issueStatusMapper.selectList(Wrappers.<IssueStatus>lambdaQuery()

@@ -65,10 +65,9 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
-    /** 用户管理视图：含 username/email/enabled，列表默认过滤已删除 */
+    /** 用户管理视图：含 username/email/enabled */
     public List<UserVO> listForAdmin() {
         return userMapper.selectList(Wrappers.<SysUser>lambdaQuery()
-                        .eq(SysUser::getDeleted, 0)
                         .orderByAsc(SysUser::getDisplayName))
                 .stream().map(this::toVO)
                 .collect(Collectors.toList());
@@ -88,7 +87,7 @@ public class UserService {
         u.setPasswordHash(passwordEncoder.encode(req.getPassword() == null || req.getPassword().isBlank()
                 ? "admin123" : req.getPassword()));
         u.setEnabled(true);
-        u.setDeleted(0);
+
         userMapper.insert(u);
         return toVO(u);
     }
@@ -96,7 +95,7 @@ public class UserService {
     @Transactional
     public UserVO update(UUID id, UpdateUserRequest req) {
         SysUser u = userMapper.selectById(id);
-        if (u == null || Boolean.TRUE.equals(u.getDeleted())) {
+        if (u == null) {
             throw new ServiceException(404, "用户不存在");
         }
         if (req.getDisplayName() != null) u.setDisplayName(req.getDisplayName());
@@ -112,9 +111,7 @@ public class UserService {
 
     @Transactional
     public void delete(UUID id) {
-        SysUser u = userMapper.selectById(id);
-        if (u == null) return;
-        // 逻辑删除（@TableLogic）
+
         userMapper.deleteById(id);
     }
 
@@ -144,7 +141,7 @@ public class UserService {
     /** 查询当前登录用户个人资料 */
     public ProfileVO getProfile(UUID id) {
         SysUser u = userMapper.selectById(id);
-        if (u == null || Boolean.TRUE.equals(u.getDeleted())) {
+        if (u == null) {
             throw new ServiceException(404, "用户不存在");
         }
         return toProfileVO(u);
@@ -154,7 +151,7 @@ public class UserService {
     @Transactional
     public ProfileVO updateProfile(UUID id, UpdateProfileRequest req) {
         SysUser u = userMapper.selectById(id);
-        if (u == null || Boolean.TRUE.equals(u.getDeleted())) {
+        if (u == null) {
             throw new ServiceException(404, "用户不存在");
         }
         if (req.getDisplayName() != null && !req.getDisplayName().isBlank()) {
@@ -174,7 +171,7 @@ public class UserService {
     @Transactional
     public void changePassword(UUID id, ChangePasswordRequest req) {
         SysUser u = userMapper.selectById(id);
-        if (u == null || Boolean.TRUE.equals(u.getDeleted())) {
+        if (u == null) {
             throw new ServiceException(404, "用户不存在");
         }
         if (u.getPasswordHash() == null

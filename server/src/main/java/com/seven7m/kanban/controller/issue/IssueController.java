@@ -9,7 +9,7 @@ import com.seven7m.kanban.dto.issue.IssueFilterRequest;
 import com.seven7m.kanban.dto.issue.IssueVO;
 import com.seven7m.kanban.dto.issue.MoveIssueRequest;
 import com.seven7m.kanban.dto.issue.UpdateIssueRequest;
-import com.seven7m.kanban.service.issue.IssueService;
+import com.seven7m.kanban.service.workitem.WorkItemRouter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -22,37 +22,37 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class IssueController {
 
-    private final IssueService issueService;
+    private final WorkItemRouter workItemRouter;
 
     @ProjectRoleAnnotation(Permission.ISSUE_CREATE)
     @PostMapping
     public R<IssueVO> create(@Valid @RequestBody CreateIssueRequest req) {
-        return R.ok(issueService.create(req));
+        return R.ok(workItemRouter.create(req));
     }
 
     @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping("/{id}")
     public R<IssueVO> get(@PathVariable UUID id) {
-        return R.ok(issueService.get(id));
+        return R.ok(workItemRouter.getById(id));
     }
 
     @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
     @PutMapping("/{id}")
     public R<IssueVO> update(@PathVariable UUID id, @Valid @RequestBody UpdateIssueRequest req) {
-        return R.ok(issueService.update(id, req));
+        return R.ok(workItemRouter.update(id, req));
     }
 
     /** 拖拽：状态 + 位置一次提交（自由流转，仅校验目标状态属于本项目） */
     @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
     @PatchMapping("/{id}/position")
     public R<IssueVO> move(@PathVariable UUID id, @Valid @RequestBody MoveIssueRequest req) {
-        return R.ok(issueService.move(id, req));
+        return R.ok(workItemRouter.move(id, req));
     }
 
     @ProjectRoleAnnotation(Permission.ISSUE_DELETE)
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable UUID id) {
-        issueService.delete(id);
+        workItemRouter.delete(id);
         return R.ok();
     }
 
@@ -60,13 +60,13 @@ public class IssueController {
     @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @PostMapping("/filter")
     public R<PageResult<IssueVO>> filter(@Valid @RequestBody IssueFilterRequest req) {
-        return R.ok(issueService.listByFilter(req));
+        return R.ok(workItemRouter.listByFilter(req));
     }
 
     /** 获取某任务的子任务列表（只读） */
     @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping("/{id}/children")
     public R<List<IssueVO>> children(@PathVariable UUID id) {
-        return R.ok(issueService.listChildren(id));
+        return R.ok(workItemRouter.listChildren(id));
     }
 }

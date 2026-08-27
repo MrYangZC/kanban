@@ -1,7 +1,6 @@
 package com.seven7m.kanban.common.security;
 
-import com.seven7m.kanban.entity.issue.Issue;
-import com.seven7m.kanban.mapper.issue.IssueMapper;
+import com.seven7m.kanban.service.workitem.WorkItemRouter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -20,13 +19,10 @@ public class IssueProjectCache {
 
     private static final Map<UUID, UUID> CACHE = new ConcurrentHashMap<>();
 
-    private final IssueMapper issueMapper;
+    private final WorkItemRouter workItemRouter;
 
     public UUID getProjectId(UUID issueId) {
-        return CACHE.computeIfAbsent(issueId, id -> {
-            Issue issue = issueMapper.selectById(id);
-            return issue == null ? null : issue.getProjectId();
-        });
+        return CACHE.computeIfAbsent(issueId, workItemRouter::getProjectId);
     }
 
     public static void invalidate(UUID issueId) {

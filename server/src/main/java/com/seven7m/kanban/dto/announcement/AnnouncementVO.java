@@ -10,7 +10,7 @@ public class AnnouncementVO {
     private UUID projectId;
     private String title;
     private String content;
-    private Integer pinned;
+    private Boolean pinned;
     private String authorName;
     private String createdAt;
     private String updatedAt;

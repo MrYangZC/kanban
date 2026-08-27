@@ -1,5 +1,10 @@
 package com.seven7m.kanban.common.security;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 细粒度权限码常量（按模块 × 操作）。
  * 角色 -> 权限码的映射存数据库(role_permission 表)，运行时动态判定。
@@ -44,4 +49,21 @@ public final class Permission {
 
     // ---- 公告 ----
     public static final String ANNOUNCEMENT_MANAGE = "announcement:manage";
+
+    /** 反射收集全部权限码常量，供超级管理员默认拥有所有权限使用 */
+    public static List<String> allCodes() {
+        List<String> codes = new ArrayList<>();
+        for (Field f : Permission.class.getDeclaredFields()) {
+            if (Modifier.isStatic(f.getModifiers()) && f.getType() == String.class) {
+                try {
+                    Object v = f.get(null);
+                    if (v != null) {
+                        codes.add((String) v);
+                    }
+                } catch (IllegalAccessException ignored) {
+                }
+            }
+        }
+        return codes;
+    }
 }

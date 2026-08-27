@@ -45,6 +45,7 @@ public class MilestoneService {
     @Transactional
     public MilestoneVO create(UUID projectId, CreateMilestoneRequest req) {
         Milestone m = new Milestone();
+        m.setId(UUID.randomUUID());
         m.setProjectId(projectId);
         m.setName(req.getName());
         m.setDescription(req.getDescription());
