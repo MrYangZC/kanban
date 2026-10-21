@@ -89,7 +89,10 @@ const allTags = ref<LabelVO[]>([])
 const filter = useBoardFilter(projectId.value)
 const filteredIds = ref<Set<string>>(new Set())
 const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId.value)
-const canWrite = computed(() => hasPermission('issue:create'))
+// 新建与拖拽是两种权限：前者 issue:create，后者属于编辑 issue:edit。
+// 共用同一个标记会导致「只有 issue:edit」的角色看不到拖拽、或「只有 issue:create」的角色能拖动卡片。
+const canCreate = computed(() => hasPermission('issue:create'))
+const canEdit = computed(() => hasPermission('issue:edit'))
 
 async function load() {
   loading.value = true
@@ -265,7 +268,7 @@ onMounted(() => {
     :icon="pageIcon"
     show-back
     :search-placeholder="`搜索${itemLabel}`"
-    :can-create="canWrite"
+    :can-create="canCreate"
     create-label="新建"
     :total="totalCount"
     :nav-groups="navGroups"
@@ -333,7 +336,7 @@ onMounted(() => {
                 <span class="h-2.5 w-2.5 rounded-full" :style="{ background: col.color || 'var(--ink-secondary)' }" />
                 <span class="text-sm font-medium text-ink-900">{{ col.name }}</span>
                 <span class="text-xs text-ink-400">{{ col.issues.length }}</span>
-                <button v-if="canWrite" class="ml-auto text-ink-400 hover:text-brand" @click="onNewIssue(col)">
+                <button v-if="canCreate" class="ml-auto text-ink-400 hover:text-brand" @click="onNewIssue(col)">
                   <Plus :size="16" />
                 </button>
               </div>
@@ -350,7 +353,7 @@ onMounted(() => {
                 drag-class="sortable-drag"
                 chosen-class="sortable-chosen"
                 :animation="180"
-                :disabled="!canWrite"
+                :disabled="!canEdit"
                 @move="onMove"
                 @end="onEnd"
               >

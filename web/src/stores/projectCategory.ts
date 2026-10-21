@@ -105,8 +105,13 @@ export const useProjectCategoryStore = defineStore('projectCategory', () => {
     await loadProjects()
   }
 
-  async function loadProjects() {
-    loading.value = true
+  /**
+   * 拉取项目列表。
+   * silent=true 时不切加载态：用于「成员数变了」这类后台静默刷新，
+   * 否则整块列表会被「加载中…」顶掉，用户正在看的卡片闪一下。
+   */
+  async function loadProjects(silent = false) {
+    if (!silent) loading.value = true
     error.value = null
     try {
       const res = await filterProjects({
@@ -122,7 +127,8 @@ export const useProjectCategoryStore = defineStore('projectCategory', () => {
       projects.value = []
       total.value = 0
     } finally {
-      loading.value = false
+      // 静默刷新不碰 loading，否则会把并发中的正常加载态提前关掉
+      if (!silent) loading.value = false
     }
   }
 

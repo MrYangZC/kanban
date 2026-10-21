@@ -13,8 +13,9 @@ import type { ProjectMember } from '@/api/types'
 import { Settings, Users, UserPlus, Trash2, Crown, Pencil } from 'lucide-vue-next'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import AddMemberDialog from '@/components/project/AddMemberDialog.vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { errorMessage } from '@/utils/error'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
+import { reportError } from '@/utils/error'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -78,7 +79,7 @@ const addDialogVisible = ref(false)
 // ---- 移除成员（页内） ----
 async function onRemoveMember(m: ProjectMember) {
   try {
-    await ElMessageBox.confirm(`移除成员「${m.displayName}」？`, '确认', { type: 'warning' })
+    await confirmDelete(`移除成员「${m.displayName}」？`, '确认')
   } catch {
     return
   }
@@ -88,7 +89,7 @@ async function onRemoveMember(m: ProjectMember) {
     if (editingUser.value === m.userId) editingUser.value = ''
     await loadMembers()
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '移除成员失败'))
+    reportError(e, '移除成员失败')
   }
 }
 
@@ -119,7 +120,7 @@ async function saveRoles(m: ProjectMember) {
     cancelEditRoles()
     await loadMembers()
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '角色更新失败'))
+    reportError(e, '角色更新失败')
   } finally {
     savingRoles.value = ''
   }
@@ -141,7 +142,7 @@ async function onSave() {
     // 强制刷新：否则名称/描述沿用 store 缓存，顶部标题不会更新
     await projectStore.loadCurrent(projectId.value, true)
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '保存失败'))
+    reportError(e, '保存失败')
   } finally {
     saving.value = false
   }

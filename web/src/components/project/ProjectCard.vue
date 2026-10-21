@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { Project } from '@/api/types'
 import { useProjectCategoryStore } from '@/stores/projectCategory'
-import { Users, Star, UserPlus, Lock, ListTodo, Lightbulb, Trash2, Archive, ArchiveRestore } from 'lucide-vue-next'
+import { Users, Star, UserPlus, Pencil, Lock, ListTodo, Lightbulb, Trash2, Archive, ArchiveRestore } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
-import { errorMessage } from '@/utils/error'
+import { reportError } from '@/utils/error'
 
 const props = defineProps<{
   project: Project
@@ -28,7 +28,7 @@ async function onFavorite(p: Project) {
     await store.toggleFavorite(p.id)
     ElMessage.success(wasFavorited ? '已取消收藏' : '已收藏')
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '操作失败'))
+    reportError(e, '操作失败')
   }
 }
 
@@ -38,7 +38,7 @@ async function onArchive(p: Project) {
     await store.toggleArchive(p.id)
     ElMessage.success(isArchived ? '已取消归档' : '已归档')
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '操作失败'))
+    reportError(e, '操作失败')
   }
 }
 
@@ -111,7 +111,9 @@ function goRequirements() {
         <div class="flex items-center justify-between border-t border-slate-100 pt-2.5">
           <button
             class="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-slate-500 transition hover:bg-primary-50 hover:text-primary"
-            title="添加成员"
+            :class="{ 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-500': !project.canManage }"
+            :title="project.canManage ? '添加成员' : '仅项目所有者/管理员/项目经理可添加成员'"
+            :disabled="!project.canManage"
             @click.stop="emit('addMember', project)"
           >
             <UserPlus :size="15" />
@@ -120,7 +122,18 @@ function goRequirements() {
           <div class="flex items-center gap-1">
             <button
               class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-primary-50 hover:text-primary"
+              :class="{ 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-400': !project.canManage }"
+              :title="project.canManage ? '编辑项目' : '仅项目所有者/管理员/项目经理可编辑'"
+              :disabled="!project.canManage"
+              @click.stop="emit('openEdit', project)"
+            >
+              <Pencil :size="15" />
+            </button>
+            <button
+              class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-primary-50 hover:text-primary"
+              :class="{ 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-400': !project.canManage }"
               :title="project.status === 'ARCHIVED' ? '取消归档' : '归档'"
+              :disabled="!project.canManage"
               @click.stop="onArchive(project)"
             >
               <ArchiveRestore v-if="project.status === 'ARCHIVED'" :size="15" />
@@ -128,7 +141,9 @@ function goRequirements() {
             </button>
             <button
               class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
-              title="删除项目"
+              :class="{ 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-400': !project.canManage }"
+              :title="project.canManage ? '删除项目' : '仅项目所有者/管理员/项目经理可删除项目'"
+              :disabled="!project.canManage"
               @click.stop="emit('delete', project)"
             >
               <Trash2 :size="15" />

@@ -4,7 +4,7 @@ import { Target, Plus, Calendar } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import type { MilestoneVO } from '@/api/types'
 import { createMilestone } from '@/api'
-import { errorMessage } from '@/utils/error'
+import { reportError } from '@/utils/error'
 import ProgressBar from '@/components/ProgressBar.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import type { StatusStyle } from '@/components/StatusBadge.vue'
@@ -50,7 +50,7 @@ async function submit() {
     dialogVisible.value = false
     emit('refresh')
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '保存失败'))
+    reportError(e, '保存失败')
   } finally {
     submitting.value = false
   }
@@ -86,7 +86,9 @@ async function submit() {
       </div>
     </div>
 
-    <el-dialog v-model="dialogVisible" title="新建里程碑" width="520px">
+    <!-- append-to-body 必须加：本卡片是 .glass-panel（backdrop-filter），
+         它会成为 fixed 定位的包含块，弹窗不挂到 body 就会被裁在这张卡片里 -->
+    <el-dialog v-model="dialogVisible" title="新建里程碑" width="520px" append-to-body>
       <el-form :model="form" label-width="80px">
         <el-form-item label="名称" required>
           <el-input v-model="form.name" placeholder="请输入里程碑名称" />

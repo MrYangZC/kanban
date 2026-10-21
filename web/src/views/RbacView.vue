@@ -302,8 +302,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { errorMessage, isCancel } from '@/utils/error'
+import { ElMessage } from 'element-plus'
+import { confirmRemove } from '@/utils/confirm'
+import { isCancel, reportError } from '@/utils/error'
 import { Check, File, Folder, FolderKanban, KeyRound, ListTree, Menu, Pencil, Plus, ShieldCheck, Trash2, Users } from 'lucide-vue-next'
 import ScopeNav, { type ScopeNavGroup } from '@/components/ScopeNav.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
@@ -406,11 +407,11 @@ const menuRows = computed(() => flattenMenus(menuTree.value))
 
 async function loadRoles() {
   roleLoading.value = true
-  try { roles.value = await listRoles() } catch (e: unknown) { ElMessage.error(errorMessage(e, '加载角色失败')) } finally { roleLoading.value = false }
+  try { roles.value = await listRoles() } catch (e: unknown) { reportError(e, '加载角色失败') } finally { roleLoading.value = false }
 }
 async function loadMenus() {
   menuLoading.value = true
-  try { menus.value = await listMenus() } catch (e: unknown) { ElMessage.error(errorMessage(e, '加载菜单失败')) } finally { menuLoading.value = false }
+  try { menus.value = await listMenus() } catch (e: unknown) { reportError(e, '加载菜单失败') } finally { menuLoading.value = false }
 }
 
 interface MenuTreeNode extends RbacMenu {
@@ -474,15 +475,15 @@ async function submitRole() {
     ElMessage.success('已保存')
     roleVisible.value = false
     await loadRoles()
-  } catch (e: unknown) { ElMessage.error(errorMessage(e, '保存失败')) }
+  } catch (e: unknown) { reportError(e, '保存失败') }
 }
 async function delRole(row: RbacRole) {
   try {
-    await ElMessageBox.confirm(`确认删除角色「${row.name}」？`, '提示', { type: 'warning' })
+    await confirmRemove(row.name, '角色')
     await deleteRole(row.id)
     ElMessage.success('已删除')
     await loadRoles()
-  } catch (e: unknown) { if (!isCancel(e)) ElMessage.error(errorMessage(e, '删除失败')) }
+  } catch (e: unknown) { if (!isCancel(e)) reportError(e, '删除失败') }
 }
 
 function openMenu(row?: RbacMenu) {
@@ -500,15 +501,15 @@ async function submitMenu() {
     ElMessage.success('已保存')
     menuVisible.value = false
     await loadMenus()
-  } catch (e: unknown) { ElMessage.error(errorMessage(e, '保存失败')) }
+  } catch (e: unknown) { reportError(e, '保存失败') }
 }
 async function delMenu(row: RbacMenu) {
   try {
-    await ElMessageBox.confirm(`确认删除「${row.name}」？`, '提示', { type: 'warning' })
+    await confirmRemove(row.name)
     await deleteMenu(row.id)
     ElMessage.success('已删除')
     await loadMenus()
-  } catch (e: unknown) { if (!isCancel(e)) ElMessage.error(errorMessage(e, '删除失败')) }
+  } catch (e: unknown) { if (!isCancel(e)) reportError(e, '删除失败') }
 }
 
 async function openRoleMenus(row: RbacRole) {
@@ -525,7 +526,7 @@ async function submitRoleMenus() {
     await assignRoleMenus(roleMenuTarget.value, checked)
     ElMessage.success('已保存')
     roleMenuVisible.value = false
-  } catch (e: unknown) { ElMessage.error(errorMessage(e, '保存失败')) }
+  } catch (e: unknown) { reportError(e, '保存失败') }
 }
 
 async function loadProjectsForSelect() {
@@ -555,7 +556,7 @@ async function loadProjectMembers() {
       roleIds: await listUserRoles(m.userId, userProjectId.value).catch(() => [] as string[])
     })))
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '加载项目成员失败'))
+    reportError(e, '加载项目成员失败')
   } finally {
     userRoleLoading.value = false
   }
@@ -566,12 +567,12 @@ async function saveUserRoles(row: { userId: string; roleIds: string[] }) {
   try {
     await assignUserRoles(row.userId, userProjectId.value, row.roleIds)
     ElMessage.success('已保存用户角色')
-  } catch (e: unknown) { ElMessage.error(errorMessage(e, '保存失败')) }
+  } catch (e: unknown) { reportError(e, '保存失败') }
 }
 
 async function loadAllPermissions() {
   if (allPermissions.value.length) return
-  try { allPermissions.value = await listPermissions() } catch (e: unknown) { ElMessage.error(errorMessage(e, '加载权限失败')) }
+  try { allPermissions.value = await listPermissions() } catch (e: unknown) { reportError(e, '加载权限失败') }
 }
 
 /** 左侧角色列表点击：切换角色并加载其权限（重复点击当前角色不重复请求） */
@@ -586,14 +587,14 @@ async function loadMatrixForRole(roleId: string) {
   try {
     await loadAllPermissions()
     matrixChecked.value = await listRolePermissions(roleId)
-  } catch (e: unknown) { ElMessage.error(errorMessage(e, '加载角色权限失败')) } finally { matrixLoading.value = false }
+  } catch (e: unknown) { reportError(e, '加载角色权限失败') } finally { matrixLoading.value = false }
 }
 async function saveMatrix() {
   if (!matrixRoleId.value) return
   try {
     await assignRolePermissions(matrixRoleId.value, matrixChecked.value)
     ElMessage.success('已保存权限配置')
-  } catch (e: unknown) { ElMessage.error(errorMessage(e, '保存失败')) }
+  } catch (e: unknown) { reportError(e, '保存失败') }
 }
 
 onMounted(async () => {

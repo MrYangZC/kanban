@@ -16,7 +16,7 @@ import Pagination from '@/components/project/Pagination.vue'
 import ProjectMemberDialog from '@/components/ProjectMemberDialog.vue'
 import { Plus, Menu, FolderKanban, Sparkles } from 'lucide-vue-next'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { errorMessage } from '@/utils/error'
+import { reportError } from '@/utils/error'
 
 const router = useRouter()
 const store = useProjectCategoryStore()
@@ -77,10 +77,14 @@ function openMembers(p: Project) {
   memberDialogVisible.value = true
 }
 
-/** 卡片「添加成员」：先开成员弹窗，再直接拉起检索弹窗 */
+/** 成员增删后静默刷新列表，让卡片/行上的成员数即时跟上（不闪加载态） */
+function refreshQuietly() {
+  store.loadProjects(true)
+}
+
+/** 卡片/表格的「添加成员」：只拉起检索弹窗，不再先叠一层「项目成员」列表 */
 function openAddMember(p: Project) {
   memberProjectId.value = p.id
-  memberDialogVisible.value = true
   nextTick(() => memberDialogRef.value?.openAddDialog())
 }
 
@@ -108,7 +112,7 @@ async function submitEdit() {
     ElMessage.success('项目已更新')
     await store.loadProjects()
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '更新失败'))
+    reportError(e, '更新失败')
   } finally {
     editing.value = false
   }
@@ -135,7 +139,7 @@ async function onDelete(p: Project) {
     await store.loadCategoryCounts()
     await store.loadProjects()
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '删除失败'))
+    reportError(e, '删除失败')
   }
 }
 
@@ -277,7 +281,9 @@ onMounted(async () => {
           :projects="projects"
           @open-board="openBoard"
           @open-members="openMembers"
+          @add-member="openAddMember"
           @open-edit="openEdit"
+          @delete="onDelete"
         />
 
 
@@ -300,7 +306,12 @@ onMounted(async () => {
           </template>
         </el-dialog>
 
-        <ProjectMemberDialog ref="memberDialogRef" v-model:visible="memberDialogVisible" :project-id="memberProjectId" />
+        <ProjectMemberDialog
+          ref="memberDialogRef"
+          v-model:visible="memberDialogVisible"
+          :project-id="memberProjectId"
+          @changed="refreshQuietly"
+        />
       </div>
 
       <div

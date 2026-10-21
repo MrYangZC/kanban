@@ -4,6 +4,7 @@ import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
 import com.seven7m.kanban.common.security.RequireAdmin;
+import com.seven7m.kanban.common.util.Uuids;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -83,21 +84,18 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
      */
     private UUID resolveProjectId(Map<String, String> pathVars) {
         if (pathVars != null) {
-            String projectId = pathVars.get("projectId");
-            if (projectId != null) {
-                try { return UUID.fromString(projectId); } catch (IllegalArgumentException ignored) {}
+            UUID projectUuid = Uuids.parseOrNull(pathVars.get("projectId"));
+            if (projectUuid != null) {
+                return projectUuid;
             }
-            String issueId = pathVars.get("issueId");
-            if (issueId != null) {
-                try { return issueProjectCache.getProjectId(UUID.fromString(issueId)); } catch (IllegalArgumentException ignored) {}
+            UUID issueUuid = Uuids.parseOrNull(pathVars.get("issueId"));
+            if (issueUuid != null) {
+                return issueProjectCache.getProjectId(issueUuid);
             }
-            String id = pathVars.get("id");
-            if (id != null) {
-                try {
-                    UUID idVal = UUID.fromString(id);
-                    UUID pid = issueProjectCache.getProjectId(idVal);
-                    return pid != null ? pid : idVal;
-                } catch (IllegalArgumentException ignored) {}
+            UUID idVal = Uuids.parseOrNull(pathVars.get("id"));
+            if (idVal != null) {
+                UUID pid = issueProjectCache.getProjectId(idVal);
+                return pid != null ? pid : idVal;
             }
         }
         return null;
@@ -110,12 +108,7 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
         }
         for (String key : new String[]{"projectId", "issueId", "id"}) {
             String value = pathVars.get(key);
-            if (value == null) {
-                continue;
-            }
-            try {
-                UUID.fromString(value);
-            } catch (IllegalArgumentException e) {
+            if (value != null && !Uuids.isUuid(value)) {
                 return true;
             }
         }
@@ -138,7 +131,7 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
             JsonNode node = OBJECT_MAPPER.readTree(body);
             JsonNode pid = node.get("projectId");
             if (pid != null && !pid.isNull()) {
-                return UUID.fromString(pid.asText());
+                return Uuids.parseOrNull(pid.asText());
             }
         } catch (Exception e) {
             log.debug("从请求体解析 projectId 失败", e);

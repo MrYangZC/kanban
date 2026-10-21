@@ -241,7 +241,6 @@ export interface LoginVO {
   displayName: string
   /** 头像地址（/api/uploads/xxx），为空时回退首字头像 */
   avatarUrl?: string | null
-  token: string
   /**
    * 是否系统管理员。由后端按 sys_user.is_admin 或种子管理员 UUID 的口径下发，
    * 前端不应再用 username === 'admin' 自行推断（与后端 AdminAuthInterceptor 口径不一致）。

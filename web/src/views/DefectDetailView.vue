@@ -11,7 +11,8 @@ import type {
 } from '@/api/types'
 import { REQUIREMENT_TYPE_CODES, TASK_TYPE_CODES, DEFECT_TYPE_CODES, categoryOfTypeCode } from '@/api/types'
 import type { WorkItemCategory } from '@/api/types'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmAction } from '@/utils/confirm'
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Plus, X,
   Paperclip, Link2, Trash2,
@@ -397,7 +398,7 @@ function renderDescription(content: string | null | undefined): string {
   while ((m = imgRe.exec(content))) {
     out += escapeHtml(content.slice(last, m.index))
     const url = m[2]
-    if (/^https?:\/\//.test(url) || url.startsWith('/api/')) {
+    if (isSafeImageUrl(url)) {
       out += `<img src="${url.replace(/"/g, '%22')}" alt="${m[1].replace(/"/g, '')}" style="max-width:100%;border-radius:6px;margin:4px 0" />`
     } else {
       out += escapeHtml(m[0])
@@ -407,6 +408,15 @@ function renderDescription(content: string | null | undefined): string {
   out += escapeHtml(content.slice(last))
   return out
 }
+/**
+ * 描述里的图片是否可作为 img src：允许外链 http(s) 与站内绝对路径，
+ * 但不放行协议相对地址（//evil.com）。
+ * 不再写死 /api 前缀：上传地址随服务端 context-path 变化。
+ */
+function isSafeImageUrl(url: string): boolean {
+  return /^https?:\/\//.test(url) || (url.startsWith('/') && !url.startsWith('//'))
+}
+
 // 从描述中提取图片列表，用于只读缩略图回显
 const descriptionImages = computed(() => {
   const desc = currentIssue.value?.description || ''
@@ -415,7 +425,7 @@ const descriptionImages = computed(() => {
   let m: RegExpExecArray | null
   while ((m = imgRe.exec(desc))) {
     const url = m[2]
-    if (/^https?:\/\//.test(url) || url.startsWith('/api/')) {
+    if (isSafeImageUrl(url)) {
       res.push({ url, name: m[1] || '图片' })
     }
   }
@@ -431,17 +441,8 @@ async function addAttach() {
  * 直接落库容易因误触丢失协作记录。
  */
 async function confirmRemove(text: string, title: string): Promise<boolean> {
-  try {
-    await ElMessageBox.confirm(text, title, {
-      type: 'warning',
-      confirmButtonText: '确定',
-      cancelButtonText: '取消'
-    })
-    return true
-  } catch {
-    // 用户取消：静默返回，不触发接口
-    return false
-  }
+  // 用户取消时返回 false，静默不触发接口
+  return confirmAction(text, title)
 }
 
 async function onRemoveComment(commentId: string) {

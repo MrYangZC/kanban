@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, reactive, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, reactive, watch } from 'vue'
 import { listUsersPage, createUser, updateUser, deleteUser } from '@/api'
 import type { UserVO } from '@/api/types'
 import { Plus, Search, Trash2, Pencil, X } from 'lucide-vue-next'
 import UserAvatar from '@/components/common/UserAvatar.vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 
 const users = ref<UserVO[]>([])
 const total = ref(0)
@@ -47,6 +48,11 @@ watch(keyword, () => {
     page.value = 1
     load()
   }, 300)
+})
+
+// 离开页面时取消挂起的防抖检索
+onBeforeUnmount(() => {
+  clearTimeout(searchTimer)
 })
 
 function onPageChange(p: number) {
@@ -113,11 +119,7 @@ async function toggleEnabled(u: UserVO) {
 
 async function remove(u: UserVO) {
   try {
-    await ElMessageBox.confirm(`确认删除用户「${u.displayName}」？`, '删除用户', {
-      type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消'
-    })
+    await confirmDelete(`确认删除用户「${u.displayName}」？`, '删除用户', '删除')
     await deleteUser(u.id)
     ElMessage.success('已删除')
     await load()

@@ -16,6 +16,7 @@ import { useBoardFilter } from '@/stores/boardFilter'
 import { ElMessage } from 'element-plus'
 import { Archive, BarChart3, Bug, FileText, Inbox, LayoutGrid, ListTodo, Table2, User, UserCheck } from 'lucide-vue-next'
 import { useProjectPermission } from '@/composables/useProjectPermission'
+import { useIssueFilterQuery } from '@/composables/useIssueFilterQuery'
 import { PRIORITY_COLOR as priorityColor, SEVERITY_COLOR as severityColor, PRIORITY_LABEL as priorityLabel, SEVERITY_LABEL as severityLabel } from '@/theme/colorMap'
 
 const route = useRoute()
@@ -129,41 +130,12 @@ async function loadMeta() {
   refreshPermission()
 }
 
-/**
- * 度量页点统计数字跳过来时带的筛选（?statusCategory=TODO|IN_PROGRESS|DONE / ?overdue=1）。
- * 与页面上手选的筛选互不覆盖：这里只负责「来自度量页的那一层」，用顶部 chip 单独清除。
- */
-const statusCategoryFilter = ref('')
-const overdueFilter = ref(false)
-const activeFilterLabel = computed(() => {
-  if (overdueFilter.value) return '逾期'
-  return ({ TODO: '待处理', IN_PROGRESS: '处理中', DONE: '已完成' } as Record<string, string>)[statusCategoryFilter.value] || ''
-})
-
-function clearQueryFilter() {
-  statusCategoryFilter.value = ''
-  overdueFilter.value = false
-  page.value = 1
-  // 顺手把地址栏里的筛选参数去掉，免得刷新后又「复活」
-  if (route.query.statusCategory || route.query.overdue) {
-    router.replace({ path: route.path, query: { ...route.query, statusCategory: undefined, overdue: undefined } })
-  }
-  load()
-}
-
-// 同路由仅 query 变化时组件不重建，需跟 query 同步，否则筛选会一直粘着
-watch(
-  () => [route.query.statusCategory, route.query.overdue],
-  ([sc, od]) => {
-    const nextSc = sc ? String(sc) : ''
-    const nextOd = od === '1'
-    if (nextSc === statusCategoryFilter.value && nextOd === overdueFilter.value) return
-    statusCategoryFilter.value = nextSc
-    overdueFilter.value = nextOd
+// 度量页点统计数字跳过来时带的筛选（?statusCategory / ?overdue），同步逻辑见 composable
+const { statusCategoryFilter, overdueFilter, activeFilterLabel, clearQueryFilter, syncFromQuery } =
+  useIssueFilterQuery(() => {
     page.value = 1
     load()
-  }
-)
+  })
 
 async function load() {
   loading.value = true
@@ -191,8 +163,14 @@ async function load() {
   }
 }
 
-async function onSortChange({ prop, order }: { prop: string; order: string | null }) {
-  if (!order) {
+/**
+ * el-table 的默认插槽把 row 声明为 DefaultRow（宽松对象），
+ * 这里统一收窄成项目自己的 Issue 类型，避免每个单元格各写一次断言。
+ */
+const asIssue = (row: unknown) => row as Issue
+
+async function onSortChange({ prop, order }: { prop: string | null; order: string | null }) {
+  if (!order || !prop) {
     sortField.value = ''
   } else {
     sortField.value = prop
@@ -263,8 +241,7 @@ function onScopeChange(v: string) {
 
 onMounted(() => {
   // 度量页跳转带来的筛选（进入时读一次）
-  if (route.query.statusCategory) statusCategoryFilter.value = String(route.query.statusCategory)
-  if (route.query.overdue === '1') overdueFilter.value = true
+  syncFromQuery()
   loadMeta().then(load)
 })
 </script>
@@ -345,7 +322,7 @@ onMounted(() => {
           <el-table-column type="expand">
             <template #default="{ row }">
               <div class="px-6 py-3">
-                <button class="mb-2 text-xs text-brand hover:underline" @click="toggleChildren(row)">
+                <button class="mb-2 text-xs text-brand hover:underline" @click="toggleChildren(asIssue(row))">
                   {{ expandChildren[row.id] ? '收起子任务' : '查看子任务' }}
                 </button>
                 <div v-if="expandChildren[row.id]" class="space-y-1.5">
@@ -375,7 +352,7 @@ onMounted(() => {
             <template #default="{ row }">
               <div class="flex items-center gap-2">
                 <span class="text-base">{{ row.issueTypeIcon }}</span>
-                <span class="cursor-pointer truncate text-ink-900 hover:text-brand" @click="openIssue(row)">{{ row.title }}</span>
+                <span class="cursor-pointer truncate text-ink-900 hover:text-brand" @click="openIssue(asIssue(row))">{{ row.title }}</span>
               </div>
             </template>
           </el-table-column>
@@ -386,7 +363,7 @@ onMounted(() => {
                 :model-value="row.statusId"
                 size="small"
                 :disabled="!canWrite"
-                @change="(v: string) => patchIssue(row, { statusId: v }, '状态')"
+                @change="(v: string) => patchIssue(asIssue(row), { statusId: v }, '状态')"
               >
                 <el-option v-for="s in statusOptions" :key="s.id" :value="s.id" :label="s.name">
                   <span class="mr-1 inline-block h-2 w-2 rounded-full" :style="{ background: s.color }" />{{ s.name }}
@@ -401,7 +378,7 @@ onMounted(() => {
                 :model-value="row.priority"
                 size="small"
                 :disabled="!canWrite"
-                @change="(v: string) => patchIssue(row, { priority: v }, '优先级')"
+                @change="(v: string) => patchIssue(asIssue(row), { priority: v }, '优先级')"
               >
                 <el-option v-for="p in ['P0','P1','P2','P3']" :key="p" :value="p" :label="priorityLabel[p]" />
               </el-select>
@@ -423,7 +400,7 @@ onMounted(() => {
                 clearable
                 width-class="w-full"
                 :disabled="!canWrite"
-                @change="(v) => patchIssue(row, v ? { assigneeId: v } : { assigneeId: null, clearFields: ['assigneeId'] }, '负责人')"
+                @change="(v) => patchIssue(asIssue(row), v ? { assigneeId: v } : { assigneeId: null, clearFields: ['assigneeId'] }, '负责人')"
               />
             </template>
           </el-table-column>

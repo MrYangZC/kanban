@@ -491,7 +491,9 @@ export function listUserRoles(userId: string, projectId: string) {
   return req<string[]>(http.get(`/v1/admin/users/${userId}/roles`, { params: { projectId } }))
 }
 export function assignUserRoles(userId: string, projectId: string, roleIds: string[]) {
-  return req<void>(http.post(`/v1/admin/users/${userId}/roles?projectId=${projectId}`, roleIds))
+  return req<void>(
+    http.post(`/v1/admin/users/${userId}/roles`, roleIds, { params: { projectId } })
+  )
 }
 
 // ---- 权限定义 + 角色-权限码 ----

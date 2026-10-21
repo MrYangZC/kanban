@@ -207,9 +207,12 @@ public class WorkItemRouter {
         int page = req.getPage() == null || req.getPage() < 1 ? 1 : req.getPage();
         int size = req.getSize() == null || req.getSize() < 1 ? 20 : req.getSize();
 
+        // 每张表只需取够「当前页」数量的候选即可：合并后按内存排序截取 [page, size]，
+        // 原实现每表固定拉 MERGE_FETCH_SIZE(1000) 条，20 条/页也要装配 3000 条 VO
+        int fetchSize = (int) Math.min(MERGE_FETCH_SIZE, (long) page * size);
         List<IssueVO> merged = new ArrayList<>();
         long total = 0;
-        IssueFilterRequest probe = copyForMerge(req);
+        IssueFilterRequest probe = copyForMerge(req, fetchSize);
         for (BaseWorkItemService<? extends AbstractWorkItem> svc : services) {
             PageResult<IssueVO> r = svc.listByFilter(probe);
             if (r == null) {
@@ -235,8 +238,8 @@ public class WorkItemRouter {
         return new PageResult<>(total, page, size, new ArrayList<>(merged.subList(from, to)));
     }
 
-    /** 合并场景的探测请求：各表按上限取候选集，页码/条数由内存分页接管 */
-    private IssueFilterRequest copyForMerge(IssueFilterRequest req) {
+    /** 合并场景的探测请求：各表按 fetchSize 取候选集，页码/条数由内存分页接管 */
+    private IssueFilterRequest copyForMerge(IssueFilterRequest req, int fetchSize) {
         IssueFilterRequest c = new IssueFilterRequest();
         c.setProjectId(req.getProjectId());
         c.setScope(req.getScope());
@@ -252,7 +255,7 @@ public class WorkItemRouter {
         c.setGroupBy(req.getGroupBy());
         c.setSprintId(req.getSprintId());
         c.setPage(1);
-        c.setSize(MERGE_FETCH_SIZE);
+        c.setSize(fetchSize);
         c.setSortField(req.getSortField());
         c.setSortOrder(req.getSortOrder());
         return c;

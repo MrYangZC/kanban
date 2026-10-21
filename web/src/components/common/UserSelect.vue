@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import { POPPER_OPTIONS } from '@/constants/popper'
 
 /**
  * 全站统一的「选一个人」下拉。
@@ -54,19 +55,7 @@ const emit = defineEmits<{
 }>()
 
 // 抽屉/弹窗里 popper 默认 relative 会被容器裁剪，统一 fixed 策略
-const POPPER = {
-  strategy: 'fixed',
-  modifiers: [
-    {
-      name: 'preventOverflow',
-      options: { altAxis: true, boundary: 'viewport', rootBoundary: 'viewport', padding: 8 }
-    },
-    {
-      name: 'flip',
-      options: { allowedAutoPlacements: ['bottom', 'top'] }
-    }
-  ]
-}
+const POPPER = POPPER_OPTIONS
 
 const options = computed(() => props.users.map((u) => {
   const value = u.userId || u.id || ''

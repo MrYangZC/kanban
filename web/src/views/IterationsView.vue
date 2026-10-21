@@ -58,10 +58,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { errorMessage, isCancel } from '@/utils/error'
+import { ElMessage } from 'element-plus'
+import { reportError } from '@/utils/error'
+import { useEntityCrud } from '@/composables/useEntityCrud'
 import { Repeat } from 'lucide-vue-next'
 import {
   listSprints,
@@ -83,15 +84,38 @@ import { SPRINT_STATUS } from '@/constants/issueDict'
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
 
-const sprints = ref<SprintVO[]>([])
-const loading = ref(false)
-const keyword = ref('')
-const dialogVisible = ref(false)
-const editing = ref<SprintVO | null>(null)
-const form = ref({ name: '', goal: '', startDate: '', endDate: '' })
-
 const { hasPermission, refresh } = useProjectPermission(() => projectId.value)
 const canManage = computed(() => hasPermission('sprint:manage'))
+
+// 列表 + 弹窗表单骨架（与里程碑页同构），解构重命名以保持模板不变
+const {
+  rows: sprints,
+  filtered: filteredSprints,
+  loading,
+  keyword,
+  dialogVisible,
+  editing,
+  form,
+  load,
+  openCreate,
+  openEdit,
+  submit,
+  doDelete
+} = useEntityCrud(() => projectId.value, {
+  label: '迭代',
+  fetch: (pid) => listSprints(pid),
+  create: (pid, payload) => createSprint(pid, payload),
+  update: (pid, id, payload) => updateSprint(pid, id, payload),
+  remove: (pid, id) => deleteSprint(pid, id),
+  emptyForm: () => ({ name: '', goal: '', startDate: '', endDate: '' }),
+  toForm: (row: SprintVO) => ({
+    name: row.name,
+    goal: row.goal || '',
+    startDate: row.startDate || '',
+    endDate: row.endDate || ''
+  }),
+  searchText: (row: SprintVO) => [row.name, row.goal]
+})
 
 const columns: TableColumn[] = [
   { key: 'name', label: '名称' },
@@ -111,66 +135,13 @@ function rowActions(row: SprintVO): RowAction[] {
   ]
 }
 
-const filteredSprints = computed(() => {
-  const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return sprints.value
-  return sprints.value.filter((s) =>
-    s.name.toLowerCase().includes(kw) || (s.goal || '').toLowerCase().includes(kw)
-  )
-})
-
-async function load() {
-  loading.value = true
-  try {
-    sprints.value = await listSprints(projectId.value)
-  } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '加载迭代失败'))
-  } finally {
-    loading.value = false
-  }
-}
-
-function openCreate() {
-  editing.value = null
-  form.value = { name: '', goal: '', startDate: '', endDate: '' }
-  dialogVisible.value = true
-}
-function openEdit(row: SprintVO) {
-  editing.value = row
-  form.value = {
-    name: row.name,
-    goal: row.goal || '',
-    startDate: row.startDate || '',
-    endDate: row.endDate || ''
-  }
-  dialogVisible.value = true
-}
-async function submit() {
-  if (!form.value.name.trim()) {
-    ElMessage.warning('请输入迭代名称')
-    return
-  }
-  try {
-    if (editing.value) {
-      await updateSprint(projectId.value, editing.value.id, { ...form.value })
-      ElMessage.success('已更新')
-    } else {
-      await createSprint(projectId.value, { ...form.value })
-      ElMessage.success('已创建')
-    }
-    dialogVisible.value = false
-    await load()
-  } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '保存失败'))
-  }
-}
 async function doStart(row: SprintVO) {
   try {
     await startSprint(projectId.value, row.id)
     ElMessage.success('迭代已开始')
     await load()
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '操作失败'))
+    reportError(e, '操作失败')
   }
 }
 async function doComplete(row: SprintVO) {
@@ -179,20 +150,9 @@ async function doComplete(row: SprintVO) {
     ElMessage.success('迭代已完成')
     await load()
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '操作失败'))
+    reportError(e, '操作失败')
   }
 }
-async function doDelete(row: SprintVO) {
-  try {
-    await ElMessageBox.confirm(`确认删除迭代「${row.name}」？`, '提示', { type: 'warning' })
-    await deleteSprint(projectId.value, row.id)
-    ElMessage.success('已删除')
-    await load()
-  } catch (e: unknown) {
-    if (!isCancel(e)) ElMessage.error(errorMessage(e, '删除失败'))
-  }
-}
-
 onMounted(async () => {
   await refresh()
   await load()

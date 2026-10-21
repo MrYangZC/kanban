@@ -37,7 +37,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   const userStore = useUserStore()
   userStore.restore()
-  if (to.path !== '/login' && !userStore.token) {
+  if (to.path !== '/login' && !userStore.isLoggedIn) {
     return '/login'
   }
   // 管理员判定与后端口径一致：由登录接口下发的 isAdmin 决定（is_admin 字段或种子管理员）

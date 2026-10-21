@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.UserContext;
+import com.seven7m.kanban.common.util.LikeEscaper;
 import com.seven7m.kanban.dto.user.ChangePasswordRequest;
 import com.seven7m.kanban.dto.user.CreateUserRequest;
 import com.seven7m.kanban.dto.user.LoginRequest;
@@ -29,8 +30,12 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -49,26 +54,81 @@ public class UserService {
     private final IssueActivityMapper activityMapper;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
+    /** 用户名不存在时也跑一次等成本哈希比对，让响应时间与「密码错误」一致，避免用户名枚举 */
+    private static final String DUMMY_HASH = "$2a$10$" + "0".repeat(53);
+    /** 同一账号窗口期内允许的连续失败次数与窗口长度 */
+    private static final int MAX_LOGIN_FAILURES = 5;
+    private static final long FAILURE_WINDOW_MS = 10 * 60 * 1000L;
+    private static final int MAX_TRACKED_USERNAMES = 10_000;
+
+    /**
+     * 登录失败计数（进程内）。多实例部署时各实例独立计数，
+     * 只作为暴力破解的减速带，不追求全局精确。
+     */
+    private final Map<String, Deque<Long>> loginFailures = new ConcurrentHashMap<>();
+
     public LoginVO login(LoginRequest req) {
+        String username = req.getUsername() == null ? "" : req.getUsername().trim();
+        String password = req.getPassword() == null ? "" : req.getPassword();
+
+        ensureNotLocked(username);
+
         SysUser user = userMapper.selectOne(Wrappers.<SysUser>lambdaQuery()
-                .eq(SysUser::getUsername, req.getUsername()));
-        if (user == null || !Boolean.TRUE.equals(user.getEnabled())) {
+                .eq(SysUser::getUsername, username));
+        if (user == null) {
+            passwordEncoder.matches(password, DUMMY_HASH);
+            recordLoginFailure(username);
             throw new ServiceException(401, "用户名或密码错误");
         }
         // BCrypt 校验密码哈希；空哈希直接拒绝，避免任意登录
-        if (user.getPasswordHash() == null
-                || !passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
+        if (!Boolean.TRUE.equals(user.getEnabled())
+                || user.getPasswordHash() == null
+                || !passwordEncoder.matches(password, user.getPasswordHash())) {
+            recordLoginFailure(username);
             throw new ServiceException(401, "用户名或密码错误");
         }
+        loginFailures.remove(username);
 
         LoginVO vo = new LoginVO();
         BeanUtils.copyProperties(user, vo);
-        vo.setToken("stub-" + user.getId());
         // 与 PermissionService#isSuperAdmin 口径保持一致：is_admin 字段或种子管理员 UUID。
         // 不能只依赖 BeanUtils 拷贝的 is_admin，否则种子管理员（该字段可能为空）会被判为非管理员。
         vo.setIsAdmin(Boolean.TRUE.equals(user.getIsAdmin())
                 || user.getId().equals(UserContext.DEFAULT_ADMIN_ID));
         return vo;
+    }
+
+    /** 窗口期内失败次数达到上限时直接拒绝，避免无限次撞库 */
+    private void ensureNotLocked(String username) {
+        Deque<Long> fails = loginFailures.get(username);
+        if (fails == null) {
+            return;
+        }
+        synchronized (fails) {
+            pruneFailures(fails);
+            if (fails.size() >= MAX_LOGIN_FAILURES) {
+                throw new ServiceException(429, "登录失败次数过多，请稍后再试");
+            }
+        }
+    }
+
+    private void recordLoginFailure(String username) {
+        // 用户名可任意构造，限制 Map 规模避免被刷爆内存
+        if (loginFailures.size() >= MAX_TRACKED_USERNAMES) {
+            loginFailures.clear();
+        }
+        Deque<Long> fails = loginFailures.computeIfAbsent(username, k -> new ArrayDeque<>());
+        synchronized (fails) {
+            pruneFailures(fails);
+            fails.addLast(System.currentTimeMillis());
+        }
+    }
+
+    private static void pruneFailures(Deque<Long> fails) {
+        long deadline = System.currentTimeMillis() - FAILURE_WINDOW_MS;
+        while (!fails.isEmpty() && fails.peekFirst() < deadline) {
+            fails.pollFirst();
+        }
     }
 
     public SysUser getById(UUID id) {
@@ -89,7 +149,7 @@ public class UserService {
         LambdaQueryWrapper<SysUser> q = Wrappers.lambdaQuery();
         if (keyword != null && !keyword.isBlank()) {
             // 转义 LIKE 通配符，避免关键字 _ / % 命中全部用户
-            String pattern = "%" + keyword.trim().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+            String pattern = LikeEscaper.contains(keyword);
             q.and(w -> w.apply("(username LIKE {0} ESCAPE '\\' OR display_name LIKE {1} ESCAPE '\\' OR email LIKE {2} ESCAPE '\\')",
                     pattern, pattern, pattern));
         }

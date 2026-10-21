@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { addProjectMember, getMemberCandidates } from '@/api'
 import type { MemberCandidate } from '@/api/types'
 import { ElMessage } from 'element-plus'
-import { errorMessage } from '@/utils/error'
+import { reportError } from '@/utils/error'
 import { Search, UserPlus, UserRound } from 'lucide-vue-next'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 
@@ -27,7 +27,7 @@ async function load() {
     candidates.value = await getMemberCandidates(props.projectId, keyword.value.trim() || undefined)
   } catch (e: unknown) {
     candidates.value = []
-    ElMessage.error(errorMessage(e, '加载用户失败'))
+    reportError(e, '加载用户失败')
   } finally {
     loading.value = false
   }
@@ -38,6 +38,11 @@ watch(keyword, () => {
   if (!visible.value) return
   if (timer) clearTimeout(timer)
   timer = setTimeout(load, 250)
+})
+
+// 组件卸载时取消挂起的防抖任务，避免卸载后仍发起请求写已销毁的响应式状态
+onBeforeUnmount(() => {
+  if (timer) clearTimeout(timer)
 })
 
 watch(visible, (v) => {
@@ -56,7 +61,7 @@ async function onAdd(u: MemberCandidate) {
     candidates.value = candidates.value.filter((c) => c.id !== u.id)
     emit('added')
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '添加成员失败'))
+    reportError(e, '添加成员失败')
   } finally {
     addingId.value = ''
   }

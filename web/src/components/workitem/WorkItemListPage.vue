@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import {
   filterIssues, listProjectStatuses, listProjectMembers,
   getBoardGrouped, listTransitions, moveIssue
@@ -26,6 +26,8 @@ import PriorityPill from '@/components/common/PriorityPill.vue'
 import UserCell from '@/components/common/UserCell.vue'
 import EmptyRow from '@/components/common/EmptyRow.vue'
 import type { ViewTab } from '@/components/ViewTabs.vue'
+import { fmtDateOrDash as fmtDate } from '@/utils/datetime'
+import { useIssueFilterQuery } from '@/composables/useIssueFilterQuery'
 
 /**
  * 需求/任务列表页通用实现：两类页面结构完全一致，仅业务参数不同。
@@ -47,7 +49,6 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
-const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 
 type ViewMode = 'list' | 'tree' | 'board'
@@ -151,7 +152,6 @@ const renderGroups = computed(() => {
 function statusName(id: string) { return statusNameMap.value[id] || '—' }
 function statusColor(id: string) { return statuses.value.find((s) => s.id === id)?.color || 'var(--primary)' }
 function memberName(id: string | null) { return members.value.find((m) => m.userId === id)?.displayName || '—' }
-function fmtDate(t?: string) { return t ? t.slice(0, 10) : '—' }
 
 async function loadMeta() {
   // 状态/成员为筛选辅助数据，失败降级为空（接口层已统一提示错误）
@@ -159,42 +159,12 @@ async function loadMeta() {
   try { members.value = await listProjectMembers(projectId.value) } catch { /* 成员筛选降级为空 */ }
 }
 
-/**
- * 度量页点统计数字跳过来时带的筛选（?statusCategory=TODO|IN_PROGRESS|DONE / ?overdue=1）。
- * 只在进入页面时读一次 query，之后由顶部的「清除」按钮管理，避免和用户手选的筛选互相覆盖。
- */
-const statusCategoryFilter = ref('')
-const overdueFilter = ref(false)
-const activeFilterLabel = computed(() => {
-  if (overdueFilter.value) return '逾期'
-  return ({ TODO: '待处理', IN_PROGRESS: '处理中', DONE: '已完成' } as Record<string, string>)[statusCategoryFilter.value] || ''
-})
-
-function clearQueryFilter() {
-  statusCategoryFilter.value = ''
-  overdueFilter.value = false
-  page.value = 1
-  // 顺手把地址栏里的筛选参数去掉，免得刷新后又「复活」
-  if (route.query.statusCategory || route.query.overdue) {
-    router.replace({ path: route.path, query: { ...route.query, statusCategory: undefined, overdue: undefined } })
-  }
-  load()
-}
-
-// 同一路由只改 query 时组件不会重建（例如从度量页带筛选进来后再点左侧导航），
-// 这里跟 query 双向同步，避免筛选「粘」在页面上出不去
-watch(
-  () => [route.query.statusCategory, route.query.overdue],
-  ([sc, od]) => {
-    const nextSc = sc ? String(sc) : ''
-    const nextOd = od === '1'
-    if (nextSc === statusCategoryFilter.value && nextOd === overdueFilter.value) return
-    statusCategoryFilter.value = nextSc
-    overdueFilter.value = nextOd
+// 度量页点统计数字跳过来时带的筛选（?statusCategory / ?overdue），同步逻辑见 composable
+const { statusCategoryFilter, overdueFilter, activeFilterLabel, clearQueryFilter, syncFromQuery } =
+  useIssueFilterQuery(() => {
     page.value = 1
     load()
-  }
-)
+  })
 
 function baseParams(extra: Record<string, unknown> = {}) {
   return {
@@ -325,8 +295,7 @@ onMounted(() => {
   const saved = localStorage.getItem(`kanban:${props.storageKey}:${projectId.value}`)
   if (saved === 'list' || saved === 'tree' || saved === 'board') view.value = saved
   // 度量页跳转带来的筛选
-  if (route.query.statusCategory) statusCategoryFilter.value = String(route.query.statusCategory)
-  if (route.query.overdue === '1') overdueFilter.value = true
+  syncFromQuery()
   refreshPermission()
   loadMeta().then(() => {
     load()

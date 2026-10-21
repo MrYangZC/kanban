@@ -54,10 +54,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { errorMessage, isCancel } from '@/utils/error'
+import { useEntityCrud } from '@/composables/useEntityCrud'
 import { Target } from 'lucide-vue-next'
 import {
   listMilestones,
@@ -77,15 +76,37 @@ import { MILESTONE_STATUS } from '@/constants/issueDict'
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
 
-const milestones = ref<MilestoneVO[]>([])
-const loading = ref(false)
-const keyword = ref('')
-const dialogVisible = ref(false)
-const editing = ref<MilestoneVO | null>(null)
-const form = ref({ name: '', description: '', dueDate: '' })
-
 const { hasPermission, refresh } = useProjectPermission(() => projectId.value)
 const canManage = computed(() => hasPermission('milestone:manage'))
+
+// 列表 + 弹窗表单骨架（与迭代页同构），解构重命名以保持模板不变
+const {
+  rows: milestones,
+  filtered: filteredMilestones,
+  loading,
+  keyword,
+  dialogVisible,
+  editing,
+  form,
+  load,
+  openCreate,
+  openEdit,
+  submit,
+  doDelete
+} = useEntityCrud(() => projectId.value, {
+  label: '里程碑',
+  fetch: (pid) => listMilestones(pid),
+  create: (pid, payload) => createMilestone(pid, payload),
+  update: (pid, id, payload) => updateMilestone(pid, id, payload),
+  remove: (pid, id) => deleteMilestone(pid, id),
+  emptyForm: () => ({ name: '', description: '', dueDate: '' }),
+  toForm: (row: MilestoneVO) => ({
+    name: row.name,
+    description: row.description || '',
+    dueDate: row.dueDate || ''
+  }),
+  searchText: (row: MilestoneVO) => [row.name, row.description]
+})
 
 const columns: TableColumn[] = [
   { key: 'name', label: '名称' },
@@ -100,69 +121,6 @@ function rowActions(row: MilestoneVO): RowAction[] {
     { label: '编辑', onClick: () => openEdit(row) },
     { label: '删除', tone: 'danger', disabled: !canManage.value, onClick: () => doDelete(row) }
   ]
-}
-
-const filteredMilestones = computed(() => {
-  const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return milestones.value
-  return milestones.value.filter((m) =>
-    m.name.toLowerCase().includes(kw) || (m.description || '').toLowerCase().includes(kw)
-  )
-})
-
-async function load() {
-  loading.value = true
-  try {
-    milestones.value = await listMilestones(projectId.value)
-  } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '加载里程碑失败'))
-  } finally {
-    loading.value = false
-  }
-}
-
-function openCreate() {
-  editing.value = null
-  form.value = { name: '', description: '', dueDate: '' }
-  dialogVisible.value = true
-}
-function openEdit(row: MilestoneVO) {
-  editing.value = row
-  form.value = {
-    name: row.name,
-    description: row.description || '',
-    dueDate: row.dueDate || ''
-  }
-  dialogVisible.value = true
-}
-async function submit() {
-  if (!form.value.name.trim()) {
-    ElMessage.warning('请输入里程碑名称')
-    return
-  }
-  try {
-    if (editing.value) {
-      await updateMilestone(projectId.value, editing.value.id, { ...form.value })
-      ElMessage.success('已更新')
-    } else {
-      await createMilestone(projectId.value, { ...form.value })
-      ElMessage.success('已创建')
-    }
-    dialogVisible.value = false
-    await load()
-  } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '保存失败'))
-  }
-}
-async function doDelete(row: MilestoneVO) {
-  try {
-    await ElMessageBox.confirm(`确认删除里程碑「${row.name}」？`, '提示', { type: 'warning' })
-    await deleteMilestone(projectId.value, row.id)
-    ElMessage.success('已删除')
-    await load()
-  } catch (e: unknown) {
-    if (!isCancel(e)) ElMessage.error(errorMessage(e, '删除失败'))
-  }
 }
 
 onMounted(async () => {

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { X } from 'lucide-vue-next'
 import UserSelect from '@/components/common/UserSelect.vue'
+import { POPPER_OPTIONS } from '@/constants/popper'
 import type { IssueStatusVO, ProjectMember } from '@/api/types'
 import { PRIMARY } from '@/theme/colorMap'
 
@@ -45,18 +46,15 @@ const emit = defineEmits<{
 }>()
 
 // 统一弹窗定位（避免抽屉/弹窗容器内定位错位）
-const POPPER = {
-  strategy: 'fixed',
-  modifiers: [
-    {
-      name: 'preventOverflow',
-      options: { altAxis: true, boundary: 'viewport', rootBoundary: 'viewport', padding: 8 }
-    },
-    {
-      name: 'flip',
-      options: { allowedAutoPlacements: ['bottom', 'top'] }
-    }
-  ]
+const POPPER = POPPER_OPTIONS
+
+/**
+ * modelValue 是"可扩展字段袋"（Record<string, unknown>），直接绑定到 el-select / el-date-picker
+ * 时值是 unknown，与组件要求的字面量类型不兼容。这里按字段收窄：非字符串一律当作未设置。
+ */
+function strField(key: string): string | undefined {
+  const v = props.modelValue[key]
+  return typeof v === 'string' ? v : undefined
 }
 
 
@@ -93,7 +91,7 @@ defineExpose({ tagInput, clearTagInput })
     <div v-if="showStatus" class="flex items-center justify-between">
       <label class="text-sm text-ink-regular">状态</label>
       <el-select
-        :model-value="modelValue.statusId"
+        :model-value="strField('statusId')"
         size="small"
         :popper-options="POPPER"
         class="w-44"
@@ -152,7 +150,7 @@ defineExpose({ tagInput, clearTagInput })
     <div v-if="showSeverity" class="flex items-center justify-between">
       <label class="text-sm text-ink-regular">严重程度<span class="text-danger">*</span></label>
       <el-select
-        :model-value="modelValue.severity"
+        :model-value="strField('severity')"
         size="small"
         :popper-options="POPPER"
         class="w-44"
@@ -216,7 +214,7 @@ defineExpose({ tagInput, clearTagInput })
     <div class="flex items-center justify-between">
       <label class="text-sm text-ink-regular">计划开始时间</label>
       <el-date-picker
-        :model-value="modelValue.planStart"
+        :model-value="strField('planStart')"
         type="date"
         value-format="YYYY-MM-DD"
         placeholder="请选择"
@@ -233,7 +231,7 @@ defineExpose({ tagInput, clearTagInput })
     <div class="flex items-center justify-between">
       <label class="text-sm text-ink-regular">计划完成时间</label>
       <el-date-picker
-        :model-value="modelValue.dueDate"
+        :model-value="strField('dueDate')"
         type="date"
         value-format="YYYY-MM-DD"
         placeholder="请选择"

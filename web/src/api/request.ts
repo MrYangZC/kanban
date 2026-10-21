@@ -1,6 +1,6 @@
 import axios, { AxiosError, type AxiosResponse } from 'axios'
-import { ElMessage } from 'element-plus'
 import { AUTH_USER_KEY, clearAllCaches } from '@/utils/cache'
+import { notifyError } from '@/utils/error'
 
 /**
  * 统一响应结构（与后端 R<T> 一致）：
@@ -34,6 +34,17 @@ const http = axios.create({
   withCredentials: true
 })
 
+/** 401 可能由多个并发请求同时触发：只跳转一次，避免重复整页刷新 */
+let redirectingToLogin = false
+
+function redirectToLogin(): void {
+  if (redirectingToLogin || window.location.pathname === '/login') return
+  redirectingToLogin = true
+  localStorage.removeItem(AUTH_USER_KEY)
+  clearAllCaches()
+  window.location.href = '/login'
+}
+
 http.interceptors.response.use(
   // 拦截层不关心业务数据类型，具体类型由 req<T> 在调用点还原
   (resp: AxiosResponse<R<unknown>>) => {
@@ -41,30 +52,26 @@ http.interceptors.response.use(
     if (body && body.code === 200) {
       return resp
     }
-    // 业务/系统错误：提示并 reject
+    // 业务/系统错误：提示并 reject（notifyError 会与调用点的提示去重，同文案只留一条）
     const msg = body?.msg || '请求失败'
-    ElMessage.error(msg)
+    notifyError(msg)
     return Promise.reject(new ApiError(body?.code ?? 500, msg))
   },
   (error: AxiosError<{ msg?: string }>) => {
     const status = error.response?.status
     if (status === 401) {
       // 登录态失效：清理本地凭证并跳转登录页
-      localStorage.removeItem(AUTH_USER_KEY)
-      clearAllCaches()
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
-      }
+      redirectToLogin()
       return Promise.reject(error)
     }
     if (status === 403) {
       // 已登录但无权限：保留登录态，仅提示，避免与 401 一样被误判为掉线而跳登录页
       const forbidden = error.response?.data?.msg || '权限不足，无法执行该操作'
-      ElMessage.error(forbidden)
+      notifyError(forbidden)
       return Promise.reject(new ApiError(403, forbidden))
     }
     const msg = error.response?.data?.msg || error.message || '网络错误'
-    ElMessage.error(msg)
+    notifyError(msg)
     return Promise.reject(new ApiError(status ?? 500, msg))
   }
 )

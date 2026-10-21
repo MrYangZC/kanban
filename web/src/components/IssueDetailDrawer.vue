@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { defineAsyncComponent, ref } from 'vue'
 import AppDrawer from '@/components/AppDrawer.vue'
-import DefectDetailView from '@/views/DefectDetailView.vue'
+
+// 详情页是全库最大的组件（40KB+），且被看板/表格/缺陷/工作项四个列表页通过本抽屉间接引用。
+// 静态 import 会把它塞进这些页面的首屏 chunk，抵消路由懒加载；抽屉本身 v-if 才渲染，改为异步组件后
+// 只在真正打开详情时才加载对应 chunk。
+const DefectDetailView = defineAsyncComponent(() => import('@/views/DefectDetailView.vue'))
 
 const props = defineProps<{
   projectId: string

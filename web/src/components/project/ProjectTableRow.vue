@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { Project } from '@/api/types'
 import { useProjectCategoryStore } from '@/stores/projectCategory'
-import { Star, Pencil, Users, FileText, FolderKanban, ArrowRight } from 'lucide-vue-next'
+import {
+  Star, Pencil, Users, UserPlus, ListTodo, FolderKanban, ArrowRight, Trash2, Archive, ArchiveRestore
+} from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import { computed } from 'vue'
-import { errorMessage } from '@/utils/error'
+import { useRouter } from 'vue-router'
+import { reportError } from '@/utils/error'
 import { projectStatusBadge } from '@/constants/issueDict'
 
 const props = defineProps<{
@@ -14,10 +17,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'openBoard', p: Project): void
   (e: 'openMembers', p: Project): void
+  (e: 'addMember', p: Project): void
   (e: 'openEdit', p: Project): void
+  (e: 'delete', p: Project): void
 }>()
 
 const store = useProjectCategoryStore()
+const router = useRouter()
 
 const statusConfig = computed(() => projectStatusBadge(props.project.status))
 
@@ -32,7 +38,23 @@ async function onFavorite(p: Project) {
     await store.toggleFavorite(p.id)
     ElMessage.success(wasFavorited ? '已取消收藏' : '已收藏')
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '操作失败'))
+    reportError(e, '操作失败')
+  }
+}
+
+/** 与卡片视图保持一致：点「任务」直接进该项目的任务页 */
+function goTasks() {
+  router.push(`/projects/${props.project.id}/tasks`)
+}
+
+/** 与卡片视图保持一致：归档 / 取消归档 */
+async function onArchive(p: Project) {
+  const isArchived = p.status === 'ARCHIVED'
+  try {
+    await store.toggleArchive(p.id)
+    ElMessage.success(isArchived ? '已取消归档' : '已归档')
+  } catch (e: unknown) {
+    reportError(e, '操作失败')
   }
 }
 </script>
@@ -66,16 +88,24 @@ async function onFavorite(p: Project) {
       <span class="line-clamp-1">{{ project.description || '暂无描述' }}</span>
     </td>
     <td class="px-5 py-3.5 text-center">
-      <span class="inline-flex items-center gap-1 text-sm text-ink-secondary">
+      <button
+        class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-ink-secondary transition-all duration-200 hover:bg-surface-hover hover:text-primary-600"
+        title="成员"
+        @click.stop="emit('openMembers', project)"
+      >
         <Users :size="14" class="text-ink-secondary" />
         <span class="font-medium">{{ project.stats?.memberCount || 0 }}</span>
-      </span>
+      </button>
     </td>
     <td class="px-5 py-3.5 text-center">
-      <span class="inline-flex items-center gap-1 text-sm text-ink-secondary">
-        <FileText :size="14" class="text-ink-secondary" />
+      <button
+        class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-ink-secondary transition-all duration-200 hover:bg-surface-hover hover:text-primary-600"
+        title="任务"
+        @click.stop="goTasks"
+      >
+        <ListTodo :size="14" class="text-ink-secondary" />
         <span class="font-medium">{{ project.stats?.issueCount || 0 }}</span>
-      </span>
+      </button>
     </td>
     <td class="px-5 py-3.5 text-sm text-ink-secondary">
       {{ formattedDate }}
@@ -100,7 +130,35 @@ async function onFavorite(p: Project) {
           <Pencil :size="15" />
         </button>
         <button
-          class="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary-600 transition-all duration-200 hover:bg-primary-500 hover:text-white"
+          class="rounded-md p-1.5 text-ink-secondary transition-all duration-200 hover:bg-surface-hover hover:text-primary"
+          :class="{ 'cursor-not-allowed opacity-50': !project.canManage }"
+          :title="project.canManage ? '添加成员' : '仅项目所有者/管理员/项目经理可添加成员'"
+          :disabled="!project.canManage"
+          @click.stop="emit('addMember', project)"
+        >
+          <UserPlus :size="15" />
+        </button>
+        <button
+          class="rounded-md p-1.5 text-ink-secondary transition-all duration-200 hover:bg-surface-hover hover:text-primary"
+          :class="{ 'cursor-not-allowed opacity-50': !project.canManage }"
+          :title="project.status === 'ARCHIVED' ? '取消归档' : '归档'"
+          :disabled="!project.canManage"
+          @click.stop="onArchive(project)"
+        >
+          <ArchiveRestore v-if="project.status === 'ARCHIVED'" :size="15" />
+          <Archive v-else :size="15" />
+        </button>
+        <button
+          class="rounded-md p-1.5 text-ink-secondary transition-all duration-200 hover:bg-rose-50 hover:text-rose-500"
+          :class="{ 'cursor-not-allowed opacity-50': !project.canManage }"
+          :title="project.canManage ? '删除项目' : '仅项目所有者/管理员/项目经理可删除项目'"
+          :disabled="!project.canManage"
+          @click.stop="emit('delete', project)"
+        >
+          <Trash2 :size="15" />
+        </button>
+        <button
+          class="ml-1 flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary-600 transition-all duration-200 hover:bg-primary-500 hover:text-white"
           @click.stop="emit('openBoard', project)"
         >
           进入

@@ -88,8 +88,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { errorMessage, isCancel } from '@/utils/error'
+import { ElMessage } from 'element-plus'
+import { confirmRemove } from '@/utils/confirm'
+import { isCancel, reportError } from '@/utils/error'
 import { ShieldAlert } from 'lucide-vue-next'
 import {
   listRisks,
@@ -159,7 +160,7 @@ async function load() {
   try {
     risks.value = await listRisks(projectId.value)
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '加载风险失败'))
+    reportError(e, '加载风险失败')
   } finally {
     loading.value = false
   }
@@ -215,17 +216,17 @@ async function submit() {
     dialogVisible.value = false
     await load()
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '保存失败'))
+    reportError(e, '保存失败')
   }
 }
 async function doDelete(row: RiskVO) {
   try {
-    await ElMessageBox.confirm(`确认删除风险「${row.title}」？`, '提示', { type: 'warning' })
+    await confirmRemove(row.title, '风险')
     await deleteRisk(projectId.value, row.id)
     ElMessage.success('已删除')
     await load()
   } catch (e: unknown) {
-    if (!isCancel(e)) ElMessage.error(errorMessage(e, '删除失败'))
+    if (!isCancel(e)) reportError(e, '删除失败')
   }
 }
 

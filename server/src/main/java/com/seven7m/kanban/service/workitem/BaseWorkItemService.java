@@ -10,7 +10,9 @@ import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.IssueProjectCache;
 import com.seven7m.kanban.common.security.UserContext;
+import com.seven7m.kanban.common.util.LikeEscaper;
 import com.seven7m.kanban.common.util.SortKeyUtils;
+import com.seven7m.kanban.common.util.Uuids;
 import com.seven7m.kanban.dto.issue.CreateIssueRequest;
 import com.seven7m.kanban.dto.issue.IssueFilterRequest;
 import com.seven7m.kanban.dto.issue.IssueVO;
@@ -110,17 +112,19 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
         if (req.getSeverity() != null && this instanceof com.seven7m.kanban.service.workitem.BugService)
             q.eq("severity", req.getSeverity());
         if (req.getKeyword() != null && !req.getKeyword().isBlank())
-            q.like("title", req.getKeyword());
+            // 转义 LIKE 通配符：_ / % 是合法搜索字符，不转义会退化成"匹配任意内容"
+            q.apply("title LIKE {0} ESCAPE '\\'", LikeEscaper.contains(req.getKeyword()));
 
-        if ("ASSIGNED".equals(req.getScope())) q.eq("assignee_id", me);
-        else if ("REPORTED".equals(req.getScope())) q.eq("reporter_id", me);
-        else if ("VERIFIED".equals(req.getScope())) q.eq("verifier_id", me);
-        else if ("SHARED".equals(req.getScope()))
+        String scope = req.getScope();
+        if ("ASSIGNED".equals(scope)) q.eq("assignee_id", me);
+        else if ("REPORTED".equals(scope)) q.eq("reporter_id", me);
+        else if ("VERIFIED".equals(scope)) q.eq("verifier_id", me);
+        else if ("SHARED".equals(scope))
             q.apply("id IN (SELECT issue_id FROM issue_participant WHERE user_id = {0} AND category = {1})", me, categoryName());
-        else if ("ARCHIVED".equals(req.getScope())) q.eq("archived", true);
-        else if ("ACTIVE".equals(req.getScope())) q.eq("archived", false);
-
-        if (req.getScope() == null) q.eq("archived", false);
+        else if ("ARCHIVED".equals(scope)) q.eq("archived", true);
+        // ACTIVE、未指定以及无法识别的 scope（拼写错误等）一律只查未归档：
+        // 原实现只对 null 过滤，传入未知取值时会把归档工作项一并返回
+        else q.eq("archived", false);
 
         if (req.getLabelId() != null) {
             q.apply("id IN (SELECT issue_id FROM issue_label WHERE label_id = {0} AND category = {1})", req.getLabelId(), categoryName());
@@ -379,11 +383,7 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
 
     /** 参与者/抄送用户 id 解析：非法 UUID 应返回 400 而不是 500 */
     private UUID parseUserId(String uid) {
-        try {
-            return UUID.fromString(uid.trim());
-        } catch (IllegalArgumentException e) {
-            throw new ServiceException(400, "用户 ID 格式非法: " + uid);
-        }
+        return Uuids.parseOrThrow(uid, "用户 ID");
     }
 
     // ========================= 拖拽移动 =========================

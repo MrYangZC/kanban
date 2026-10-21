@@ -9,7 +9,9 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'openBoard', p: Project): void
   (e: 'openMembers', p: Project): void
+  (e: 'addMember', p: Project): void
   (e: 'openEdit', p: Project): void
+  (e: 'delete', p: Project): void
 }>()
 </script>
 
@@ -25,7 +27,7 @@ const emit = defineEmits<{
           <th class="w-20 px-5 py-3.5 text-center">成员</th>
           <th class="w-20 px-5 py-3.5 text-center">任务</th>
           <th class="w-28 px-5 py-3.5">创建时间</th>
-          <th class="w-32 px-5 py-3.5 text-right">操作</th>
+          <th class="w-64 px-5 py-3.5 text-right">操作</th>
         </tr>
       </thead>
       <tbody>
@@ -35,7 +37,9 @@ const emit = defineEmits<{
           :project="p"
           @open-board="emit('openBoard', $event)"
           @open-members="emit('openMembers', $event)"
+          @add-member="emit('addMember', $event)"
           @open-edit="emit('openEdit', $event)"
+          @delete="emit('delete', $event)"
         />
       </tbody>
     </table>

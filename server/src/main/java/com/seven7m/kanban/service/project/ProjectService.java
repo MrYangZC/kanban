@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.UserContext;
+import com.seven7m.kanban.common.util.LikeEscaper;
 import com.seven7m.kanban.entity.project.ProjectCategoryKey;
 import com.seven7m.kanban.entity.project.ProjectRole;
 import com.seven7m.kanban.entity.project.ProjectStatus;
@@ -202,7 +203,7 @@ public class ProjectService {
 
         if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
             // 必须转义 LIKE 通配符，否则 keyword=_ 或 % 会命中全部项目
-            String pattern = "%" + escapeLike(req.getKeyword().trim()) + "%";
+            String pattern = LikeEscaper.contains(req.getKeyword());
             query.and(w -> w.apply("(name LIKE {0} ESCAPE '\\' OR project_key LIKE {1} ESCAPE '\\')",
                     pattern, pattern));
         }
@@ -236,11 +237,6 @@ public class ProjectService {
         }).collect(Collectors.toList());
 
         return new PageResult<>(total, page, size, voList);
-    }
-
-    /** 转义 LIKE 通配符（\\ % _），配合 SQL 中的 ESCAPE '\\' 使用 */
-    private static String escapeLike(String kw) {
-        return kw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     /** 排序字段白名单，防止 SQL 注入 */

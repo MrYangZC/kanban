@@ -3,18 +3,9 @@ import type { Issue } from '@/api/types'
 import { MessageSquare, CalendarClock } from 'lucide-vue-next'
 import { PRIORITY_LABEL, PRIORITY_COLOR, SEVERITY_LABEL, SEVERITY_COLOR } from '@/constants/issueDict'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import { dueText } from '@/utils/datetime'
 
 const props = defineProps<{ issue: Issue }>()
-
-function dueText(due?: string) {
-  if (!due) return ''
-  const date = new Date(due)
-  const now = new Date()
-  const diff = Math.ceil((date.getTime() - now.getTime()) / 86400000)
-  if (diff < 0) return '已逾期'
-  if (diff === 0) return '今天'
-  return `${diff}天后`
-}
 </script>
 
 <template>

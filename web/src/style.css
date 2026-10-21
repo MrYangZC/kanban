@@ -109,7 +109,10 @@ body {
     border-color: var(--glass-line);
   }
 
-  /* 玻璃面板：卡片、表格容器、看板列等主要承载面 */
+  /* 玻璃面板：卡片、表格容器、看板列等主要承载面
+     注意：backdrop-filter 会让本元素成为 position:fixed 后代的包含块。
+     所以面板内部若放 el-dialog 等 fixed 浮层，必须写 append-to-body，
+     否则遮罩与弹窗会被裁在这一块面板里（概览页里程碑/公告曾踩此坑）。 */
   .glass-panel {
     background-color: var(--glass);
     -webkit-backdrop-filter: var(--glass-blur);

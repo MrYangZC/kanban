@@ -3,9 +3,11 @@ package com.seven7m.kanban.common.upload;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.UserContext;
+import com.seven7m.kanban.common.util.Uuids;
 import com.seven7m.kanban.entity.upload.UploadFile;
 import com.seven7m.kanban.mapper.upload.UploadFileMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -30,6 +32,10 @@ public class FileUploadController {
 
     private final UploadProperties uploadProperties;
     private final UploadFileMapper uploadFileMapper;
+
+    /** 服务 context-path（默认 /api），用于返回可直接访问的站内地址 */
+    @Value("${server.servlet.context-path:}")
+    private String contextPath;
 
     @PostMapping("/image")
     public R<UploadImageVO> uploadImage(@RequestParam("file") MultipartFile file,
@@ -61,15 +67,12 @@ public class FileUploadController {
         record.setFilename(filename);
         record.setUploaderId(uploaderId);
         if (projectId != null && !projectId.isBlank()) {
-            try {
-                record.setProjectId(UUID.fromString(projectId.trim()));
-            } catch (IllegalArgumentException e) {
-                throw new ServiceException(400, "项目 ID 格式非法: " + projectId);
-            }
+            record.setProjectId(Uuids.parseOrThrow(projectId, "项目 ID"));
         }
         record.setCreatedAt(LocalDateTime.now());
         uploadFileMapper.insert(record);
 
-        return R.ok(new UploadImageVO("/api/uploads/" + filename));
+        // 由配置推导，不写死 /api：部署前缀变化时前后端无需同步改
+        return R.ok(new UploadImageVO(contextPath + "/uploads/" + filename));
     }
 }

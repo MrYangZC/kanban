@@ -47,3 +47,4 @@ Skill.iml
 /.ai-tmp/
 target
 *.log
+*.err

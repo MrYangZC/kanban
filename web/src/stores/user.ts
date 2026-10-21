@@ -6,19 +6,19 @@ import { AUTH_USER_KEY, clearAllCaches } from '@/utils/cache'
 
 export const useUserStore = defineStore('user', () => {
   const user = ref<LoginVO | null>(null)
+
   /**
-   * 仅作为"本地是否曾登录过"的提示，用于路由守卫的体验控制。
-   * 真正的鉴权在服务端：请求携带 Cookie 中的 HttpSession，未登录后端会返回 401，
-   * 由 request.ts 统一跳转登录页。因此该值被本地篡改不会获得任何真实权限。
+   * 登录态完全由服务端 HttpSession（JSESSIONID Cookie）承载，本地只缓存"上次登录的用户信息"用于首屏渲染。
+   * isLoggedIn 仅作为路由守卫的体验控制：真正的鉴权在服务端，未登录时后端返回 401 由 request.ts 统一跳登录页。
+   * 因此该值被本地篡改不会获得任何真实权限。
    */
-  const token = ref<string>('')
+  const isLoggedIn = computed(() => user.value !== null)
 
   /** 是否系统管理员，口径与后端 PermissionService#isSuperAdmin 一致 */
   const isAdmin = computed(() => user.value?.isAdmin === true)
 
   function setLogin(vo: LoginVO) {
     user.value = vo
-    token.value = vo.token
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(vo))
   }
 
@@ -32,9 +32,13 @@ export const useUserStore = defineStore('user', () => {
 
   function restore() {
     const raw = localStorage.getItem(AUTH_USER_KEY)
-    if (raw) {
+    if (!raw) return
+    try {
       user.value = JSON.parse(raw)
-      token.value = user.value?.token || ''
+    } catch {
+      // 本地缓存损坏（手工编辑/旧版本数据结构）：丢弃，回到未登录态
+      localStorage.removeItem(AUTH_USER_KEY)
+      user.value = null
     }
   }
 
@@ -49,10 +53,9 @@ export const useUserStore = defineStore('user', () => {
       // 会话可能已过期，忽略错误继续完成本地清理
     }
     user.value = null
-    token.value = ''
     localStorage.removeItem(AUTH_USER_KEY)
     clearAllCaches()
   }
 
-  return { user, token, isAdmin, setLogin, patchProfile, restore, logout }
+  return { user, isLoggedIn, isAdmin, setLogin, patchProfile, restore, logout }
 })

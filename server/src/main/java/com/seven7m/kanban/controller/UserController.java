@@ -33,10 +33,11 @@ public class UserController {
     public R<LoginVO> login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
         LoginVO vo = userService.login(req);
         // 登录态维持：把用户写进 HttpSession，拦截器据此还原真实操作人
-        request.getSession(true)
-                .setAttribute(UserContextInterceptor.SESSION_UID, vo.getId());
-        request.getSession(true)
-                .setAttribute(UserContextInterceptor.SESSION_UNAME, vo.getUsername());
+        HttpSession session = request.getSession(true);
+        // 会话固定攻击防护：登录成功后轮换 session id（凭据升级必须换新 id）
+        request.changeSessionId();
+        session.setAttribute(UserContextInterceptor.SESSION_UID, vo.getId());
+        session.setAttribute(UserContextInterceptor.SESSION_UNAME, vo.getUsername());
         return R.ok(vo);
     }
 

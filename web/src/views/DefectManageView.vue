@@ -24,6 +24,8 @@ import EmptyRow from '@/components/common/EmptyRow.vue'
 import type { ViewTab } from '@/components/ViewTabs.vue'
 import { PRIORITY_COLOR as priorityColor } from '@/constants/issueDict'
 import { PRIMARY_HEX } from '@/theme/colorMap'
+import { fmtDateOrDash as fmtDate } from '@/utils/datetime'
+import { useIssueFilterQuery } from '@/composables/useIssueFilterQuery'
 import { useWorkflowTransition } from '@/composables/useWorkflowTransition'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { useScopeCounts, isScopeKey } from '@/composables/useScopeCounts'
@@ -159,41 +161,12 @@ function statusOptionsFor(fromStatusId: string): IssueStatusVO[] {
   return statuses.value.filter((s) => s.id === fromStatusId || reachable.has(s.id))
 }
 
-/**
- * 度量页点统计数字跳过来时带的筛选（?statusCategory=TODO|IN_PROGRESS|DONE / ?overdue=1）。
- * 进入页面时读一次 query，之后交给顶部的「清除」按钮管理。
- */
-const statusCategoryFilter = ref('')
-const overdueFilter = ref(false)
-const activeFilterLabel = computed(() => {
-  if (overdueFilter.value) return '逾期'
-  return ({ TODO: '待处理', IN_PROGRESS: '处理中', DONE: '已完成' } as Record<string, string>)[statusCategoryFilter.value] || ''
-})
-
-function clearQueryFilter() {
-  statusCategoryFilter.value = ''
-  overdueFilter.value = false
-  page.value = 1
-  // 顺手把地址栏里的筛选参数去掉，免得刷新后又「复活」
-  if (route.query.statusCategory || route.query.overdue) {
-    router.replace({ path: route.path, query: { ...route.query, statusCategory: undefined, overdue: undefined } })
-  }
-  load()
-}
-
-// 同路由仅 query 变化时组件不重建，需跟 query 同步，否则筛选会一直粘着
-watch(
-  () => [route.query.statusCategory, route.query.overdue],
-  ([sc, od]) => {
-    const nextSc = sc ? String(sc) : ''
-    const nextOd = od === '1'
-    if (nextSc === statusCategoryFilter.value && nextOd === overdueFilter.value) return
-    statusCategoryFilter.value = nextSc
-    overdueFilter.value = nextOd
+// 度量页点统计数字跳过来时带的筛选（?statusCategory / ?overdue），同步逻辑见 composable
+const { statusCategoryFilter, overdueFilter, activeFilterLabel, clearQueryFilter, syncFromQuery } =
+  useIssueFilterQuery(() => {
     page.value = 1
     load()
-  }
-)
+  })
 
 /** 列表/树/看板共用的筛选参数，保证三个视图口径一致 */
 function filterParams(extra: Record<string, unknown> = {}) {
@@ -280,7 +253,6 @@ function statusColor(id: string) {
 }
 function memberName(id: string | null) { return members.value.find((m) => m.userId === id)?.displayName || '—' }
 function userName(id: string | null) { return users.value.find((u) => u.id === id)?.displayName || '—' }
-function fmtDate(t?: string) { return t ? t.slice(0, 10) : '—' }
 
 
 async function patchStatus(issue: Issue, statusId: string) {
@@ -386,8 +358,7 @@ onMounted(() => {
     localStorage.removeItem(`kanban:defectScope:${pid}`)
   }
   // 度量页跳转带来的筛选
-  if (route.query.statusCategory) statusCategoryFilter.value = String(route.query.statusCategory)
-  if (route.query.overdue === '1') overdueFilter.value = true
+  syncFromQuery()
   loadMeta().then(() => {
     load()
     refreshScopeCounts()

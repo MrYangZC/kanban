@@ -7,8 +7,9 @@ import {
 } from '@/api'
 import type { ProjectMember } from '@/api/types'
 import { useUserStore } from '@/stores/user'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { errorMessage } from '@/utils/error'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
+import { reportError } from '@/utils/error'
 import { UserPlus, Trash2, Crown } from 'lucide-vue-next'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import AddMemberDialog from '@/components/project/AddMemberDialog.vue'
@@ -22,6 +23,8 @@ const props = withDefaults(
   { canManage: undefined }
 )
 const visible = defineModel<boolean>('visible', { default: false })
+/** 成员增删后通知调用方（项目列表据此刷新卡片上的成员数） */
+const emit = defineEmits<{ (e: 'changed'): void }>()
 const userStore = useUserStore()
 
 // RBAC 全局角色字典（与后端 role 表种子数据一致）
@@ -49,6 +52,8 @@ const canManageResolved = computed(() => {
 const members = ref<ProjectMember[]>([])
 const loading = ref(false)
 const addDialogVisible = ref(false)
+/** 添加弹窗是否由成员列表发起：是则关闭后回到成员列表，否则（项目列表快捷入口）直接收场 */
+const addFromList = ref(false)
 
 async function load() {
   if (!props.projectId) return
@@ -66,13 +71,20 @@ watch(visible, (v) => {
 
 async function onRemove(m: ProjectMember) {
   try {
-    await ElMessageBox.confirm(`移除成员「${m.displayName}」？`, '确认', { type: 'warning' })
+    await confirmDelete(`移除成员「${m.displayName}」？`, '确认')
   } catch {
     return
   }
   await removeProjectMember(props.projectId, m.userId)
   ElMessage.success('已移除')
   await load()
+  emit('changed')
+}
+
+/** 添加成员成功：刷新成员列表，同时让外层（项目列表卡片）的成员数一起更新 */
+function onMemberAdded() {
+  load()
+  emit('changed')
 }
 
 // 行内编辑角色
@@ -108,7 +120,7 @@ async function saveRoles(m: ProjectMember) {
     cancelEditRoles()
     await load()
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '角色更新失败'))
+    reportError(e, '角色更新失败')
   } finally {
     savingRoles.value = ''
   }
@@ -118,18 +130,36 @@ onMounted(() => {
   if (visible.value) load()
 })
 
-/** 供调用方（如项目卡片的「添加成员」）直接拉起检索弹窗，省掉再点一次 */
+/**
+ * 成员列表里的「添加成员」：收起成员列表再开检索弹窗。
+ * 两个弹窗同时可见会像「叠了两层」，且下层列表此时没有可操作性，纯属干扰。
+ */
+function openAddFromList() {
+  addFromList.value = true
+  addDialogVisible.value = true
+  visible.value = false
+}
+
+/** 供调用方（如项目卡片的「添加成员」）直接拉起检索弹窗，不经过成员列表 */
 function openAddDialog() {
+  addFromList.value = false
   addDialogVisible.value = true
 }
 defineExpose({ openAddDialog })
+
+// 添加弹窗关闭：从成员列表进来的就退回成员列表（顺带刷新，刚加的人立刻可见）
+watch(addDialogVisible, (v) => {
+  if (v || !addFromList.value) return
+  addFromList.value = false
+  visible.value = true
+})
 </script>
 
 <template>
   <el-dialog v-model="visible" title="项目成员" width="560px">
     <div v-loading="loading">
       <div v-if="canManageResolved" class="mb-3 flex justify-end">
-        <el-button type="primary" size="small" :icon="UserPlus" @click="addDialogVisible = true">
+        <el-button type="primary" size="small" :icon="UserPlus" @click="openAddFromList">
           添加成员
         </el-button>
       </div>
@@ -209,7 +239,8 @@ defineExpose({ openAddDialog })
       </ul>
 
     </div>
-
-    <AddMemberDialog v-model:visible="addDialogVisible" :project-id="projectId" @added="load" />
   </el-dialog>
+
+  <!-- 必须与「项目成员」平级：嵌在 el-dialog 内会出现两个弹窗叠着显示 -->
+  <AddMemberDialog v-model:visible="addDialogVisible" :project-id="projectId" @added="onMemberAdded" />
 </template>

@@ -9,11 +9,13 @@ import {
   uploadImage
 } from '@/api'
 import type { UserVO } from '@/api/types'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmAction } from '@/utils/confirm'
 import { MessageSquare, Paperclip, Image as ImageIcon, X, Plus, Trash2, UserCircle2, ShieldCheck } from 'lucide-vue-next'
 import { useIssueTabs } from '@/composables/useIssueTabs'
 import ActivityItem from '@/components/ActivityItem.vue'
 import { useUserStore } from '@/stores/user'
+import { fmtTime } from '@/utils/datetime'
 
 const props = defineProps<{ issue: Issue; projectId: string }>()
 const emit = defineEmits<{ updated: [Issue] }>()
@@ -207,32 +209,15 @@ async function addTag() {
 
 // ---- 删除确认（与详情页保持一致，避免误触丢失协作记录） ----
 async function onRemoveComment(commentId: string) {
-  try {
-    await ElMessageBox.confirm('确定删除该评论吗？删除后不可恢复。', '删除评论', {
-      type: 'warning',
-      confirmButtonText: '确定',
-      cancelButtonText: '取消'
-    })
-  } catch {
-    return
-  }
+  if (!(await confirmAction('确定删除该评论吗？删除后不可恢复。', '删除评论'))) return
   await removeComment(commentId)
 }
 
 async function onRemoveAttach(attachmentId: string) {
-  try {
-    await ElMessageBox.confirm('确定删除该附件吗？', '删除附件', {
-      type: 'warning',
-      confirmButtonText: '确定',
-      cancelButtonText: '取消'
-    })
-  } catch {
-    return
-  }
+  if (!(await confirmAction('确定删除该附件吗？', '删除附件'))) return
   await removeAttach(attachmentId)
 }
 
-const fmtTime = (t?: string) => (t ? new Date(t).toLocaleString('zh-CN') : '')
 </script>
 
 <template>

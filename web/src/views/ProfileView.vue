@@ -4,7 +4,7 @@ import { getMyProfile, updateMyProfile, changeMyPassword, uploadImage } from '@/
 import { useUserStore } from '@/stores/user'
 import type { ProfileVO } from '@/api/types'
 import { ElMessage } from 'element-plus'
-import { errorMessage } from '@/utils/error'
+import { reportError } from '@/utils/error'
 import { User, Lock, Save, Camera, ShieldCheck, Clock } from 'lucide-vue-next'
 
 const userStore = useUserStore()
@@ -40,7 +40,7 @@ async function loadProfile() {
       avatarUrl: profile.value.avatarUrl || ''
     }
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '加载个人信息失败'))
+    reportError(e, '加载个人信息失败')
   } finally {
     loading.value = false
   }
@@ -63,7 +63,7 @@ async function onAvatarChange(e: Event) {
     syncLoginStore(updated)
     ElMessage.success('头像已更新')
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '头像上传失败'))
+    reportError(e, '头像上传失败')
   } finally {
     uploadingAvatar.value = false
     input.value = ''
@@ -76,8 +76,7 @@ function syncLoginStore(p: ProfileVO) {
     userStore.setLogin({
       ...userStore.user,
       displayName: p.displayName,
-      avatarUrl: p.avatarUrl,
-      token: userStore.user.token
+      avatarUrl: p.avatarUrl
     })
   }
 }
@@ -98,7 +97,7 @@ async function onSaveProfile() {
     syncLoginStore(updated)
     ElMessage.success('个人信息已保存')
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '保存失败'))
+    reportError(e, '保存失败')
   } finally {
     savingProfile.value = false
   }
@@ -130,7 +129,7 @@ async function onChangePassword() {
     pwdForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
     ElMessage.success('密码修改成功')
   } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '修改密码失败'))
+    reportError(e, '修改密码失败')
   } finally {
     savingPwd.value = false
   }
