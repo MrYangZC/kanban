@@ -16,6 +16,7 @@ import Pagination from '@/components/project/Pagination.vue'
 import ProjectMemberDialog from '@/components/ProjectMemberDialog.vue'
 import { Plus, Menu, FolderKanban, Sparkles } from 'lucide-vue-next'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { errorMessage } from '@/utils/error'
 
 const router = useRouter()
 const store = useProjectCategoryStore()
@@ -97,8 +98,8 @@ async function submitEdit() {
     editDialogVisible.value = false
     ElMessage.success('项目已更新')
     await store.loadProjects()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '更新失败')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '更新失败'))
   } finally {
     editing.value = false
   }
@@ -124,8 +125,8 @@ async function onDelete(p: Project) {
     ElMessage.success('项目已删除')
     await store.loadCategoryCounts()
     await store.loadProjects()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '删除失败')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '删除失败'))
   }
 }
 
@@ -294,7 +295,7 @@ onMounted(async () => {
 
       <div
         v-if="!loading && !error && projects.length"
-        class="flex shrink-0 items-center justify-center border-t border-line-light bg-white px-8 py-2"
+        class="glass-bar flex shrink-0 items-center justify-center border-t px-8 py-2"
       >
         <Pagination
           :current-page="currentPage"

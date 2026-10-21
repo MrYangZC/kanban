@@ -52,7 +52,7 @@ const drawerVisible = computed({
   <!-- inline 模式：页面内嵌右侧详情面板（宽度与 overlay 一致） -->
   <div
     v-else-if="props.open && props.issue"
-    class="flex h-full w-[clamp(800px,65vw,1280px)] shrink-0 flex-col border-l border-surface-muted bg-white"
+    class="glass-pop flex h-full w-[clamp(800px,65vw,1280px)] shrink-0 flex-col border-l"
   >
     <div class="flex shrink-0 items-center justify-between border-b border-surface-muted px-5 py-4">
       <div class="flex items-center gap-2">

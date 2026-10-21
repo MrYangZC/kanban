@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Users } from 'lucide-vue-next'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import type { ProjectMember } from '@/api/types'
 
 interface Props {
@@ -38,8 +39,8 @@ const groupedMembers = computed(() => {
 </script>
 
 <template>
-  <div class="rounded-lg border border-[#E9ECEF] bg-white shadow-sm">
-    <div class="flex items-center justify-between border-b border-[#E9ECEF] px-4 py-3">
+  <div class="glass-panel rounded-lg">
+    <div class="flex items-center justify-between border-b border-line-light px-4 py-3">
       <div class="flex items-center gap-2 text-sm font-medium text-ink-900">
         <Users :size="16" class="text-brand" /> 项目成员
       </div>
@@ -54,12 +55,10 @@ const groupedMembers = computed(() => {
             <div
               v-for="m in g.members"
               :key="m.userId"
-              class="flex items-center gap-1.5 rounded-md border border-[#E9ECEF] px-2 py-1"
+              class="flex items-center gap-1.5 rounded-md border border-line-light px-2 py-1"
               :title="m.username"
             >
-              <div class="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-xs font-medium text-white">
-                {{ m.displayName?.charAt(0) || 'U' }}
-              </div>
+              <UserAvatar :name="m.displayName" :src="m.avatarUrl" :size="24" />
               <span class="text-sm text-ink-600">{{ m.displayName }}</span>
             </div>
           </div>

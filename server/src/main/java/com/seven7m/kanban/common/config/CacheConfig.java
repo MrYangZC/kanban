@@ -13,8 +13,14 @@ import org.springframework.context.annotation.Configuration;
 @EnableCaching
 public class CacheConfig {
 
+    /**
+     * 注意：ConcurrentMapCacheManager 使用显式名字构造时处于非动态模式，
+     * 未在此注册的缓存名会在首次 getCache 时抛
+     * IllegalArgumentException("Cannot find cache named ...")。
+     * 因此新增任何 @Cacheable/@CacheEvict 的 cacheNames 都必须同步登记到此处。
+     */
     @Bean
     public CacheManager cacheManager() {
-        return new ConcurrentMapCacheManager("projectPermissions", "rolePermissions");
+        return new ConcurrentMapCacheManager("projectPermissions", "rolePermissions", "superAdminFlag");
     }
 }

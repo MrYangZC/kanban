@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import type { Issue, IssueActivity, AttachmentVO, LinkVO, IssueStatusVO, LabelVO, WorkflowTransitionVO } from '@/api/types'
+import type { Issue, AttachmentVO, IssueStatusVO } from '@/api/types'
+import { categoryOfTypeCode } from '@/api/types'
 import {
   updateIssue,
-  listActivities, addComment, deleteComment,
-  listAttachments, uploadAttachment, deleteAttachment,
-  listLinks, addLink, deleteLink,
-  listIssueTags, addIssueTag, removeIssueTag,
   listProjectStatuses, listTransitions,
   listUsers,
   uploadImage
 } from '@/api'
 import type { UserVO } from '@/api/types'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MessageSquare, Paperclip, Image as ImageIcon, X, Plus, Trash2, UserCircle2, ShieldCheck } from 'lucide-vue-next'
+import { useIssueTabs } from '@/composables/useIssueTabs'
+import ActivityItem from '@/components/ActivityItem.vue'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps<{ issue: Issue; projectId: string }>()
 const emit = defineEmits<{ updated: [Issue] }>()
@@ -43,21 +43,38 @@ const statusOptions = computed(() => {
   return statuses.value.filter((s) => s.id === current || reachable.has(s.id))
 })
 
-// 动态&评论
-const activities = ref<IssueActivity[]>([])
+const userStore = useUserStore()
+// 删除按钮只对自己的评论显示，口径与路由级详情页一致
+const currentUserName = computed(() => userStore.user?.displayName || userStore.user?.username || '')
+
 const commentText = ref('')
 const fileInput = ref<HTMLInputElement>()
-// 附件
-const attachments = ref<AttachmentVO[]>([])
 const attachInput = ref<HTMLInputElement>()
 const attachUploading = ref(false)
-// 关联
-const links = ref<LinkVO[]>([])
 const linkTarget = ref('')
 const linkType = ref('关联')
-// 标签
-const tags = ref<LabelVO[]>([])
 const tagInput = ref('')
+
+// 动态&评论 / 附件 / 关联 / 标签的数据与增删逻辑与路由级详情页（DefectDetailView）共用，
+// 避免面板与详情页出现两套行为（如删除评论后是否刷新、标签配色口径不一致）
+const {
+  activities,
+  attachments,
+  links,
+  tags,
+  reload: reloadTabs,
+  sendComment: sendCommentApi,
+  uploadFile: uploadFileApi,
+  addLinkItem: addLinkItemApi,
+  removeComment,
+  removeLink,
+  removeAttachment: removeAttach,
+  addTag: addTagApi,
+  removeTag
+} = useIssueTabs({
+  issueId: () => props.issue.id,
+  projectId: () => props.projectId
+})
 
 watch(
   () => props.issue,
@@ -75,20 +92,25 @@ watch(
     reporterName.value = v.reporterName || ''
     statusId.value = v.statusId || ''
     tags.value = v.labels || []
-    loadTabs(v.id)
+    reloadTabs()
+    loadUsers()
   },
   { immediate: true }
 )
 
+// 状态下拉与流转规则都按工作项类别取：任务/需求/缺陷各有自己的状态节点，
+// 因此监视 projectId + 当前工作项类型（类型切换时换一套字典）
 watch(
-  () => props.projectId,
-  async (pid) => {
+  () => [props.projectId, categoryOfTypeCode(props.issue?.issueTypeCode)] as const,
+  async ([pid, category]) => {
     if (!pid) return
     try {
-      statuses.value = await listProjectStatuses(pid)
-    } catch { /* ignore */ }
+      statuses.value = await listProjectStatuses(pid, category)
+    } catch {
+      // 状态字典拉取失败时下拉为空，保存时因 statusId 为空不会误改状态
+    }
     try {
-      const transitions = await listTransitions(pid)
+      const transitions = await listTransitions(pid, category)
       const map: Record<string, Set<string>> = {}
       for (const t of transitions) {
         if (!map[t.fromStatusId]) map[t.fromStatusId] = new Set()
@@ -100,22 +122,13 @@ watch(
   { immediate: true }
 )
 
-async function loadTabs(issueId: string) {
-  try {
-    activities.value = await listActivities(issueId)
-  } catch { /* ignore */ }
-  try {
-    attachments.value = await listAttachments(issueId)
-  } catch { /* ignore */ }
-  try {
-    links.value = await listLinks(issueId)
-  } catch { /* ignore */ }
-  try {
-    tags.value = await listIssueTags(issueId)
-  } catch { /* ignore */ }
+async function loadUsers() {
   try {
     users.value = await listUsers()
-  } catch { /* ignore */ }
+  } catch {
+    // 接口层已提示失败原因；负责人/验证人下拉退化为仅"未指派"
+    users.value = []
+  }
 }
 
 async function save() {
@@ -148,7 +161,7 @@ async function onPickImage(e: Event) {
   const file = input.files?.[0]
   if (!file) return
   try {
-    const res = await uploadImage(file)
+    const res = await uploadImage(file, props.projectId)
     commentText.value += `\n<img src="${res.url}" style="max-width:100%" alt="图片" />\n`
   } finally {
     input.value = ''
@@ -156,24 +169,10 @@ async function onPickImage(e: Event) {
 }
 
 async function sendComment() {
-  if (!commentText.value.trim()) return
-  await addComment(props.issue.id, commentText.value.trim())
-  commentText.value = ''
-  activities.value = await listActivities(props.issue.id)
+  if (await sendCommentApi(commentText.value)) commentText.value = ''
 }
 
-async function removeComment(id: string) {
-  await deleteComment(props.issue.id, id)
-  activities.value = await listActivities(props.issue.id)
-}
-
-// 评论渲染前做基础安全过滤（demo 级防 XSS）
-function sanitizeHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/javascript:/gi, '')
-}
+// 评论正文的白名单渲染统一交给 utils/commentContent（与详情页同一套规则）
 
 // ---- 附件（真实文件上传） ----
 async function onPickAttachment(e: Event) {
@@ -182,18 +181,11 @@ async function onPickAttachment(e: Event) {
   if (!file) return
   attachUploading.value = true
   try {
-    await uploadAttachment(props.issue.id, file)
-    ElMessage.success('上传成功')
-    attachments.value = await listAttachments(props.issue.id)
+    if (await uploadFileApi(file)) ElMessage.success('上传成功')
   } finally {
     attachUploading.value = false
     input.value = ''
   }
-}
-
-async function removeAttach(id: string) {
-  await deleteAttachment(props.issue.id, id)
-  attachments.value = await listAttachments(props.issue.id)
 }
 
 const isImage = (a: AttachmentVO) => a.url && /\.(jpg|jpeg|png|gif|webp)$/i.test(a.fileName)
@@ -205,27 +197,39 @@ async function addLinkItem() {
     ElMessage.warning('请输入任务编号，如 12')
     return
   }
-  await addLink(props.issue.id, linkTarget.value.trim(), linkType.value)
-  linkTarget.value = ''
-  links.value = await listLinks(props.issue.id)
-}
-
-async function removeLink(id: string) {
-  await deleteLink(props.issue.id, id)
-  links.value = await listLinks(props.issue.id)
+  if (await addLinkItemApi(linkTarget.value.trim(), linkType.value)) linkTarget.value = ''
 }
 
 // ---- 标签 ----
 async function addTag() {
-  if (!tagInput.value.trim()) return
-  await addIssueTag(props.issue.id, props.projectId, tagInput.value.trim(), '#1677FF')
-  tagInput.value = ''
-  tags.value = await listIssueTags(props.issue.id)
+  if (await addTagApi(tagInput.value)) tagInput.value = ''
 }
 
-async function removeTag(labelId: string) {
-  await removeIssueTag(props.issue.id, labelId)
-  tags.value = tags.value.filter((t) => t.id !== labelId)
+// ---- 删除确认（与详情页保持一致，避免误触丢失协作记录） ----
+async function onRemoveComment(commentId: string) {
+  try {
+    await ElMessageBox.confirm('确定删除该评论吗？删除后不可恢复。', '删除评论', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消'
+    })
+  } catch {
+    return
+  }
+  await removeComment(commentId)
+}
+
+async function onRemoveAttach(attachmentId: string) {
+  try {
+    await ElMessageBox.confirm('确定删除该附件吗？', '删除附件', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消'
+    })
+  } catch {
+    return
+  }
+  await removeAttach(attachmentId)
 }
 
 const fmtTime = (t?: string) => (t ? new Date(t).toLocaleString('zh-CN') : '')
@@ -293,22 +297,16 @@ const fmtTime = (t?: string) => (t ? new Date(t).toLocaleString('zh-CN') : '')
               </div>
             </div>
 
-            <div class="space-y-3">
-              <div v-for="a in activities" :key="a.id" class="rounded-lg bg-surface-muted/50 p-3 text-sm">
-                <div class="mb-1 flex items-center justify-between">
-                  <span class="font-medium text-ink-900">{{ a.actorName }}</span>
-                  <span class="text-xs text-ink-400">{{ fmtTime(a.createdAt) }}</span>
-                </div>
-                <div v-if="a.type === 'COMMENT'" class="text-ink-600">
-                  <!-- 评论内容含用户上传的 <img>，渲染前已做基础安全过滤 -->
-                  <span class="comment-content" v-html="sanitizeHtml(a.content || '')" />
-                  <button class="ml-2 text-xs text-ink-400 hover:text-red-500" @click="removeComment(a.id)"><Trash2 :size="12" /></button>
-                </div>
-                <div v-else class="text-ink-400">
-                  {{ a.type === 'STATUS_CHANGED' ? '变更了状态' : '更新了字段' }}
-                  <code class="ml-1 text-xs text-ink-600">{{ a.oldValue }} → {{ a.newValue }}</code>
-                </div>
-              </div>
+            <!-- 动态与评论共用 ActivityItem，与详情页版式一致（头像 + 姓名 + 时间 + 正文） -->
+            <div class="space-y-4">
+              <ActivityItem
+                v-for="a in activities"
+                :key="a.id"
+                :node="a"
+                can-write
+                :current-user-name="currentUserName"
+                @remove="onRemoveComment"
+              />
               <div v-if="!activities.length" class="text-center text-sm text-ink-400">暂无动态</div>
             </div>
           </div>
@@ -367,7 +365,7 @@ const fmtTime = (t?: string) => (t ? new Date(t).toLocaleString('zh-CN') : '')
                   <span v-else class="truncate text-ink-900">{{ a.fileName }}</span>
                   <span class="shrink-0 text-xs text-ink-400">{{ a.uploaderName }} · {{ fmtTime(a.createdAt) }}</span>
                 </div>
-                <button class="shrink-0 text-ink-400 hover:text-red-500" @click="removeAttach(a.id)"><Trash2 :size="14" /></button>
+                <button class="shrink-0 text-ink-400 hover:text-red-500" @click="onRemoveAttach(a.id)"><Trash2 :size="14" /></button>
               </div>
               <div v-if="!attachments.length" class="text-center text-sm text-ink-400">暂无附件</div>
             </div>
@@ -376,7 +374,7 @@ const fmtTime = (t?: string) => (t ? new Date(t).toLocaleString('zh-CN') : '')
       </div>
 
       <!-- 右栏：基础字段 -->
-      <div class="w-[280px] shrink-0 space-y-3.5 overflow-y-auto border-l border-surface-muted bg-surface-base/40 px-4 py-4">
+      <div class="glass-bar w-[280px] shrink-0 space-y-3.5 overflow-y-auto border-l px-4 py-4">
         <div class="text-xs font-semibold uppercase tracking-wide text-ink-400">基础字段</div>
         <div>
           <label class="mb-1 block text-xs text-ink-400">状态</label>
@@ -449,7 +447,7 @@ const fmtTime = (t?: string) => (t ? new Date(t).toLocaleString('zh-CN') : '')
               v-for="t in tags"
               :key="t.id"
               class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-white"
-              :style="{ background: t.color || '#1677FF' }"
+              :style="{ background: t.color || 'var(--primary)' }"
             >
               {{ t.name }}
               <button class="hover:opacity-70" @click="removeTag(t.id)"><X :size="10" /></button>
@@ -466,7 +464,7 @@ const fmtTime = (t?: string) => (t ? new Date(t).toLocaleString('zh-CN') : '')
     </div>
 
     <!-- 底部保存 -->
-    <div class="shrink-0 border-t border-surface-muted bg-surface-base/40 px-5 py-3">
+    <div class="glass-bar shrink-0 border-t px-5 py-3">
       <button
         class="w-full rounded-lg bg-brand py-2.5 text-sm font-medium text-white transition hover:bg-brand-dark"
         @click="save"

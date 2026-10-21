@@ -1,32 +1,65 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { Target, Plus, Calendar } from 'lucide-vue-next'
+import { ElMessage } from 'element-plus'
 import type { MilestoneVO } from '@/api/types'
+import { createMilestone } from '@/api'
+import { errorMessage } from '@/utils/error'
 import ProgressBar from '@/components/ProgressBar.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import type { StatusStyle } from '@/components/StatusBadge.vue'
 
 interface Props {
   milestones?: MilestoneVO[]
+  /** 所属项目：概览页在其卡片内直接新建里程碑 */
+  projectId?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  milestones: () => []
+  milestones: () => [],
+  projectId: ''
 })
 
+const emit = defineEmits<{ (e: 'refresh'): void }>()
+
 const STATUS_STYLE: Record<string, StatusStyle> = {
-  OPEN: { label: '进行中', color: '#1677FF', bg: 'rgba(22,119,255,0.1)' },
-  DONE: { label: '已完成', color: '#28A745', bg: 'rgba(40,167,69,0.1)' },
-  OVERDUE: { label: '已逾期', color: '#DC3545', bg: 'rgba(220,53,69,0.1)' }
+  OPEN: { label: '进行中', color: 'var(--primary)' },
+  DONE: { label: '已完成', color: 'var(--success)' },
+  OVERDUE: { label: '已逾期', color: 'var(--danger)' }
 }
 
+const dialogVisible = ref(false)
+const submitting = ref(false)
+const form = ref({ name: '', description: '', dueDate: '' })
+
 function onAdd() {
-  // emit or callback
+  if (!props.projectId) return
+  form.value = { name: '', description: '', dueDate: '' }
+  dialogVisible.value = true
+}
+
+async function submit() {
+  if (!form.value.name.trim()) {
+    ElMessage.warning('请输入里程碑名称')
+    return
+  }
+  submitting.value = true
+  try {
+    await createMilestone(props.projectId, { ...form.value })
+    ElMessage.success('已创建')
+    dialogVisible.value = false
+    emit('refresh')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '保存失败'))
+  } finally {
+    submitting.value = false
+  }
 }
 </script>
 
 <template>
-  <div class="rounded-lg border border-[#E9ECEF] bg-white shadow-sm">
-    <div class="flex items-center justify-between border-b border-[#E9ECEF] px-4 py-3">
+  <div class="glass-panel rounded-lg">
+    <div class="flex items-center justify-between border-b border-line-light px-4 py-3">
       <div class="flex items-center gap-2 text-sm font-medium text-ink-900">
         <Target :size="16" class="text-brand" /> 里程碑
       </div>
@@ -37,7 +70,7 @@ function onAdd() {
     <div class="p-4">
       <div v-if="!props.milestones.length" class="py-6 text-center text-sm text-ink-400">暂无里程碑</div>
       <div v-else class="space-y-3">
-        <div v-for="m in props.milestones" :key="m.id" class="rounded-md border border-[#E9ECEF] p-3 transition hover:bg-surface-muted/50">
+        <div v-for="m in props.milestones" :key="m.id" class="rounded-md border border-line-light p-3 transition hover:bg-surface-muted/50">
           <div class="flex items-center justify-between">
             <span class="text-sm font-medium text-ink-900">{{ m.name }}</span>
             <StatusBadge :status="m.status" :dict="STATUS_STYLE" />
@@ -52,5 +85,23 @@ function onAdd() {
         </div>
       </div>
     </div>
+
+    <el-dialog v-model="dialogVisible" title="新建里程碑" width="520px">
+      <el-form :model="form" label-width="80px">
+        <el-form-item label="名称" required>
+          <el-input v-model="form.name" placeholder="请输入里程碑名称" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="form.description" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="截止日期">
+          <el-date-picker v-model="form.dueDate" type="date" value-format="YYYY-MM-DD" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="submit">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>

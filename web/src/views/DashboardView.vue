@@ -1,19 +1,20 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { BarChart3, ChevronLeft } from 'lucide-vue-next'
 import ProjectMetricsPanel from '@/components/ProjectMetricsPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
-const projectId = route.params.projectId as string
+const projectId = computed(() => route.params.projectId as string)
 
 function back() { router.push('/projects') }
-function toBoard() { router.push(`/projects/${projectId}/board`) }
+function toBoard() { router.push(`/projects/${projectId.value}/board`) }
 </script>
 
 <template>
-  <div class="min-h-full bg-surface-base">
-    <header class="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-surface-muted bg-white px-4">
+  <div class="app-canvas min-h-full">
+    <header class="glass-bar sticky top-0 z-10 flex h-14 items-center gap-3 border-b px-4">
       <button class="flex items-center gap-1 text-sm text-ink-600 hover:text-ink-900" @click="back">
         <ChevronLeft :size="18" /> 项目
       </button>

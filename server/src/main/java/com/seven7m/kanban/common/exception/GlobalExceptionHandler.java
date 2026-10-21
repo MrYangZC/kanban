@@ -3,6 +3,7 @@ package com.seven7m.kanban.common.exception;
 import com.seven7m.kanban.common.domain.R;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
@@ -10,8 +11,10 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.stream.Collectors;
 
@@ -29,11 +32,36 @@ public class GlobalExceptionHandler {
         return R.fail(e.getCode(), e.getMessage());
     }
 
+    /**
+     * 把 Spring 默认的英文校验消息统一成本地化文案，并带上字段名。
+     * 注解未显式声明 message 时会得到 "must not be blank" 这类英文，直接返回给前端不可读。
+     */
+    private String fieldMessage(FieldError fe) {
+        String raw = fe.getDefaultMessage();
+        String field = fe.getField();
+        if (raw == null || raw.isBlank()) return "参数 " + field + " 不合法";
+        return switch (raw) {
+            case "must not be blank", "must not be null", "must not be empty" -> field + " 不能为空";
+            case "must be a well-formed email address" -> field + " 不是合法的邮箱地址";
+            case "must be true", "must be false" -> field + " 取值不合法";
+            default -> {
+                String lower = raw.toLowerCase();
+                if (lower.startsWith("size must be between")) yield field + " 长度超出允许范围";
+                if (lower.startsWith("must be less than") || lower.startsWith("must be greater than")
+                        || lower.startsWith("must be less than or equal to") || lower.startsWith("must be greater than or equal to")) {
+                    yield field + " 数值超出允许范围";
+                }
+                if (lower.startsWith("must ")) yield field + " 参数不合法";
+                yield raw;
+            }
+        };
+    }
+
     /** 参数校验失败（@RequestBody + @Valid）：400 */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public R<Void> handleValid(MethodArgumentNotValidException e) {
         String msg = e.getBindingResult().getFieldErrors().stream()
-                .map(FieldError::getDefaultMessage)
+                .map(this::fieldMessage)
                 .collect(Collectors.joining("; "));
         return R.fail(HttpStatus.BAD_REQUEST.value(), msg);
     }
@@ -41,9 +69,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BindException.class)
     public R<Void> handleBind(BindException e) {
         String msg = e.getBindingResult().getFieldErrors().stream()
-                .map(FieldError::getDefaultMessage)
+                .map(this::fieldMessage)
                 .collect(Collectors.joining("; "));
         return R.fail(HttpStatus.BAD_REQUEST.value(), msg);
+    }
+
+    /** 上传文件超过大小限制：给明确文案，避免落到兜底 500「系统异常」 */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public R<Void> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        log.warn("上传文件超过大小限制: {}", e.getMessage());
+        return R.fail(HttpStatus.BAD_REQUEST.value(), "上传文件超过大小限制（单个文件最大 5MB）");
     }
 
     /** 缺少请求参数（如 @RequestParam 缺失）：400 */
@@ -64,8 +99,23 @@ public class GlobalExceptionHandler {
         return R.fail(HttpStatus.BAD_REQUEST.value(), "请求体格式错误");
     }
 
-    /** 兜底：未知异常 500，仅返回通用文案，不泄露内部细节（SQL/堆栈等） */
+    /**
+     * 数据库约束/长度/外键等数据完整性问题：400 明确提示，不落到兜底 500。
+     * 典型场景：字段超长命中 varchar(n)、唯一键冲突等。
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public R<Void> handleDataIntegrity(DataIntegrityViolationException e) {
+        log.warn("数据约束异常: {}", e.getMostSpecificCause().getMessage());
+        return R.fail(HttpStatus.BAD_REQUEST.value(), "提交的数据不符合约束（可能超长或重复），请检查后重试");
+    }
+
+    /**
+     * 兜底：未知异常 500，仅返回通用文案，不泄露内部细节（SQL/堆栈等）。
+     * HTTP 状态码同步置为 500（而非一律 200），让网关/监控/Apollo 之类的告警体系能按状态码识别故障；
+     * 响应体仍是 R 结构（code=500 + 通用文案），前端拦截器对非 2xx 走 error 分支并 toast 同一文案，行为不变。
+     */
     @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public R<Void> handleException(Exception e, HttpServletRequest request) {
         log.error("系统异常", e);
         return R.fail(HttpStatus.INTERNAL_SERVER_ERROR.value(), "系统异常，请稍后重试");

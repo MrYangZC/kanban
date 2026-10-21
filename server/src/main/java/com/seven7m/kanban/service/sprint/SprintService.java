@@ -15,8 +15,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -32,17 +37,33 @@ public class SprintService {
     private final SysUserMapper userMapper;
 
     public List<SprintVO> listByProject(UUID projectId) {
-        List<Sprint> list = sprintMapper.selectList(
+        List<Sprint> sprints = sprintMapper.selectList(
                 Wrappers.<Sprint>lambdaQuery().eq(Sprint::getProjectId, projectId).orderByDesc(Sprint::getCreatedAt));
-        return list.stream().map(this::toVO).collect(Collectors.toList());
+        // 创建人一次性批量查出，避免逐行查用户表（N+1）
+        Set<UUID> creatorIds = sprints.stream()
+                .map(Sprint::getCreatedBy)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, SysUser> userMap = creatorIds.isEmpty() ? Map.of() :
+                userMapper.selectBatchIds(creatorIds).stream()
+                        .collect(Collectors.toMap(SysUser::getId, Function.identity()));
+        return sprints.stream().map(s -> toVO(s, userMap)).collect(Collectors.toList());
     }
 
     public SprintVO detail(UUID projectId, UUID id) {
         return toVO(requireSprint(projectId, id));
     }
 
+    /** 迭代起止日期校验：结束日期不能早于开始日期 */
+    private void validateDateRange(LocalDate start, LocalDate end) {
+        if (start != null && end != null && end.isBefore(start)) {
+            throw new ServiceException(400, "结束日期不能早于开始日期");
+        }
+    }
+
     @Transactional
     public SprintVO create(UUID projectId, CreateSprintRequest req) {
+        validateDateRange(req.getStartDate(), req.getEndDate());
         Sprint sprint = new Sprint();
         sprint.setId(UUID.randomUUID());
         sprint.setProjectId(projectId);
@@ -62,6 +83,9 @@ public class SprintService {
         Sprint sprint = requireSprint(projectId, id);
         if (req.getName() != null) sprint.setName(req.getName());
         if (req.getGoal() != null) sprint.setGoal(req.getGoal());
+        LocalDate newStart = req.getStartDate() != null ? req.getStartDate() : sprint.getStartDate();
+        LocalDate newEnd = req.getEndDate() != null ? req.getEndDate() : sprint.getEndDate();
+        validateDateRange(newStart, newEnd);
         if (req.getStartDate() != null) sprint.setStartDate(req.getStartDate());
         if (req.getEndDate() != null) sprint.setEndDate(req.getEndDate());
         sprint.setUpdatedBy(UserContext.getUserId());
@@ -109,7 +133,17 @@ public class SprintService {
         return sprint;
     }
 
+    /** 单条场景（create/update/start/complete）：只查一次创建人 */
     private SprintVO toVO(Sprint s) {
+        if (s.getCreatedBy() == null) {
+            return toVO(s, Map.of());
+        }
+        SysUser u = userMapper.selectById(s.getCreatedBy());
+        return toVO(s, u == null ? Map.of() : Map.of(u.getId(), u));
+    }
+
+    /** 列表场景：创建人由调用方批量查好传入 */
+    private SprintVO toVO(Sprint s, Map<UUID, SysUser> userMap) {
         SprintVO vo = new SprintVO();
         vo.setId(s.getId());
         vo.setProjectId(s.getProjectId());
@@ -121,7 +155,7 @@ public class SprintService {
         vo.setCreatedAt(s.getCreatedAt() == null ? null : s.getCreatedAt().toString());
         vo.setUpdatedAt(s.getUpdatedAt() == null ? null : s.getUpdatedAt().toString());
         if (s.getCreatedBy() != null) {
-            SysUser u = userMapper.selectById(s.getCreatedBy());
+            SysUser u = userMap.get(s.getCreatedBy());
             if (u != null) vo.setCreatorName(u.getDisplayName());
         }
         return vo;

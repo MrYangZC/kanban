@@ -14,18 +14,18 @@ interface Props {
 const props = defineProps<Props>()
 
 const STATUS_MAP: Record<string, StatusStyle> = {
-  ACTIVE: { label: '进行中', color: '#28A745', bg: 'rgba(40,167,69,0.1)' },
-  ARCHIVED: { label: '已归档', color: '#8F959E', bg: 'rgba(143,149,158,0.1)' },
-  CLOSED: { label: '已关闭', color: '#DC3545', bg: 'rgba(220,53,69,0.1)' }
+  ACTIVE: { label: '进行中', color: 'var(--success)' },
+  ARCHIVED: { label: '已归档', color: 'var(--ink-secondary)' },
+  CLOSED: { label: '已关闭', color: 'var(--danger)' }
 }
 
-const fallback: StatusStyle = { label: '未知', color: '#1677FF', bg: 'rgba(22,119,255,0.1)' }
+const fallback: StatusStyle = { label: '未知', color: 'var(--primary)' }
 
 const createdAt = computed(() => fmtDate(props.project.createdAt))
 </script>
 
 <template>
-  <div class="rounded-lg border border-[#E9ECEF] bg-white p-5 shadow-sm">
+  <div class="glass-panel rounded-lg p-5">
     <div class="flex items-start gap-4">
       <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-brand">
         <FolderKanban :size="24" />

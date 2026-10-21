@@ -8,6 +8,7 @@ import com.seven7m.kanban.dto.sprint.SprintVO;
 import com.seven7m.kanban.dto.sprint.UpdateSprintRequest;
 import com.seven7m.kanban.service.sprint.SprintService;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,13 +42,13 @@ public class SprintController {
 
     @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
     @PostMapping
-    public R<SprintVO> create(@PathVariable UUID projectId, @RequestBody CreateSprintRequest req) {
+    public R<SprintVO> create(@PathVariable UUID projectId, @Valid @RequestBody CreateSprintRequest req) {
         return R.ok(sprintService.create(projectId, req));
     }
 
     @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
     @PutMapping("/{id}")
-    public R<SprintVO> update(@PathVariable UUID projectId, @PathVariable UUID id, @RequestBody UpdateSprintRequest req) {
+    public R<SprintVO> update(@PathVariable UUID projectId, @PathVariable UUID id, @Valid @RequestBody UpdateSprintRequest req) {
         return R.ok(sprintService.update(projectId, id, req));
     }
 

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, onScopeDispose } from 'vue'
 import type { Project, ProjectCategoryKey, ProjectCategoryCounts, ViewMode } from '@/api/types'
 import {
   filterProjects,
@@ -9,6 +9,7 @@ import {
   archiveProject,
   unarchiveProject
 } from '@/api'
+import { errorMessage } from '@/utils/error'
 
 const CATEGORY_STORAGE_KEY = 'kanban:projectCategory'
 const VIEW_MODE_STORAGE_KEY = 'kanban:projectViewMode'
@@ -61,6 +62,14 @@ export const useProjectCategoryStore = defineStore('projectCategory', () => {
 
   let searchTimer: ReturnType<typeof setTimeout> | null = null
 
+  // 防抖定时器需随 store 作用域释放而清理，避免悬空回调触发已卸载后的请求
+  onScopeDispose(() => {
+    if (searchTimer) {
+      clearTimeout(searchTimer)
+      searchTimer = null
+    }
+  })
+
   const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 
   const currentCategoryItem = computed<CategoryItem | undefined>(() =>
@@ -108,8 +117,8 @@ export const useProjectCategoryStore = defineStore('projectCategory', () => {
       })
       projects.value = res.list
       total.value = res.total
-    } catch (e: any) {
-      error.value = e?.message || '项目列表加载失败'
+    } catch (e: unknown) {
+      error.value = errorMessage(e, '项目列表加载失败')
       projects.value = []
       total.value = 0
     } finally {
@@ -160,7 +169,8 @@ export const useProjectCategoryStore = defineStore('projectCategory', () => {
       if (selectedCategory.value === 'favorited' && !wasFavorited) {
         await loadProjects()
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      // 失败回滚乐观更新，由调用方决定提示方式
       project.favorited = wasFavorited
       throw e
     }
@@ -170,17 +180,13 @@ export const useProjectCategoryStore = defineStore('projectCategory', () => {
     const project = projects.value.find((p) => p.id === projectId)
     if (!project) return
     const isArchived = project.status === 'ARCHIVED'
-    try {
-      if (isArchived) {
-        await unarchiveProject(projectId)
-      } else {
-        await archiveProject(projectId)
-      }
-      await loadCategoryCounts()
-      await loadProjects()
-    } catch (e: any) {
-      throw e
+    if (isArchived) {
+      await unarchiveProject(projectId)
+    } else {
+      await archiveProject(projectId)
     }
+    await loadCategoryCounts()
+    await loadProjects()
   }
 
   return {

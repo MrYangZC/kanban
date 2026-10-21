@@ -20,6 +20,9 @@ public class Workflow {
     private String name;
     private String description;
     private Boolean isDefault;
+
+    /** 适用工作项大类：TASK / REQUIREMENT / BUG（每类一条默认模板，见 V31） */
+    private String appliesTo;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

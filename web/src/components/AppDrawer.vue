@@ -74,7 +74,7 @@ onBeforeUnmount(() => {
 }
 .app-drawer-panel {
   height: 100%;
-  background: #f5f7fa;
+  background: var(--surface-page);
   display: flex;
   flex-direction: column;
   overflow: hidden;

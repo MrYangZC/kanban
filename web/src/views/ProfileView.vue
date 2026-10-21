@@ -4,6 +4,7 @@ import { getMyProfile, updateMyProfile, changeMyPassword, uploadImage } from '@/
 import { useUserStore } from '@/stores/user'
 import type { ProfileVO } from '@/api/types'
 import { ElMessage } from 'element-plus'
+import { errorMessage } from '@/utils/error'
 import { User, Lock, Save, Camera, ShieldCheck, Clock } from 'lucide-vue-next'
 
 const userStore = useUserStore()
@@ -38,8 +39,8 @@ async function loadProfile() {
       email: profile.value.email || '',
       avatarUrl: profile.value.avatarUrl || ''
     }
-  } catch (e: any) {
-    ElMessage.error(e?.message || '加载个人信息失败')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '加载个人信息失败'))
   } finally {
     loading.value = false
   }
@@ -61,8 +62,8 @@ async function onAvatarChange(e: Event) {
     profile.value = updated
     syncLoginStore(updated)
     ElMessage.success('头像已更新')
-  } catch (e: any) {
-    ElMessage.error(e?.message || '头像上传失败')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '头像上传失败'))
   } finally {
     uploadingAvatar.value = false
     input.value = ''
@@ -71,9 +72,11 @@ async function onAvatarChange(e: Event) {
 
 function syncLoginStore(p: ProfileVO) {
   if (userStore.user) {
+    // 同步头像：否则右上角等全局头像位要等下次登录才换成新图
     userStore.setLogin({
       ...userStore.user,
       displayName: p.displayName,
+      avatarUrl: p.avatarUrl,
       token: userStore.user.token
     })
   }
@@ -94,8 +97,8 @@ async function onSaveProfile() {
     profile.value = updated
     syncLoginStore(updated)
     ElMessage.success('个人信息已保存')
-  } catch (e: any) {
-    ElMessage.error(e?.message || '保存失败')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '保存失败'))
   } finally {
     savingProfile.value = false
   }
@@ -126,8 +129,8 @@ async function onChangePassword() {
     })
     pwdForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
     ElMessage.success('密码修改成功')
-  } catch (e: any) {
-    ElMessage.error(e?.message || '修改密码失败')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '修改密码失败'))
   } finally {
     savingPwd.value = false
   }

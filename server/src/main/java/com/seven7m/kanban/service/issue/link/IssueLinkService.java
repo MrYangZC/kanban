@@ -1,6 +1,7 @@
 package com.seven7m.kanban.service.issue.link;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.dto.issue.IssueVO;
 import com.seven7m.kanban.dto.issue.LinkVO;
@@ -28,6 +29,13 @@ public class IssueLinkService {
     /** 关联类型枚举（与前端下拉选项一致） */
     private static final Set<String> VALID_RELATION_TYPES = Set.of("关联", "阻塞", "重复", "修复");
 
+    /** 根据工作项 id 判定所属类别（TASK/REQUIREMENT/BUG），不存在抛 404 */
+    private String categoryOf(UUID issueId) {
+        ItemCategory c = workItemRouter.categoryOf(issueId);
+        if (c == null) throw new ServiceException(404, "工作项不存在");
+        return c.name();
+    }
+
     public List<LinkVO> list(UUID issueId) {
         return linkMapper.selectList(Wrappers.<IssueLink>lambdaQuery()
                         .eq(IssueLink::getIssueId, issueId)
@@ -37,8 +45,7 @@ public class IssueLinkService {
                     BeanUtils.copyProperties(l, vo);
                     IssueVO target = workItemRouter.getBriefById(l.getTargetIssueId());
                     if (target != null) {
-                        vo.setTargetKey(target.getIssueNumber() == null ? "" : "ISSUE-" + target.getIssueNumber());
-                        vo.setTargetTitle(target.getTitle());
+                        fillTarget(vo, target);
                     }
                     return vo;
                 }).collect(Collectors.toList());
@@ -73,6 +80,8 @@ public class IssueLinkService {
         IssueLink l = new IssueLink();
         l.setId(UUID.randomUUID());
         l.setIssueId(issueId);
+        // 显式落类别，避免取列默认值 TASK 导致需求/缺陷的关联查询与清理失效
+        l.setCategory(categoryOf(issueId));
         l.setTargetIssueId(targetIssueId);
         l.setRelationType(relationType);
         l.setCreatedAt(LocalDateTime.now());
@@ -80,9 +89,14 @@ public class IssueLinkService {
 
         LinkVO vo = new LinkVO();
         BeanUtils.copyProperties(l, vo);
-        vo.setTargetKey(target.getIssueNumber() == null ? "" : "ISSUE-" + target.getIssueNumber());
-        vo.setTargetTitle(target.getTitle());
+        fillTarget(vo, target);
         return vo;
+    }
+
+    /** 关联项的展示字段统一在此填充：编号必须取工作项真实编号，不允许自拼前缀 */
+    private void fillTarget(LinkVO vo, IssueVO target) {
+        vo.setTargetKey(target.getIssueKey() == null ? "" : target.getIssueKey());
+        vo.setTargetTitle(target.getTitle());
     }
 
     @Transactional

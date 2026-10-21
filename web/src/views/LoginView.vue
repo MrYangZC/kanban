@@ -5,8 +5,8 @@ import { login as apiLogin } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { LayoutGrid } from 'lucide-vue-next'
 
-const username = ref('admin')
-const password = ref('admin123')
+const username = ref('')
+const password = ref('')
 const loading = ref(false)
 const router = useRouter()
 const userStore = useUserStore()
@@ -25,8 +25,8 @@ async function onSubmit() {
 </script>
 
 <template>
-  <div class="flex h-full items-center justify-center bg-gradient-to-br from-surface-base to-surface-muted">
-    <div class="w-[380px] rounded-2xl bg-white p-8 shadow-xl ring-1 ring-black/5">
+  <div class="app-canvas flex h-full items-center justify-center">
+    <div class="glass-pop w-[380px] rounded-2xl p-8">
       <div class="mb-6 flex items-center gap-3">
         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white">
           <LayoutGrid :size="22" />
@@ -42,7 +42,7 @@ async function onSubmit() {
           <input
             v-model="username"
             class="w-full rounded-lg border border-surface-muted px-3 py-2 text-sm outline-none focus:border-brand"
-            placeholder="admin"
+            placeholder="请输入用户名"
           />
         </div>
         <div>
@@ -51,7 +51,7 @@ async function onSubmit() {
             v-model="password"
             type="password"
             class="w-full rounded-lg border border-surface-muted px-3 py-2 text-sm outline-none focus:border-brand"
-            placeholder="admin123"
+            placeholder="请输入密码"
           />
         </div>
         <button
@@ -62,7 +62,7 @@ async function onSubmit() {
           {{ loading ? '登录中…' : '登 录' }}
         </button>
       </form>
-      <div class="mt-4 text-center text-xs text-ink-400">默认账号 admin / admin123</div>
+
     </div>
   </div>
 </template>

@@ -3,34 +3,106 @@ import { onMounted, ref, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   filterIssues, listIssueChildren, updateIssue, getBoardGrouped,
-  listProjectTags, listProjectMembers, createIssue, listUsers
+  listProjectTags, listProjectMembers, listUsers
 } from '@/api'
 import type { Issue, LabelVO, ProjectMember, UserVO } from '@/api/types'
+import { TASK_TYPE_CODES, REQUIREMENT_TYPE_CODES, DEFECT_TYPE_CODES, categoryOfTypeCode } from '@/api/types'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
-import BoardFilterBar, { type FilterPayload } from '@/components/BoardFilterBar.vue'
-import { createBoardFilter } from '@/stores/boardFilter'
-import { useUserStore } from '@/stores/user'
+import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
+import SimpleListView from '@/components/SimpleListView.vue'
+import UserSelect from '@/components/common/UserSelect.vue'
+import type { ViewTab } from '@/components/ViewTabs.vue'
+import { useBoardFilter } from '@/stores/boardFilter'
 import { ElMessage } from 'element-plus'
-import { ChevronUp, ChevronDown, Plus } from 'lucide-vue-next'
+import { Archive, BarChart3, Bug, FileText, Inbox, LayoutGrid, ListTodo, Table2, User, UserCheck } from 'lucide-vue-next'
 import { useProjectPermission } from '@/composables/useProjectPermission'
+import { PRIORITY_COLOR as priorityColor, SEVERITY_COLOR as severityColor, PRIORITY_LABEL as priorityLabel, SEVERITY_LABEL as severityLabel } from '@/theme/colorMap'
 
 const route = useRoute()
 const router = useRouter()
-const userStore = useUserStore()
-const projectId = route.params.projectId as string
+const projectId = computed(() => route.params.projectId as string)
 
 const boardName = ref('')
 const loading = ref(false)
 const total = ref(0)
 const page = ref(1)
-const size = ref(20)
+const size = ref(25)
 const tableData = ref<Issue[]>([])
 const allTags = ref<LabelVO[]>([])
 const members = ref<ProjectMember[]>([])
 const users = ref<UserVO[]>([])
-const filter = createBoardFilter()
-const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId)
+const filter = useBoardFilter(projectId.value)
+const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId.value)
 const canWrite = computed(() => hasPermission('issue:edit'))
+
+const typeKey = computed(() => (route.query.type as string) || '')
+const TYPE_LABEL: Record<string, string> = {
+  task: '任务列表',
+  requirement: '需求列表',
+  defect: '缺陷列表'
+}
+const TYPE_CODE_MAP: Record<string, string[]> = {
+  task: TASK_TYPE_CODES,
+  requirement: REQUIREMENT_TYPE_CODES,
+  defect: DEFECT_TYPE_CODES
+}
+const itemLabel = computed(() => {
+  switch (typeKey.value) {
+    case 'task': return '任务'
+    case 'requirement': return '需求'
+    case 'defect': return '缺陷'
+    default: return '工作项'
+  }
+})
+
+// 页面图标随工作项类型切换，与任务/需求/缺陷页保持一致
+const pageIcon = computed(() => {
+  switch (typeKey.value) {
+    case 'task': return ListTodo
+    case 'requirement': return FileText
+    case 'defect': return Bug
+    default: return LayoutGrid
+  }
+})
+
+const defaultTypeCode = computed(() => TYPE_CODE_MAP[typeKey.value]?.[0] || '')
+
+// 看板/表格为两个独立路由页，这里仅作为视图切换入口
+const viewTabs: ViewTab[] = [
+  { key: 'board', label: '看板', icon: LayoutGrid },
+  { key: 'table', label: '表格', icon: Table2 }
+]
+
+const PRIORITY_OPTIONS = [
+  { k: 'P0', label: '紧急' },
+  { k: 'P1', label: '高' },
+  { k: 'P2', label: '中' },
+  { k: 'P3', label: '低' }
+]
+const SEVERITY_OPTIONS = [
+  { k: 'S1', label: '致命' },
+  { k: 'S2', label: '严重' },
+  { k: 'S3', label: '一般' },
+  { k: 'S4', label: '轻微' }
+]
+
+const navGroups = computed(() => [
+  {
+    title: '个人',
+    items: [
+      { key: 'REPORTED', label: '我创建的', icon: User },
+      { key: 'ASSIGNED', label: '我负责的', icon: UserCheck },
+      { key: 'VERIFIED', label: '待我验证', icon: Inbox }
+    ]
+  },
+  {
+    title: '公共',
+    items: [
+      { key: '', label: `全部${itemLabel.value}`, icon: pageIcon.value, count: total.value },
+      { key: 'ARCHIVED', label: '已归档', icon: Archive }
+    ]
+  }
+])
 
 // 状态列（来自看板分组），用于行内编辑下拉
 const statusOptions = ref<{ id: string; name: string; color: string }[]>([])
@@ -38,29 +110,21 @@ const sortField = ref('')
 const sortOrder = ref<'asc' | 'desc'>('asc')
 
 const detailDrawer = ref<InstanceType<typeof IssueDetailDrawer> | null>(null)
+const createOpen = ref(false)
 const expandChildren = reactive<Record<string, Issue[]>>({})
 
-const priorityColor: Record<string, string> = {
-  P0: '#E34D59', P1: '#E37318', P2: '#2A4FD0', P3: '#8592A6'
-}
-const severityColor: Record<string, string> = {
-  S1: '#E34D59', S2: '#E37318', S3: '#2BA471', S4: '#8592A6'
-}
-const priorityLabel: Record<string, string> = {
-  P0: '紧急', P1: '高', P2: '中', P3: '低'
-}
-const severityLabel: Record<string, string> = {
-  S1: '致命', S2: '严重', S3: '一般', S4: '轻微'
-}
+
 
 async function loadMeta() {
-  const board = await getBoardGrouped(projectId, 'STATUS')
-  boardName.value = board.name || '任务看板'
+  // 状态列按当前页面的工作项类别取（任务/需求/缺陷是三套工作流节点）
+  const board = await getBoardGrouped(projectId.value, 'STATUS', categoryOfTypeCode(defaultTypeCode.value))
+  boardName.value = TYPE_LABEL[typeKey.value] || board.name || '任务列表'
   statusOptions.value = board.groups.flatMap((g) => g.columns).map((c) => ({
     id: c.statusId, name: c.name, color: c.color
   }))
-  allTags.value = await listProjectTags(projectId).catch(() => [])
-  members.value = await listProjectMembers(projectId).catch(() => [])
+  // 以下为筛选辅助数据，失败降级为空列表（接口层已统一提示错误）
+  allTags.value = await listProjectTags(projectId.value).catch(() => [])
+  members.value = await listProjectMembers(projectId.value).catch(() => [])
   users.value = await listUsers().catch(() => [])
   refreshPermission()
 }
@@ -69,13 +133,14 @@ async function load() {
   loading.value = true
   try {
     const res = await filterIssues({
-      projectId,
+      projectId: projectId.value,
       scope: filter.scope || undefined,
       keyword: filter.keyword || undefined,
       priority: filter.priority || undefined,
       severity: filter.severity || undefined,
       statusId: filter.statusId || undefined,
       labelId: filter.labelId || undefined,
+      issueTypeCodes: TYPE_CODE_MAP[typeKey.value]?.length ? TYPE_CODE_MAP[typeKey.value] : undefined,
       page: page.value,
       size: size.value,
       sortField: sortField.value || undefined,
@@ -123,46 +188,39 @@ async function toggleChildren(row: Issue) {
   expandChildren[row.id] = children
 }
 
-const statusName = (id: string) => statusOptions.value.find((s) => s.id === id)?.name || '—'
-const statusColor = (id: string) => statusOptions.value.find((s) => s.id === id)?.color || '#8592A6'
+
 const memberName = (id: string | null) => members.value.find((m) => m.userId === id)?.displayName || '—'
 
 function openIssue(issue: Issue) {
   detailDrawer.value?.open(issue.id)
 }
 
-async function onNewIssue() {
-  try {
-    const title = window.prompt('任务标题')
-    if (!title) return
-    await createIssue({
-      projectId,
-      statusId: statusOptions.value[0]?.id || '',
-      title,
-      priority: 'P2',
-      severity: 'S3'
-    })
-    await load()
-    ElMessage.success('已创建')
-  } catch {
-    /* 取消 */
-  }
+function onNewIssue() {
+  createOpen.value = true
 }
 
 function back() {
   router.push('/projects')
 }
 function toDashboard() {
-  router.push(`/projects/${projectId}/metrics`)
+  router.push(`/projects/${projectId.value}/metrics`)
 }
-function switchView(v: 'board' | 'table' | 'defects') {
+function switchView(v: 'board' | 'table') {
   // 记忆视图选择：从项目列表再次进入时恢复
-  localStorage.setItem(`kanban:lastView:${projectId}`, v)
-  if (v === 'defects') {
-    router.push(`/projects/${projectId}/defects`)
-    return
-  }
-  router.push(`/projects/${projectId}/${v}`)
+  localStorage.setItem(`kanban:lastView:${projectId.value}`, v)
+  router.push(`/projects/${projectId.value}/${v}`)
+}
+function onViewChange(v: string) {
+  switchView(v as 'board' | 'table')
+}
+function onSearch() {
+  page.value = 1
+  load()
+}
+function onScopeChange(v: string) {
+  filter.scope = v
+  page.value = 1
+  load()
 }
 
 onMounted(() => {
@@ -171,23 +229,67 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col">
-    <BoardFilterBar
-      :board-name="boardName"
-      :tags="allTags"
-      view="table"
-      :total="total"
-      :can-write="canWrite"
-      v-model="filter"
-      @change="() => { page = 1; load() }"
-      @switch-view="switchView"
-      @new="onNewIssue"
-      @dashboard="toDashboard"
-      @back="back"
-    />
+  <SimpleListView
+    :title="boardName"
+    :icon="pageIcon"
+    show-back
+    :search-placeholder="`搜索${itemLabel}`"
+    :can-create="canWrite"
+    create-label="新建"
+    :loading="loading"
+    :total="total"
+    :is-empty="!tableData.length"
+    :empty-text="`暂无${itemLabel}`"
+    :nav-groups="navGroups"
+    :scope="filter.scope"
+    :view-tabs="viewTabs"
+    view="table"
+    v-model:page="page"
+    v-model:size="size"
+    show-pagination
+    v-model:keyword="filter.keyword"
+    @update:scope="onScopeChange"
+    @update:view="onViewChange"
+    @search="onSearch"
+    @refresh="load"
+    @create="onNewIssue"
+    @back="back"
+  >
+    <template #header-extra>
+      <button class="btn-ghost" @click="toDashboard"><BarChart3 :size="15" /> 报表</button>
+    </template>
 
-    <div class="flex-1 overflow-auto bg-surface-base p-4">
-      <div class="overflow-hidden rounded-xl bg-white ring-1 ring-black/5">
+    <!-- 高级筛选：优先级 / 严重度(仅缺陷) / 标签，保留原筛选条能力 -->
+    <div class="glass-bar flex flex-wrap items-center gap-2 border-b px-4 py-2">
+      <select
+        v-model="filter.priority"
+        class="rounded-lg border border-surface-muted px-2 py-1.5 text-sm outline-none focus:border-brand"
+        @change="onSearch"
+      >
+        <option value="">优先级</option>
+        <option v-for="p in PRIORITY_OPTIONS" :key="p.k" :value="p.k">{{ p.label }}</option>
+      </select>
+      <select
+        v-if="typeKey === 'defect'"
+        v-model="filter.severity"
+        class="rounded-lg border border-surface-muted px-2 py-1.5 text-sm outline-none focus:border-brand"
+        @change="onSearch"
+      >
+        <option value="">严重度</option>
+        <option v-for="s in SEVERITY_OPTIONS" :key="s.k" :value="s.k">{{ s.label }}</option>
+      </select>
+      <select
+        v-model="filter.labelId"
+        class="rounded-lg border border-surface-muted px-2 py-1.5 text-sm outline-none focus:border-brand"
+        @change="onSearch"
+      >
+        <option value="">标签</option>
+        <option v-for="t in allTags" :key="t.id" :value="t.id">{{ t.name }}</option>
+      </select>
+    </div>
+
+    <div class="p-4">
+      <div class="glass-panel overflow-hidden">
         <el-table
           :data="tableData"
           v-loading="loading"
@@ -267,18 +369,17 @@ onMounted(() => {
             </template>
           </el-table-column>
 
-          <el-table-column prop="assigneeId" label="负责人" width="140">
+          <el-table-column prop="assigneeId" label="负责人" width="160">
             <template #default="{ row }">
-              <el-select
-                :model-value="row.assigneeId || ''"
-                size="small"
+              <UserSelect
+                :model-value="row.assigneeId"
+                :users="members"
+                empty-label="未分配"
                 clearable
+                width-class="w-full"
                 :disabled="!canWrite"
-                placeholder="未分配"
-                @change="(v: string) => patchIssue(row, { assigneeId: v || null }, '负责人')"
-              >
-                <el-option v-for="m in members" :key="m.userId" :value="m.userId" :label="m.displayName" />
-              </el-select>
+                @change="(v) => patchIssue(row, v ? { assigneeId: v } : { assigneeId: null, clearFields: ['assigneeId'] }, '负责人')"
+              />
             </template>
           </el-table-column>
 
@@ -306,22 +407,20 @@ onMounted(() => {
           </el-table-column>
         </el-table>
 
-        <div class="flex items-center justify-end px-4 py-3">
-          <el-pagination
-            v-model:current-page="page"
-            v-model:page-size="size"
-            :total="total"
-            :page-sizes="[20, 50, 100]"
-            layout="total, sizes, prev, pager, next"
-            background
-            @current-change="load"
-            @size-change="() => { page = 1; load() }"
-          />
-        </div>
       </div>
     </div>
 
-    <!-- 云效风格缺陷详情：宽抽屉（60% 屏宽），不跳转路由 -->
-    <IssueDetailDrawer ref="detailDrawer" :project-id="projectId" @closed="load" />
-  </div>
+    <template #footer>
+      <!-- 云效风格缺陷详情：宽抽屉（60% 屏宽），不跳转路由 -->
+      <IssueDetailDrawer ref="detailDrawer" :project-id="projectId" @closed="load" />
+      <CreateIssueDialog
+        v-model="createOpen"
+        :project-id="projectId"
+        :title="`新建${itemLabel}`"
+        :default-issue-type-code="defaultTypeCode"
+        :default-status-id="statusOptions[0]?.id || ''"
+        @created="load"
+      />
+    </template>
+  </SimpleListView>
 </template>

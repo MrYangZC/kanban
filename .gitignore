@@ -12,6 +12,9 @@ build/
 .env.local
 .env.*.local
 *.local
+# Spring 本地私有配置（含 192.168.2.17 环境凭据），禁止入库
+application-local.yml
+application-local.yaml
 
 # 凭据与临时文件
 .askpass.tmp.sh
@@ -35,3 +38,12 @@ Skill.iml
 /.playwright-cli/
 /测试报告/
 *.yaml
+
+# Playwright 测试产物（HTML 报告与原始 trace/视频不入库，用例与报告文档保留）
+/测试/test-results/
+/测试/playwright-report/
+/web/test-results/
+/web/playwright-report/
+/.ai-tmp/
+target
+*.log

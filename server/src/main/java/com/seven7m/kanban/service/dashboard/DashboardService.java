@@ -50,7 +50,6 @@ public class DashboardService {
     }
 
     private void buildBurndown(DashboardVO vo, UUID projectId, long totalCount, long totalDone) {
-        List<DashboardMapper.DateCountView> created = dashboardMapper.dailyCreated(projectId);
         List<DashboardMapper.DateCountView> completed = dashboardMapper.dailyCompleted(projectId);
 
         Map<String, Long> completedByDate = new LinkedHashMap<>();
@@ -60,16 +59,13 @@ public class DashboardService {
 
         LocalDate end = LocalDate.now();
         LocalDate start = end.minusDays(13);
-        long cumCreated = 0;
+        // 注：此前这里有一段计算 cumCreated 的嵌套循环，但其结果从未被读取（燃尽图
+        // 只消费 cumDone），属死代码，且连带一次无用的 dailyCreated 查询，已移除。
         long cumDone = totalDone - sumRecent(completed, start); // 起点前已完成的基线
         List<DashboardVO.BurndownPoint> points = new ArrayList<>();
         for (int d = 0; d < 14; d++) {
             LocalDate day = start.plusDays(d);
             String key = day.toString();
-            // 当日创建累计
-            for (DashboardMapper.DateCountView c : created) {
-                if (c.date.compareTo(key) <= 0) cumCreated = totalCreatedUpto(created, key);
-            }
             long doneToday = completedByDate.getOrDefault(key, 0L);
             cumDone += doneToday;
             long remaining = Math.max(0, totalCount - cumDone);
@@ -80,14 +76,6 @@ public class DashboardService {
             points.add(p);
         }
         vo.setBurndown(points);
-    }
-
-    private long totalCreatedUpto(List<DashboardMapper.DateCountView> created, String key) {
-        long sum = 0;
-        for (DashboardMapper.DateCountView c : created) {
-            if (c.date.compareTo(key) <= 0) sum += c.created;
-        }
-        return sum;
     }
 
     private long sumRecent(List<DashboardMapper.DateCountView> completed, LocalDate start) {

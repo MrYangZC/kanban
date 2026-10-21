@@ -1,6 +1,7 @@
 package com.seven7m.kanban.common.security;
 
-import com.seven7m.kanban.mapper.rbac.UserRoleMapper;
+import com.seven7m.kanban.entity.user.SysUser;
+import com.seven7m.kanban.mapper.user.SysUserMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -12,26 +13,34 @@ import java.util.UUID;
 
 /**
  * 系统管理员权限拦截器：保护标注 {@link RequireAdmin} 的接口。
- * 判定：当前用户在任一项目的 project_member 中拥有 OWNER / ADMIN 角色即放行。
+ * 判定：sys_user.is_admin = true（系统级管理员标识，与项目级角色无关）。
  * 依赖 UserContextInterceptor 先行填充操作人。
  */
 @Component
 @RequiredArgsConstructor
 public class AdminAuthInterceptor implements HandlerInterceptor {
 
-    private final UserRoleMapper userRoleMapper;
+    private final SysUserMapper userMapper;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        if (!(handler instanceof HandlerMethod hm) || hm.getMethodAnnotation(RequireAdmin.class) == null) {
+        if (!(handler instanceof HandlerMethod hm)) {
+            return true;
+        }
+        // 注解可能标注在方法或类上，两者都要识别：只查方法级会让类级标注静默失效（接口裸奔）
+        RequireAdmin annotation = hm.getMethodAnnotation(RequireAdmin.class);
+        if (annotation == null) {
+            annotation = hm.getBeanType().getAnnotation(RequireAdmin.class);
+        }
+        if (annotation == null) {
             return true;
         }
         UUID userId = UserContext.getUserId();
         if (userId.equals(UserContext.DEFAULT_ADMIN_ID)) {
             return true;
         }
-        int adminProjects = userRoleMapper.countAdminProjects(userId);
-        if (adminProjects <= 0) {
+        SysUser user = userMapper.selectById(userId);
+        if (user == null || !Boolean.TRUE.equals(user.getIsAdmin())) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("application/json;charset=UTF-8");
             try {

@@ -7,18 +7,20 @@
 > - 状态/类型/标签/工作流接口由「项目维度」改为「全局字典 + 项目选用」：全局字典由全局接口管理，项目通过 `workflow_id` 绑定模板、通过 `project_label` 选用标签。
 > - 标签选择器改为「全局标签库 + 项目选用关联」。
 > - 看板列不再返回冗余 `name`，由 `statusId → issue_status.name` 获取。
+> - **工作流按类别拆成三套**（`workflow.applies_to` = TASK / REQUIREMENT / BUG，V31）：`/statuses`、`/transitions`、`/board`、`/board/grouped` 均支持 `category` 参数，缺省 `BUG` 仅为兼容旧调用。
+> - 下文示例中的 `TODO` / `DONE` / `IN_PROGRESS` 等状态 code 属设计期示意，**实际取值以 §20 的三类节点表为准**（`TASK_*` / `REQ_*` / 缺陷 `TO_CONFIRM`…`CLOSED`）；`status.category` 仍是 `TODO / IN_PROGRESS / DONE` 三值。
 > - 角色授权基于 `role_id`，菜单仅导航、按钮权限由 `permission` 承载。
 >
 > **权威参考：** 后端 `server/src/main/java/com/seven7m/kanban/controller`；前端 `web/src/api`。
 >
 > ---
 
-可以。API 这一层建议现在直接定成一套规范，后续前后端所有接口都严格遵循。你明确要求 `code / msg / data`，那我建议不要再用 `message`，统一就是：
+API 层统一遵循一套规范，前后端所有接口一致。响应体固定 `code / msg / data` 三个字段，不使用 `message`：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {}
 }
 ```
@@ -26,13 +28,13 @@
 其中：
 
 ```text
-code = 0      成功
-code != 0     业务/系统错误
+code = 200    成功（复用 HTTP 语义码，400/401/403/404/405/500）
+code != 200   业务/系统错误，HTTP 层通常仍返回 200，需按 body.code 判定
 msg            给前端展示或开发定位的信息
 data           业务数据
 ```
 
-下面给你一份可以直接放进 `docs/04-api/api-design.md` 的版本。
+以下为 API 设计规范 V1.0 正文。
 
 # API 设计规范 V1.0
 
@@ -76,8 +78,8 @@ Authorization: Bearer {token}
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {}
 }
 ```
@@ -86,8 +88,8 @@ Authorization: Bearer {token}
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "id": "018f4c9a-..."
   }
@@ -238,8 +240,8 @@ code
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "records": [],
     "total": 100,
@@ -322,8 +324,8 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "accessToken": "xxxxx",
     "tokenType": "Bearer",
@@ -350,8 +352,8 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "id": "xxx",
     "username": "admin",
@@ -376,8 +378,8 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": [
     {
       "id": "xxx",
@@ -411,8 +413,8 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "id": "xxx",
     "name": "SevenM",
@@ -475,8 +477,8 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "records": [
       {
@@ -555,8 +557,8 @@ GET /api/v1/projects/{projectId}
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "id": "xxx",
     "projectKey": "YSP",
@@ -616,8 +618,8 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "records": [
       {
@@ -694,8 +696,8 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "id": "xxx",
     "key": "YSP-102",
@@ -721,8 +723,8 @@ GET /api/v1/issues/{issueId}
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "id": "xxx",
     "key": "YSP-102",
@@ -766,13 +768,13 @@ Request：
 
 注意：
 
-**不要通过这个 API 修改 Status。**
-
-Status 有独立的状态流转接口。
+**本接口可以带 `statusId` 改状态**（当前实现的改状态主路径之一）。服务端按该工作项所属类别（TASK / REQUIREMENT / BUG）的工作流校验流转，非法返回 `400 不允许从「A」流转到「B」`；跨类别状态返回 `400 状态不属于该工作项类型的工作流`。局部更新语义：未传字段不覆盖。
 
 ---
 
-# 15. Issue 状态变更
+# 15. Issue 状态变更（独立接口，未落地）
+
+> 现状：未实现 `PATCH /issues/{id}/status`。改状态走 `PUT /issues/{id}`（带 `statusId`）或拖拽 `PATCH /issues/{id}/position`，两者共用同一套流转校验。
 
 ```http
 PATCH /api/v1/issues/{issueId}/status
@@ -818,12 +820,13 @@ Transition
 PATCH /api/v1/issues/{issueId}/position
 ```
 
-Request：
+Request（实际实现为 `statusId` + `beforeId`/`afterId`，`sortKey` 由服务端用 `SortKeyUtils.between` 算出，前端不传）：
 
 ```json
 {
   "statusId": "xxx",
-  "sortKey": "M"
+  "beforeId": "xxx",
+  "afterId": "xxx"
 }
 ```
 
@@ -831,8 +834,8 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "id": "xxx",
     "key": "YSP-102",
@@ -851,27 +854,28 @@ Response：
 ## 获取 Board
 
 ```http
-GET /api/v1/projects/{projectId}/board
+GET /api/v1/projects/{projectId}/board?category=BUG
 ```
 
-Response：
+`category` 取 `TASK / REQUIREMENT / BUG`，缺省 `BUG`（兼容旧的单工作流调用）；分组看板 `GET /projects/{id}/board/grouped?groupBy=STATUS&category=` 同理。列不返回冗余 `name`，列名由 `statusId → issue_status.name` 得到。
+
+Response（`category=BUG` 时为缺陷 6 列；`TASK` 4 列、`REQUIREMENT` 6 列）：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "id": "xxx",
-    "name": "研发看板",
+    "name": "缺陷看板",
     "type": "KANBAN",
     "columns": [
       {
         "id": "column-1",
-        "name": "待处理",
         "status": {
           "id": "status-1",
-          "code": "TODO",
-          "name": "待处理",
+          "code": "TO_CONFIRM",
+          "name": "待确认",
           "category": "TODO"
         },
         "sortOrder": 1,
@@ -880,11 +884,10 @@ Response：
       },
       {
         "id": "column-2",
-        "name": "开发中",
         "status": {
           "id": "status-2",
           "code": "IN_PROGRESS",
-          "name": "开发中",
+          "name": "处理中",
           "category": "IN_PROGRESS"
         },
         "sortOrder": 2,
@@ -944,8 +947,8 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "columns": [
       {
@@ -995,39 +998,95 @@ Issue.sortKey
 # 20. Status API
 
 ```http
-GET /api/v1/projects/{projectId}/statuses
+GET /api/v1/projects/{projectId}/statuses?category=BUG
 ```
 
-Response：
+`category` 取 `TASK / REQUIREMENT / BUG`，缺省 `BUG`（兼容旧的单工作流调用）。返回该类别工作流的节点，是看板列、详情状态下拉、新建默认状态的唯一来源。
+
+Response（`category=TASK`）：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": [
     {
       "id": "xxx",
-      "code": "TODO",
-      "name": "待处理",
+      "code": "TASK_TODO",
+      "name": "待办",
       "category": "TODO",
       "color": "#999999",
-      "sortOrder": 1
+      "sortOrder": 10
     },
     {
       "id": "xxx",
-      "code": "IN_PROGRESS",
-      "name": "开发中",
+      "code": "TASK_IN_PROGRESS",
+      "name": "进行中",
       "category": "IN_PROGRESS",
       "color": "#1677ff",
-      "sortOrder": 2
+      "sortOrder": 11
     }
   ]
 }
 ```
 
+三个类别的完整节点（`issue_status` 共 16 条，`workflow_status` 16 条）：
+
+| category | 节点数 | code |
+|---|---|---|
+| TASK | 4 | `TASK_TODO` 待办 / `TASK_IN_PROGRESS` 进行中 / `TASK_DONE` 已完成 / `TASK_CANCELLED` 已取消 |
+| REQUIREMENT | 6 | `REQ_TODO` 待处理 / `REQ_DESIGNING` 设计中 / `REQ_DEVELOPING` 开发中 / `REQ_TESTING` 测试中 / `REQ_DONE` 已完成 / `REQ_CANCELLED` 已取消 |
+| BUG | 6 | `TO_CONFIRM` 待确认 / `REOPENED` 再次打开 / `IN_PROGRESS` 处理中 / `FIXED` 已修复 / `WONT_FIX` 暂不修复 / `CLOSED` 已关闭 |
+
 ---
 
-# 21. Workflow API
+# 20.1 Transition API（流转规则）
+
+```http
+GET /api/v1/projects/{projectId}/transitions?category=BUG
+```
+
+`category` 同上，缺省 `BUG`。返回该类别的流转白名单，前端用于看板拖拽的实时校验（非法列立即回弹）与详情状态下拉过滤。
+
+```json
+{
+  "code": 200,
+  "msg": "操作成功",
+  "data": [
+    {
+      "fromStatusId": "xxx",
+      "toStatusId": "xxx",
+      "name": "提交修复"
+    }
+  ]
+}
+```
+
+边数：任务 6 / 需求 21 / 缺陷 10（`workflow_transition` 共 37 条）。
+
+需求流（V34/V35 起）的连通规则——返工不用绕回「待处理」：
+
+| from \ to | 待处理 | 设计中 | 开发中 | 测试中 | 已完成 | 已取消 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 待处理 | — | ✓ | ✓ | ✓ | ✗ | ✓ |
+| 设计中 | ✓ | — | ✓ | ✓ | ✗ | ✓ |
+| 开发中 | ✓ | ✓ | — | ✓ | ✗ | ✓ |
+| 测试中 | ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| 已完成 | ✗ | ✓ | ✓ | ✓ | — | ✗ |
+| 已取消 | ✓ | ✗ | ✗ | ✗ | ✗ | — |
+
+`—` 为同状态（服务端幂等放行），`✗` 返回 `400 不允许从「A」流转到「B」`。
+
+- 四个活跃阶段（待处理 / 设计中 / 开发中 / 测试中）两两互转；
+- 进入「已完成」只有「测试中 → 已完成（测试通过）」一条入边（待处理 / 设计中 / 开发中 直接改「已完成」返回 400）；
+- 「已完成」可打回设计中 / 开发中 / 测试中（V35：重新设计 / 重新开发 / 重新测试），但**不能回「待处理」、不能改成「已取消」**；
+- 任一活跃阶段可 → 已取消；「已取消」只能回到「待处理」（重新打开）。
+
+---
+
+# 21. Workflow API（未落地）
+
+> 现状：未实现 `GET /projects/{id}/workflow`。工作流定义按类别存在 `workflow`（`applies_to` = TASK / REQUIREMENT / BUG，各一条 `is_default` 模板），前端只用 `statuses?category=` 取节点、`transitions?category=` 取边，不需要整条 workflow 对象。
 
 ## 获取 Workflow
 
@@ -1035,25 +1094,26 @@ Response：
 GET /api/v1/projects/{projectId}/workflow
 ```
 
-Response：
+Response（若实现，结构应为）：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "id": "xxx",
-    "name": "默认工作流",
+    "name": "缺陷工作流",
+    "appliesTo": "BUG",
     "statuses": [
       {
         "id": "xxx",
-        "code": "TODO",
-        "name": "待处理"
+        "code": "TO_CONFIRM",
+        "name": "待确认"
       },
       {
         "id": "xxx",
         "code": "IN_PROGRESS",
-        "name": "开发中"
+        "name": "处理中"
       }
     ],
     "transitions": [
@@ -1175,8 +1235,8 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "id": "xxx",
     "relationType": "BLOCKS",
@@ -1204,8 +1264,8 @@ Content-Type: multipart/form-data
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "id": "xxx",
     "fileName": "design.pdf",
@@ -1235,27 +1295,33 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": [
     {
       "id": "xxx",
-      "action": "STATUS_CHANGED",
-      "actor": {
-        "id": "xxx",
-        "displayName": "张三"
-      },
-      "oldValue": {
-        "status": "TODO"
-      },
-      "newValue": {
-        "status": "IN_PROGRESS"
-      },
+      "type": "STATUS_CHANGED",
+      "actorId": "xxx",
+      "actorName": "张三",
+      "parentId": null,
+      "content": null,
+      "oldValue": "待处理",
+      "newValue": "开发中",
       "createdAt": "2026-08-17T08:30:00+08:00"
     }
   ]
 }
 ```
+
+说明：
+
+- `type`：`COMMENT`（评论，正文在 `content`，走 `commentTree` 楼层渲染）/ `STATUS_CHANGED`（状态变更）/ `CREATED`（创建）。
+- `oldValue` / `newValue`：库里 `issue_activity.old_value / new_value` 存的是 `{"status": "REQ_TODO"}` 这类机器值，**接口层已翻成中文状态名**（`待处理`、`开发中`…），前端直接拼「将 状态 从 待处理 置为 开发中」即可，不要再自己维护 code 字典。
+- 历史遗留 code（V33 改名前后的 `REQ_TO_REVIEW` / `REQ_SCHEDULED` / 已移除的 `REQ_REJECTED`）由后端兜底翻成「待处理 / 设计中 / 已拒绝」，V36 已就地改写存量数据。
+- 项目级动态 `GET /projects/{projectId}/activities` 的 `oldValue` / `newValue` 同样返回中文名。
+- 排序：`GET /issues/{id}/activities` 仍按 `createdAt` **升序**返回（楼层组装依赖父评论先于子回复），**倒序展示由前端负责**——`utils/commentTree.ts` 把顶层（楼层根 + 状态动态）按时间倒序，楼层内子回复保持升序。
+- 头像字段：`actorAvatarUrl`（工作项动态/评论、项目动态）、`assigneeAvatarUrl` / `reporterAvatarUrl` / `verifierAvatarUrl`（工作项）、`avatarUrl`（`/users/login` 与 `/users/me`）统一返回 `/api/uploads/xxx` 形式；为空表示未上传，前端 `components/common/UserAvatar.vue` 回退首字彩色圆，图片加载失败同样回退。
+- 度量接口 `GET /projects/{projectId}/dashboard` 的 `assigneeDist[]` 每项为 `{ name, count, avatarUrl }`：`name` 取 `display_name`（兜底 `username`，再兜底「未分配」，与全站显示名口径一致），`avatarUrl` 为空（含「未分配」行）时前端回退首字/图标。前端另会过滤非图片形式的脏值（历史上曾把学号写进 `avatar_url`），不发起无意义请求。
 
 ---
 
@@ -1271,8 +1337,8 @@ Response：
 
 ```json
 {
-  "code": 0,
-  "msg": "success",
+  "code": 200,
+  "msg": "操作成功",
   "data": {
     "summary": {
       "total": 128,
@@ -1529,10 +1595,11 @@ Board
 └── GET    /projects/{id}/board/issues
 
 Workflow
-└── GET    /projects/{id}/workflow
+├── GET    /projects/{id}/transitions              ?category=TASK|REQUIREMENT|BUG
+└── GET    /projects/{id}/workflow                 （未实现）
 
 Status
-└── GET    /projects/{id}/statuses
+└── GET    /projects/{id}/statuses                 ?category=TASK|REQUIREMENT|BUG
 
 Sprint
 ├── GET    /projects/{id}/sprints

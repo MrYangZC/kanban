@@ -1,73 +1,68 @@
 <template>
-  <div class="iterations">
-    <div class="header">
-      <h2>迭代管理</h2>
-      <el-button type="primary" @click="openCreate" :disabled="!canManage">新建迭代</el-button>
-    </div>
+  <SimpleListView
+    title="迭代"
+    :icon="Repeat"
+    search-placeholder="搜索迭代"
+    create-label="新建迭代"
+    :loading="loading"
+    :total="sprints.length"
+    empty-text="暂无迭代"
+    :can-create="canManage"
+    v-model:keyword="keyword"
+    @search="load"
+    @refresh="load"
+    @create="openCreate"
+  >
+    <DataTable :columns="columns">
+      <tr v-for="row in filteredSprints" :key="row.id" class="data-tr">
+        <td class="data-td data-td-first font-medium text-ink">{{ row.name }}</td>
+        <td class="data-td max-w-[240px] truncate cell-text" :title="row.goal || ''">{{ row.goal || '—' }}</td>
+        <td class="data-td">
+          <StatusPill
+            :label="SPRINT_STATUS[row.status]?.label || row.status"
+            :color="SPRINT_STATUS[row.status]?.color || 'var(--ink-secondary)'"
+          />
+        </td>
+        <td class="data-td cell-text">{{ row.startDate || '—' }} ~ {{ row.endDate || '—' }}</td>
+        <td class="data-td cell-text">{{ row.creatorName || '—' }}</td>
+        <td class="data-td">
+          <RowActions :actions="rowActions(row)" />
+        </td>
+      </tr>
+      <EmptyRow v-if="!loading && !filteredSprints.length" :colspan="columns.length" text="暂无迭代" />
+    </DataTable>
 
-    <el-table :data="sprints" v-loading="loading" border stripe style="width: 100%">
-      <el-table-column prop="name" label="名称" min-width="160" />
-      <el-table-column prop="goal" label="目标" min-width="200" show-overflow-tooltip />
-      <el-table-column label="状态" width="120">
-        <template #default="{ row }">
-          <el-tag :type="statusType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+    <template #footer>
+      <el-dialog v-model="dialogVisible" :title="editing ? '编辑迭代' : '新建迭代'" width="520px">
+        <el-form :model="form" label-width="80px">
+          <el-form-item label="名称" required>
+            <el-input v-model="form.name" placeholder="如 Sprint 1" />
+          </el-form-item>
+          <el-form-item label="目标">
+            <el-input v-model="form.goal" type="textarea" :rows="3" />
+          </el-form-item>
+          <el-form-item label="开始日期">
+            <el-date-picker v-model="form.startDate" type="date" value-format="YYYY-MM-DD" />
+          </el-form-item>
+          <el-form-item label="结束日期">
+            <el-date-picker v-model="form.endDate" type="date" value-format="YYYY-MM-DD" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submit">确定</el-button>
         </template>
-      </el-table-column>
-      <el-table-column label="起止日期" width="220">
-        <template #default="{ row }">
-          {{ row.startDate || '-' }} ~ {{ row.endDate || '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="creatorName" label="创建人" width="120" />
-      <el-table-column label="操作" width="260" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" @click="openEdit(row)">编辑</el-button>
-          <el-button
-            v-if="row.status === 'PLANNED'"
-            size="small"
-            type="success"
-            :disabled="!canManage"
-            @click="doStart(row)"
-          >开始</el-button>
-          <el-button
-            v-if="row.status === 'ACTIVE'"
-            size="small"
-            type="warning"
-            :disabled="!canManage"
-            @click="doComplete(row)"
-          >完成</el-button>
-          <el-button size="small" type="danger" :disabled="!canManage" @click="doDelete(row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑迭代' : '新建迭代'" width="520px">
-      <el-form :model="form" label-width="80px">
-        <el-form-item label="名称" required>
-          <el-input v-model="form.name" placeholder="如 Sprint 1" />
-        </el-form-item>
-        <el-form-item label="目标">
-          <el-input v-model="form.goal" type="textarea" :rows="3" />
-        </el-form-item>
-        <el-form-item label="开始日期">
-          <el-date-picker v-model="form.startDate" type="date" value-format="YYYY-MM-DD" />
-        </el-form-item>
-        <el-form-item label="结束日期">
-          <el-date-picker v-model="form.endDate" type="date" value-format="YYYY-MM-DD" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submit">确定</el-button>
-      </template>
-    </el-dialog>
-  </div>
+      </el-dialog>
+    </template>
+  </SimpleListView>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { errorMessage, isCancel } from '@/utils/error'
+import { Repeat } from 'lucide-vue-next'
 import {
   listSprints,
   createSprint,
@@ -77,36 +72,62 @@ import {
   completeSprint
 } from '@/api'
 import type { SprintVO } from '@/api/types'
+import SimpleListView from '@/components/SimpleListView.vue'
+import DataTable, { type TableColumn } from '@/components/common/DataTable.vue'
+import StatusPill from '@/components/common/StatusPill.vue'
+import RowActions, { type RowAction } from '@/components/common/RowActions.vue'
+import EmptyRow from '@/components/common/EmptyRow.vue'
 import { useProjectPermission } from '@/composables/useProjectPermission'
+import { SPRINT_STATUS } from '@/constants/issueDict'
 
 const route = useRoute()
-const projectId = route.params.projectId as string
+const projectId = computed(() => route.params.projectId as string)
 
 const sprints = ref<SprintVO[]>([])
 const loading = ref(false)
+const keyword = ref('')
 const dialogVisible = ref(false)
 const editing = ref<SprintVO | null>(null)
 const form = ref({ name: '', goal: '', startDate: '', endDate: '' })
 
-const { hasPermission, refresh } = useProjectPermission(() => projectId)
+const { hasPermission, refresh } = useProjectPermission(() => projectId.value)
 const canManage = computed(() => hasPermission('sprint:manage'))
+
+const columns: TableColumn[] = [
+  { key: 'name', label: '名称' },
+  { key: 'goal', label: '目标' },
+  { key: 'status', label: '状态' },
+  { key: 'range', label: '起止日期' },
+  { key: 'creator', label: '创建人' },
+  { key: 'actions', label: '操作', align: 'right' }
+]
+
+function rowActions(row: SprintVO): RowAction[] {
+  return [
+    { label: '编辑', onClick: () => openEdit(row) },
+    { label: '开始', tone: 'success', hidden: row.status !== 'PLANNED', disabled: !canManage.value, onClick: () => doStart(row) },
+    { label: '完成', tone: 'warning', hidden: row.status !== 'ACTIVE', disabled: !canManage.value, onClick: () => doComplete(row) },
+    { label: '删除', tone: 'danger', disabled: !canManage.value, onClick: () => doDelete(row) }
+  ]
+}
+
+const filteredSprints = computed(() => {
+  const kw = keyword.value.trim().toLowerCase()
+  if (!kw) return sprints.value
+  return sprints.value.filter((s) =>
+    s.name.toLowerCase().includes(kw) || (s.goal || '').toLowerCase().includes(kw)
+  )
+})
 
 async function load() {
   loading.value = true
   try {
-    sprints.value = await listSprints(projectId)
-  } catch (e: any) {
-    ElMessage.error(e?.msg || '加载迭代失败')
+    sprints.value = await listSprints(projectId.value)
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '加载迭代失败'))
   } finally {
     loading.value = false
   }
-}
-
-function statusType(s: string) {
-  return s === 'ACTIVE' ? 'success' : s === 'COMPLETED' ? 'info' : 'warning'
-}
-function statusLabel(s: string) {
-  return s === 'ACTIVE' ? '进行中' : s === 'COMPLETED' ? '已完成' : '规划中'
 }
 
 function openCreate() {
@@ -131,44 +152,44 @@ async function submit() {
   }
   try {
     if (editing.value) {
-      await updateSprint(projectId, editing.value.id, { ...form.value })
+      await updateSprint(projectId.value, editing.value.id, { ...form.value })
       ElMessage.success('已更新')
     } else {
-      await createSprint(projectId, { ...form.value })
+      await createSprint(projectId.value, { ...form.value })
       ElMessage.success('已创建')
     }
     dialogVisible.value = false
     await load()
-  } catch (e: any) {
-    ElMessage.error(e?.msg || '保存失败')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '保存失败'))
   }
 }
 async function doStart(row: SprintVO) {
   try {
-    await startSprint(projectId, row.id)
+    await startSprint(projectId.value, row.id)
     ElMessage.success('迭代已开始')
     await load()
-  } catch (e: any) {
-    ElMessage.error(e?.msg || '操作失败')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '操作失败'))
   }
 }
 async function doComplete(row: SprintVO) {
   try {
-    await completeSprint(projectId, row.id)
+    await completeSprint(projectId.value, row.id)
     ElMessage.success('迭代已完成')
     await load()
-  } catch (e: any) {
-    ElMessage.error(e?.msg || '操作失败')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '操作失败'))
   }
 }
 async function doDelete(row: SprintVO) {
   try {
     await ElMessageBox.confirm(`确认删除迭代「${row.name}」？`, '提示', { type: 'warning' })
-    await deleteSprint(projectId, row.id)
+    await deleteSprint(projectId.value, row.id)
     ElMessage.success('已删除')
     await load()
-  } catch (e: any) {
-    if (e !== 'cancel') ElMessage.error(e?.msg || '删除失败')
+  } catch (e: unknown) {
+    if (!isCancel(e)) ElMessage.error(errorMessage(e, '删除失败'))
   }
 }
 
@@ -177,8 +198,3 @@ onMounted(async () => {
   await load()
 })
 </script>
-
-<style scoped>
-.iterations { padding: 20px; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-</style>

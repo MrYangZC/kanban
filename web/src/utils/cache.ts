@@ -1,3 +1,9 @@
+/**
+ * 登录用户信息的 localStorage 键。
+ * 由 stores/user、api/request 共用，避免同一字符串在两处硬编码后失配。
+ */
+export const AUTH_USER_KEY = 'kanban_user'
+
 interface Entry<T> {
   data?: T
   promise?: Promise<T>
@@ -36,38 +42,41 @@ export function invalidate(key: string): void {
   mem.delete(key)
 }
 
-// ---- 当前登录用户权限码持久化（localStorage） ----
+// ---- 当前登录用户权限码持久化（sessionStorage） ----
+// 使用 sessionStorage 而非 localStorage：权限码属于"当前会话"的派生数据，
+// 长期驻留会让角色被回收后前端仍按旧权限渲染按钮（后端虽会拦截，但交互表现为点击报错）。
+// session 级存储让关闭标签页即失效，把陈旧窗口收敛到单次会话内。
 
 const MY_PERMS_PREFIX = 'kanban:myPermissions:'
 
 const myPermKey = (projectId: string) => `${MY_PERMS_PREFIX}${projectId}`
 
 export function readMyPermissions(projectId: string): string[] | null {
-  const raw = localStorage.getItem(myPermKey(projectId))
+  const raw = sessionStorage.getItem(myPermKey(projectId))
   if (!raw) return null
   try {
     return JSON.parse(raw) as string[]
   } catch {
-    localStorage.removeItem(myPermKey(projectId))
+    sessionStorage.removeItem(myPermKey(projectId))
     return null
   }
 }
 
 export function writeMyPermissions(projectId: string, perms: string[]): void {
-  localStorage.setItem(myPermKey(projectId), JSON.stringify(perms))
+  sessionStorage.setItem(myPermKey(projectId), JSON.stringify(perms))
 }
 
 export function clearMyPermissions(projectId?: string): void {
   if (projectId) {
-    localStorage.removeItem(myPermKey(projectId))
+    sessionStorage.removeItem(myPermKey(projectId))
     return
   }
   const keys: string[] = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i)
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const k = sessionStorage.key(i)
     if (k && k.startsWith(MY_PERMS_PREFIX)) keys.push(k)
   }
-  keys.forEach((k) => localStorage.removeItem(k))
+  keys.forEach((k) => sessionStorage.removeItem(k))
 }
 
 /** 登出 / 登录态失效时清空全部缓存（内存缓存 + 权限持久化） */

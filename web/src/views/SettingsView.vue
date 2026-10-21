@@ -1,21 +1,33 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { updateProject, listProjectMembers } from '@/api'
+import {
+  updateProject,
+  listProjectMembers,
+  addProjectMember,
+  removeProjectMember,
+  updateProjectMemberRoles,
+  listUsers
+} from '@/api'
 import { useProjectStore } from '@/stores/project'
-import type { ProjectMember } from '@/api/types'
-import { Settings, Users, Plus } from 'lucide-vue-next'
-import { ElMessage } from 'element-plus'
-import ProjectMemberDialog from '@/components/ProjectMemberDialog.vue'
+import { useUserStore } from '@/stores/user'
+import type { ProjectMember, UserVO } from '@/api/types'
+import { Settings, Users, UserPlus, Trash2, Crown, Pencil } from 'lucide-vue-next'
+import UserAvatar from '@/components/common/UserAvatar.vue'
+import UserSelect from '@/components/common/UserSelect.vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { errorMessage } from '@/utils/error'
 
 const route = useRoute()
-const projectId = route.params.projectId as string
+const projectId = computed(() => route.params.projectId as string)
 const projectStore = useProjectStore()
+const userStore = useUserStore()
 
 const form = ref({ name: '', description: '', status: 'ACTIVE' })
 const saving = ref(false)
-const memberDialogVisible = ref(false)
 const members = ref<ProjectMember[]>([])
+const allUsers = ref<UserVO[]>([])
+const loadingMembers = ref(false)
 
 const STATUS_OPTIONS = [
   { value: 'ACTIVE', label: '进行中' },
@@ -23,11 +35,138 @@ const STATUS_OPTIONS = [
   { value: 'CLOSED', label: '已关闭' }
 ]
 
+// RBAC 全局角色字典（与后端 role 表种子数据一致）
+const ROLE_OPTIONS = [
+  { value: 'OWNER', label: '所有者' },
+  { value: 'ADMIN', label: '管理员' },
+  { value: 'PM', label: '项目经理' },
+  { value: 'DEV', label: '开发' },
+  { value: 'QA', label: '测试' },
+  { value: 'MEMBER', label: '参与人' },
+  { value: 'VIEWER', label: '只读' }
+]
+
+function roleLabel(role: string): string {
+  return ROLE_OPTIONS.find((o) => o.value === role)?.label ?? role
+}
+
+/** 当前用户在该项目是否具备成员管理权限（OWNER/ADMIN/PM） */
+const canManage = computed(() => {
+  const me = userStore.user?.id
+  const rs = members.value.find((m) => m.userId === me)?.roles ?? []
+  return rs.includes('OWNER') || rs.includes('ADMIN') || rs.includes('PM')
+})
+
+/** 尚未加入项目的用户，供「添加成员」下拉选择 */
+const candidateUsers = computed(() => allUsers.value.filter((u) => !members.value.some((m) => m.userId === u.id)))
+
 async function loadMembers() {
   try {
-    members.value = await listProjectMembers(projectId)
+    members.value = await listProjectMembers(projectId.value)
   } catch {
+    // 成员列表加载失败降级为空（接口层已提示错误），不阻断设置页其余功能
     members.value = []
+    return
+  }
+  /*
+   * 全量用户列表只服务于「添加成员」下拉，且仅系统管理员可读（GET /users 由 AdminAuthInterceptor 拦截）。
+   * 这里必须单独 try，并且只在确实读得到时才请求：
+   * 之前与成员列表串在同一个 try 里，项目级 ADMIN/PM（非系统管理员）打开设置页时
+   * /users 必然 403，catch 把已经成功加载的成员列表一起清空，页面显示「共 0 人 / 暂无成员」。
+   */
+  if (canManage.value && userStore.isAdmin) {
+    try {
+      allUsers.value = await listUsers()
+    } catch {
+      allUsers.value = []
+    }
+  }
+}
+
+async function reloadMembers() {
+  loadingMembers.value = true
+  try {
+    await loadMembers()
+  } finally {
+    loadingMembers.value = false
+  }
+}
+
+// ---- 添加成员（页内） ----
+const selectedUser = ref('')
+const selectedRoles = ref<string[]>(['MEMBER'])
+const adding = ref(false)
+
+async function onAddMember() {
+  if (!selectedUser.value) {
+    ElMessage.warning('请选择要添加的用户')
+    return
+  }
+  if (!selectedRoles.value.length) {
+    ElMessage.warning('请至少选择一个角色')
+    return
+  }
+  adding.value = true
+  try {
+    await addProjectMember(projectId.value, selectedUser.value, selectedRoles.value)
+    ElMessage.success('已添加成员')
+    selectedUser.value = ''
+    selectedRoles.value = ['MEMBER']
+    await loadMembers()
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '添加成员失败'))
+  } finally {
+    adding.value = false
+  }
+}
+
+// ---- 移除成员（页内） ----
+async function onRemoveMember(m: ProjectMember) {
+  try {
+    await ElMessageBox.confirm(`移除成员「${m.displayName}」？`, '确认', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await removeProjectMember(projectId.value, m.userId)
+    ElMessage.success('已移除')
+    if (editingUser.value === m.userId) editingUser.value = ''
+    await loadMembers()
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '移除成员失败'))
+  }
+}
+
+// ---- 行内编辑角色 ----
+const editingUser = ref('')
+const editingRoles = ref<string[]>([])
+const savingRoles = ref('')
+
+function startEditRoles(m: ProjectMember) {
+  editingUser.value = m.userId
+  editingRoles.value = [...m.roles]
+}
+
+function cancelEditRoles() {
+  editingUser.value = ''
+  editingRoles.value = []
+}
+
+async function saveRoles(m: ProjectMember) {
+  if (!editingRoles.value.length) {
+    ElMessage.warning('请至少保留一个角色')
+    return
+  }
+  savingRoles.value = m.userId
+  try {
+    await updateProjectMemberRoles(projectId.value, m.userId, editingRoles.value)
+    ElMessage.success('角色已更新')
+    cancelEditRoles()
+    await loadMembers()
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '角色更新失败'))
+  } finally {
+    savingRoles.value = ''
   }
 }
 
@@ -38,22 +177,23 @@ async function onSave() {
   }
   saving.value = true
   try {
-    await updateProject(projectId, {
+    await updateProject(projectId.value, {
       name: form.value.name.trim(),
       description: form.value.description,
       status: form.value.status
     })
     ElMessage.success('设置已保存')
-    await projectStore.loadCurrent(projectId)
-  } catch (e: any) {
-    ElMessage.error(e?.message || '保存失败')
+    // 强制刷新：否则名称/描述沿用 store 缓存，顶部标题不会更新
+    await projectStore.loadCurrent(projectId.value, true)
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '保存失败'))
   } finally {
     saving.value = false
   }
 }
 
 onMounted(async () => {
-  await projectStore.loadCurrent(projectId)
+  await projectStore.loadCurrent(projectId.value)
   if (projectStore.current) {
     form.value = {
       name: projectStore.current.name,
@@ -61,7 +201,7 @@ onMounted(async () => {
       status: projectStore.current.status
     }
   }
-  await loadMembers()
+  await reloadMembers()
 })
 </script>
 
@@ -74,26 +214,26 @@ onMounted(async () => {
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <!-- 基本设置 -->
-      <div class="rounded-lg border border-[#E9ECEF] bg-white p-5 shadow-sm">
+      <div class="glass-panel rounded-lg p-5">
         <div class="mb-4 text-sm font-medium text-ink-900">基本信息</div>
         <div class="space-y-4">
           <div>
             <label class="mb-1 block text-sm text-ink-400">项目名称</label>
-            <input v-model="form.name" class="w-full rounded-md border border-[#E5E6EB] px-3 py-2 text-sm outline-none focus:border-brand" placeholder="项目名称" />
+            <input v-model="form.name" class="w-full rounded-md border border-line-light px-3 py-2 text-sm outline-none focus:border-brand" placeholder="项目名称" />
           </div>
           <div>
             <label class="mb-1 block text-sm text-ink-400">项目描述</label>
-            <textarea v-model="form.description" rows="3" class="w-full resize-none rounded-md border border-[#E5E6EB] px-3 py-2 text-sm outline-none focus:border-brand" placeholder="项目描述"></textarea>
+            <textarea v-model="form.description" rows="3" class="w-full resize-none rounded-md border border-line-light px-3 py-2 text-sm outline-none focus:border-brand" placeholder="项目描述"></textarea>
           </div>
           <div>
             <label class="mb-1 block text-sm text-ink-400">项目状态</label>
-            <select v-model="form.status" class="w-full rounded-md border border-[#E5E6EB] px-3 py-2 text-sm outline-none focus:border-brand">
+            <select v-model="form.status" aria-label="项目状态" class="w-full rounded-md border border-line-light px-3 py-2 text-sm outline-none focus:border-brand">
               <option v-for="s in STATUS_OPTIONS" :key="s.value" :value="s.value">{{ s.label }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-sm text-ink-400">项目 Key</label>
-            <input :value="projectStore.current?.projectKey || ''" disabled class="w-full cursor-not-allowed rounded-md border border-[#E5E6EB] bg-surface-muted px-3 py-2 text-sm text-ink-400" />
+            <input :value="projectStore.current?.projectKey || ''" disabled class="w-full cursor-not-allowed rounded-md border border-line-light bg-surface-muted px-3 py-2 text-sm text-ink-400" />
           </div>
           <div class="flex justify-end">
             <button class="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-dark disabled:opacity-50" :disabled="saving" @click="onSave">
@@ -103,34 +243,116 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- 成员管理 -->
-      <div class="rounded-lg border border-[#E9ECEF] bg-white p-5 shadow-sm">
+      <!-- 成员管理（页内直接调整，不再弹窗） -->
+      <div class="glass-panel rounded-lg p-5 lg:col-span-2">
         <div class="mb-4 flex items-center justify-between">
           <div class="flex items-center gap-2 text-sm font-medium text-ink-900">
             <Users :size="16" /> 成员管理
+            <span class="text-xs font-normal text-ink-400">共 {{ members.length }} 人</span>
           </div>
-          <button class="flex items-center gap-1 text-xs text-brand transition hover:opacity-80" @click="memberDialogVisible = true">
-            <Plus :size="12" /> 管理成员
-          </button>
+          <span v-if="!canManage" class="text-xs text-ink-400">仅所有者/管理员/项目经理可调整成员</span>
         </div>
-        <div class="space-y-2">
-          <div v-for="m in members" :key="m.userId" class="flex items-center gap-3 rounded-md border border-[#E9ECEF] px-3 py-2">
-            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-sm font-medium text-white">
-              {{ m.displayName?.charAt(0) || 'U' }}
+
+        <div v-loading="loadingMembers" class="space-y-2">
+          <div v-for="m in members" :key="m.userId" class="rounded-md border border-line-light">
+            <div class="flex items-center gap-3 px-3 py-2">
+              <UserAvatar :name="m.displayName" :src="m.avatarUrl" :size="32" />
+              <div class="min-w-0 flex-1">
+                <div class="truncate text-sm text-ink-900">{{ m.displayName }}</div>
+                <div class="truncate text-xs text-ink-400">@{{ m.username }}</div>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <span
+                  v-for="r in m.roles"
+                  :key="r"
+                  class="inline-flex items-center rounded px-2 py-0.5 text-xs"
+                  :class="r === 'OWNER' ? 'bg-warning-bg text-warning' : 'bg-surface-muted text-ink-600'"
+                >
+                  <Crown v-if="r === 'OWNER'" :size="11" class="mr-0.5" />{{ roleLabel(r) }}
+                </span>
+              </div>
+              <template v-if="canManage">
+                <button
+                  class="flex items-center gap-1 text-xs text-brand transition hover:opacity-80"
+                  @click="editingUser === m.userId ? cancelEditRoles() : startEditRoles(m)"
+                >
+                  <Pencil :size="12" /> {{ editingUser === m.userId ? '收起' : '编辑角色' }}
+                </button>
+                <button
+                  class="text-ink-400 transition hover:text-danger"
+                  title="移除成员"
+                  @click="onRemoveMember(m)"
+                >
+                  <Trash2 :size="14" />
+                </button>
+              </template>
             </div>
-            <div class="flex-1">
-              <div class="text-sm text-ink-900">{{ m.displayName }}</div>
-              <div class="text-xs text-ink-400">{{ m.username }}</div>
-            </div>
-            <div class="flex gap-1">
-              <span v-for="r in m.roles" :key="r" class="rounded bg-surface-muted px-2 py-0.5 text-xs text-ink-600">{{ r }}</span>
+
+            <!-- 行内角色编辑 -->
+            <div v-if="canManage && editingUser === m.userId" class="border-t border-line-lighter px-3 py-3">
+              <div class="mb-2 text-xs text-ink-400">调整「{{ m.displayName }}」在当前项目中的角色（可多选）</div>
+              <div class="flex flex-wrap gap-1.5">
+                <label
+                  v-for="o in ROLE_OPTIONS"
+                  :key="o.value"
+                  class="cursor-pointer rounded-full border px-2.5 py-1 text-xs transition"
+                  :class="editingRoles.includes(o.value) ? 'border-brand bg-brand-light text-brand' : 'border-line-light text-ink-400 hover:border-brand'"
+                >
+                  <input v-model="editingRoles" type="checkbox" class="sr-only" :value="o.value" />
+                  {{ o.label }}
+                </label>
+              </div>
+              <div class="mt-3 flex justify-end gap-2">
+                <button class="rounded-md border border-line-light px-3 py-1.5 text-xs text-ink-600 transition hover:bg-surface-muted" @click="cancelEditRoles">取消</button>
+                <button
+                  class="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white transition hover:bg-brand-dark disabled:opacity-50"
+                  :disabled="savingRoles === m.userId || !editingRoles.length"
+                  @click="saveRoles(m)"
+                >
+                  {{ savingRoles === m.userId ? '保存中…' : '保存角色' }}
+                </button>
+              </div>
             </div>
           </div>
-          <div v-if="!members.length" class="py-6 text-center text-sm text-ink-400">暂无成员</div>
+
+          <div v-if="!members.length && !loadingMembers" class="py-6 text-center text-sm text-ink-400">暂无成员</div>
+        </div>
+
+        <!-- 添加成员（页内） -->
+        <div v-if="canManage" class="mt-4 border-t border-line-lighter pt-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <UserSelect
+              :model-value="selectedUser"
+              :users="candidateUsers"
+              placeholder="选择用户"
+              show-username
+              size="default"
+              width-class="w-64"
+              :disabled="!candidateUsers.length"
+              @update:model-value="(v) => (selectedUser = (v as string) || '')"
+            />
+            <div class="flex flex-wrap gap-1.5">
+              <label
+                v-for="o in ROLE_OPTIONS"
+                :key="o.value"
+                class="cursor-pointer rounded-full border px-2.5 py-1 text-xs transition"
+                :class="selectedRoles.includes(o.value) ? 'border-brand bg-brand-light text-brand' : 'border-line-light text-ink-400 hover:border-brand'"
+              >
+                <input v-model="selectedRoles" type="checkbox" class="hidden" :value="o.value" />
+                {{ o.label }}
+              </label>
+            </div>
+            <button
+              class="flex items-center gap-1 rounded-md bg-brand px-3 py-2 text-sm font-medium text-white transition hover:bg-brand-dark disabled:opacity-50"
+              :disabled="adding || !candidateUsers.length"
+              @click="onAddMember"
+            >
+              <UserPlus :size="14" /> {{ adding ? '添加中…' : '添加成员' }}
+            </button>
+          </div>
+          <div v-if="!candidateUsers.length" class="mt-2 text-xs text-ink-400">所有用户均已加入该项目</div>
         </div>
       </div>
     </div>
-
-    <ProjectMemberDialog v-model:visible="memberDialogVisible" :project-id="projectId" />
   </div>
 </template>

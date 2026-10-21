@@ -17,10 +17,18 @@ const ADMIN_ROLES = ['OWNER', 'ADMIN']
 
 export function useProjectPermission(projectId: () => string): ProjectPermission {
   const userStore = useUserStore()
-  const canWrite = ref(true)
+  // 默认不可写：权限未加载完成或加载失败时不应放行
+  const canWrite = ref(false)
   const canAdmin = ref(false)
   const members = ref<ProjectMember[]>([])
   const permissions = ref<Set<string>>(new Set())
+
+  /**
+   * 系统管理员未必是项目成员，但其权限由后端直接放行，
+   * 前端需同步放行，否则会出现"能操作但按钮被隐藏"的错配。
+   * 判定口径与后端 PermissionService#isSuperAdmin 对齐（登录接口下发的 isAdmin）。
+   */
+  const isSystemAdmin = computed(() => userStore.isAdmin)
 
   async function refresh() {
     try {
@@ -31,11 +39,14 @@ export function useProjectPermission(projectId: () => string): ProjectPermission
       ])
       members.value = memberList
       const me = memberList.find((m) => m.userId === userStore.user?.id)
-      canWrite.value = !me || WRITE_ROLES.some((r) => me.roles.includes(r))
-      canAdmin.value = !!me && ADMIN_ROLES.some((r) => me.roles.includes(r))
+      const roles = me?.roles ?? []
+      // 失败关闭：非项目成员且非系统管理员时不具备写权限（原实现 !me 会误放行）
+      canWrite.value = isSystemAdmin.value || WRITE_ROLES.some((r) => roles.includes(r))
+      canAdmin.value = isSystemAdmin.value || ADMIN_ROLES.some((r) => roles.includes(r))
       permissions.value = new Set(perms)
     } catch {
-      canWrite.value = true
+      // 接口异常/无访问权限时关闭写权限，避免默认放行
+      canWrite.value = false
       canAdmin.value = false
       permissions.value = new Set()
     }

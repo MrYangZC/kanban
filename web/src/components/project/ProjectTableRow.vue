@@ -4,6 +4,8 @@ import { useProjectCategoryStore } from '@/stores/projectCategory'
 import { Star, Pencil, Users, FileText, FolderKanban, ArrowRight } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import { computed } from 'vue'
+import { errorMessage } from '@/utils/error'
+import { projectStatusBadge } from '@/constants/issueDict'
 
 const props = defineProps<{
   project: Project
@@ -17,14 +19,7 @@ const emit = defineEmits<{
 
 const store = useProjectCategoryStore()
 
-const statusConfig = computed(() => {
-  const s = (props.project.status || '').toUpperCase()
-  if (s === 'ARCHIVED') return { label: '已归档', cls: 'bg-surface-light text-ink-secondary', dot: 'bg-ink-secondary' }
-  if (s === 'COMPLETED' || s === 'DONE') return { label: '已完成', cls: 'bg-success-light text-success', dot: 'bg-success' }
-  if (s === 'IN_PROGRESS' || s === 'ACTIVE' || s === 'ONGOING') return { label: '进行中', cls: 'bg-primary-50 text-primary-600', dot: 'bg-primary-500' }
-  if (s === 'NOT_STARTED' || s === 'PENDING' || s === 'TODO') return { label: '未开始', cls: 'bg-warning-light text-warning', dot: 'bg-warning' }
-  return { label: '进行中', cls: 'bg-primary-50 text-primary-600', dot: 'bg-primary-500' }
-})
+const statusConfig = computed(() => projectStatusBadge(props.project.status))
 
 const formattedDate = computed(() => {
   if (!props.project.createdAt) return '—'
@@ -36,8 +31,8 @@ async function onFavorite(p: Project) {
   try {
     await store.toggleFavorite(p.id)
     ElMessage.success(wasFavorited ? '已取消收藏' : '已收藏')
-  } catch (e: any) {
-    ElMessage.error(e?.message || '操作失败')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '操作失败'))
   }
 }
 </script>

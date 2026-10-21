@@ -1,13 +1,14 @@
 import http, { req, type R } from './request'
 import { cached, invalidate, readMyPermissions, writeMyPermissions, clearMyPermissions } from '@/utils/cache'
-import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest, SprintVO, RiskVO, RbacRole, RbacMenu, PermissionDef } from './types'
+import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest, SprintVO, RiskVO, RbacRole, RbacMenu, PermissionDef, WorkItemCategory } from './types'
 
 // 内存缓存 key（项目类数据按 projectId 隔离，会话内仅请求一次）
+// 状态字典按类别分开缓存：任务/需求/缺陷是三套节点，混用一个 key 会串数据
 const C = {
   users: 'users',
   project: (id: string) => `project:${id}`,
   members: (id: string) => `members:${id}`,
-  statuses: (id: string) => `statuses:${id}`,
+  statuses: (id: string, category: WorkItemCategory) => `statuses:${id}:${category}`,
   tags: (id: string) => `tags:${id}`
 }
 
@@ -15,8 +16,13 @@ const C = {
 export function login(username: string, password: string) {
   return req<LoginVO>(http.post('/v1/users/login', { username, password }))
 }
+/** 人员下拉用的全量简表（仅管理员可读，不参与分页） */
 export function listUsers() {
-  return cached<UserVO[]>(C.users, () => req<UserVO[]>(http.get('/v1/users')))
+  return cached<UserVO[]>(C.users, () => req<UserVO[]>(http.get('/v1/users/options')))
+}
+/** 用户管理列表：分页 + 关键字检索 */
+export function listUsersPage(params?: { page?: number; size?: number; keyword?: string }) {
+  return req<PageResult<UserVO>>(http.get('/v1/users', { params }))
 }
 export function createUser(payload: {
   username: string
@@ -60,6 +66,14 @@ export function changeMyPassword(payload: ChangePasswordRequest) {
   return req<void>(http.put('/v1/users/me/password', payload))
 }
 
+/**
+ * 登出：销毁服务端 HttpSession。
+ * 仅清本地凭证会导致服务端会话仍然有效（会话复用风险）。
+ */
+export function logout() {
+  return req<void>(http.post('/v1/users/logout'))
+}
+
 // ---- project ----
 export function listProjects(category?: ProjectCategoryKey) {
   return req<Project[]>(http.get('/v1/projects', { params: { category } }))
@@ -89,19 +103,41 @@ export function updateProject(id: string, payload: {
   })
 }
 export function favoriteProject(id: string) {
-  return req<void>(http.post(`/v1/projects/${id}/favorite`))
+  return req<void>(http.post(`/v1/projects/${id}/favorite`)).then((r) => {
+    // getProject 走了内存缓存，收藏后 favorited 字段会陈旧
+    invalidate(C.project(id))
+    return r
+  })
 }
 export function unfavoriteProject(id: string) {
-  return req<void>(http.delete(`/v1/projects/${id}/favorite`))
+  return req<void>(http.delete(`/v1/projects/${id}/favorite`)).then((r) => {
+    invalidate(C.project(id))
+    return r
+  })
 }
 export function archiveProject(id: string) {
-  return req<void>(http.put(`/v1/projects/${id}/archive`))
+  return req<void>(http.put(`/v1/projects/${id}/archive`)).then((r) => {
+    // 归档改变 status，缓存不失效会导致详情页继续显示"进行中"
+    invalidate(C.project(id))
+    return r
+  })
 }
 export function unarchiveProject(id: string) {
-  return req<void>(http.put(`/v1/projects/${id}/unarchive`))
+  return req<void>(http.put(`/v1/projects/${id}/unarchive`)).then((r) => {
+    invalidate(C.project(id))
+    return r
+  })
 }
 export function deleteProject(id: string) {
-  return req<void>(http.delete(`/v1/projects/${id}`))
+  return req<void>(http.delete(`/v1/projects/${id}`)).then((r) => {
+    // 项目已删除，连带清掉详情与成员缓存，避免残留数据被复用
+    invalidate(C.project(id))
+    invalidate(C.members(id))
+    ;(['TASK', 'REQUIREMENT', 'BUG'] as WorkItemCategory[]).forEach((cat) => invalidate(C.statuses(id, cat)))
+    invalidate(C.tags(id))
+    clearMyPermissions(id)
+    return r
+  })
 }
 
 // ---- project members ----
@@ -134,8 +170,8 @@ export function updateProjectMemberRoles(projectId: string, userId: string, role
 export function getBoard(projectId: string) {
   return req<BoardView>(http.get(`/v1/projects/${projectId}/board`))
 }
-export function getBoardGrouped(projectId: string, groupBy?: string) {
-  return req<BoardGroupView>(http.get(`/v1/projects/${projectId}/board/grouped`, { params: { groupBy } }))
+export function getBoardGrouped(projectId: string, groupBy?: string, category?: string) {
+  return req<BoardGroupView>(http.get(`/v1/projects/${projectId}/board/grouped`, { params: { groupBy, category } }))
 }
 export function getDashboard(projectId: string) {
   return req<DashboardVO>(http.get(`/v1/projects/${projectId}/dashboard`))
@@ -208,6 +244,8 @@ export function filterIssues(payload: {
   labelId?: string
   keyword?: string
   issueTypeCodes?: string[]
+  /** 迭代过滤：为空表示不过滤，后端会跨 task/requirement/bug 三表查询 */
+  sprintId?: string
   page?: number
   size?: number
   sortField?: string
@@ -217,9 +255,14 @@ export function filterIssues(payload: {
 }
 
 // ---- upload ----
-export function uploadImage(file: File) {
+/**
+ * 通用图片上传（评论/描述内嵌图、头像）。
+ * 传 projectId 时服务端登记项目归属，仅该项目成员可读取；不传则作为全站共享图片。
+ */
+export function uploadImage(file: File, projectId?: string) {
   const form = new FormData()
   form.append('file', file)
+  if (projectId) form.append('projectId', projectId)
   return req<UploadImageVO>(http.post('/v1/upload/image', form))
 }
 
@@ -263,13 +306,20 @@ export function deleteLink(issueId: string, linkId: string) {
 }
 
 // ---- status ----
-export function listProjectStatuses(projectId: string) {
-  return cached<IssueStatusVO[]>(C.statuses(projectId), () => req<IssueStatusVO[]>(http.get(`/v1/projects/${projectId}/statuses`)))
+/**
+ * 指定类别工作流的状态节点。任务/需求/缺陷各有自己的节点，
+ * 缺省 BUG 仅为兼容旧的单工作流调用点。
+ */
+export function listProjectStatuses(projectId: string, category: WorkItemCategory = 'BUG') {
+  return cached<IssueStatusVO[]>(C.statuses(projectId, category), () =>
+    req<IssueStatusVO[]>(http.get(`/v1/projects/${projectId}/statuses`, { params: { category } }))
+  )
 }
 
 // ---- workflow ----
-export function listTransitions(projectId: string) {
-  return req<WorkflowTransitionVO[]>(http.get(`/v1/projects/${projectId}/transitions`))
+/** 指定类别工作流的流转规则（看板拖拽蓝/红提示、详情状态下拉预校验） */
+export function listTransitions(projectId: string, category: WorkItemCategory = 'BUG') {
+  return req<WorkflowTransitionVO[]>(http.get(`/v1/projects/${projectId}/transitions`, { params: { category } }))
 }
 
 // ---- tags ----
@@ -369,7 +419,16 @@ export function getRisk(projectId: string, id: string) {
 export function createRisk(projectId: string, payload: { title: string; description?: string; level?: string; status?: string; ownerId?: string; dueDate?: string }) {
   return req<RiskVO>(http.post(`/v1/projects/${projectId}/risks`, payload))
 }
-export function updateRisk(projectId: string, id: string, payload: { title?: string; description?: string; level?: string; status?: string; ownerId?: string; dueDate?: string }) {
+export function updateRisk(projectId: string, id: string, payload: {
+  title?: string
+  description?: string
+  level?: string
+  status?: string
+  ownerId?: string
+  dueDate?: string
+  /** 置空字段（ownerId / dueDate）：后端把 null 当作「不修改」 */
+  clearFields?: string[]
+}) {
   return req<RiskVO>(http.put(`/v1/projects/${projectId}/risks/${id}`, payload))
 }
 export function deleteRisk(projectId: string, id: string) {

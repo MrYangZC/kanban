@@ -6,6 +6,14 @@ server:
 kanban:
   api:
     prefix: /v1
+  upload:
+    # 附件物理存储目录（相对进程工作目录，也可用绝对路径）
+    dir: ${KANBAN_UPLOAD_DIR:./uploads}
+    # 单个工作项附件数量上限，<=0 表示不限制
+    max-per-issue: ${KANBAN_UPLOAD_MAX_PER_ISSUE:50}
+  dev:
+    # 一次性 Excel 导入工具（@Profile("dev")）的数据源路径；留空时该接口拒绝执行
+    excel-path: ${KANBAN_DEV_EXCEL_PATH:}
 
 spring:
   main:
@@ -13,17 +21,20 @@ spring:
   application:
     name: kanban-server
   datasource:
-    url: jdbc:postgresql://192.168.2.17:5433/kanban?reWriteBatchedInserts=true&sslmode=disable
-    username: postgres
-    password: X@bN!7n9m1
+    # 凭据一律通过环境变量注入，禁止在配置文件中提交明文密码：
+    #   DB_HOST / DB_PORT / DB_USERNAME / DB_PASSWORD
+    url: jdbc:postgresql://${DB_HOST:192.168.2.17}:${DB_PORT:5433}/kanban?reWriteBatchedInserts=true&sslmode=disable
+    username: ${DB_USERNAME:postgres}
+    # 无默认值：未注入 DB_PASSWORD 时启动即报占位符未解析，避免误用仓库内的弱口令
+    password: ${DB_PASSWORD}
     driver: org.postgresql.Driver
   data:
     redis:
-      host: 192.168.2.17
-      port: 6379
-      # redis 密码必须配置
-      password: z4e5r3u7-Redis5-1
-      database: 15
+      host: ${REDIS_HOST:192.168.2.17}
+      port: ${REDIS_PORT:6379}
+      # redis 密码必须通过环境变量 REDIS_PASSWORD 注入（未设置时按无密码连接）
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:15}
   flyway:
     enabled: true
     locations: classpath:db/migration

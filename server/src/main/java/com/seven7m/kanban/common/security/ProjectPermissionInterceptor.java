@@ -47,15 +47,22 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
         }
 
         UUID userId = UserContext.getUserId();
-        UUID projectId = resolveProjectId(request);
+        @SuppressWarnings("unchecked")
+        Map<String, String> pathVars = (Map<String, String>) request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+        UUID projectId = resolveProjectId(pathVars);
         if (projectId == null) {
             // 路径变量无 projectId 时，尝试从缓存的请求体(projectId 字段)解析，兼容 /issues/filter 等
             projectId = resolveProjectIdFromBody(request);
         }
         final UUID resolvedProjectId = projectId;
         if (resolvedProjectId == null) {
-            // 无法解析出项目（请求体未被缓存等情况）：拒绝，避免越权放行
-            writeForbidden(response, "无法解析项目上下文");
+            if (hasMalformedId(pathVars)) {
+                // 路径变量存在但不是合法 UUID：放行交给 Spring 参数解析，返回「参数类型错误」的 400，
+                // 不用 403 掩盖真正的参数问题
+                return true;
+            }
+            // 请求里完全没有项目标识，属于参数缺失（400）而非无权限（403）
+            writeError(response, HttpServletResponse.SC_BAD_REQUEST, "缺少参数：projectId");
             return false;
         }
 
@@ -63,7 +70,7 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
         boolean ok = java.util.Arrays.stream(required)
                 .allMatch(p -> permissionService.hasPermission(userId, resolvedProjectId, p));
         if (!ok) {
-            writeForbidden(response, "无权限执行该操作");
+            writeError(response, HttpServletResponse.SC_FORBIDDEN, "无权限执行该操作");
             return false;
         }
         return true;
@@ -74,9 +81,7 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
      * 直接挂在项目下的资源使用 projectId；挂在 issue 下的资源使用 issueId，
      * 再通过 WorkItemRouter/缓存解析出所属 projectId。
      */
-    private UUID resolveProjectId(HttpServletRequest request) {
-        @SuppressWarnings("unchecked")
-        Map<String, String> pathVars = (Map<String, String>) request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+    private UUID resolveProjectId(Map<String, String> pathVars) {
         if (pathVars != null) {
             String projectId = pathVars.get("projectId");
             if (projectId != null) {
@@ -96,6 +101,25 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
             }
         }
         return null;
+    }
+
+    /** 路径变量中存在「不是合法 UUID」的标识时，交由 Spring 抛参数类型错误，而不是用权限错误掩盖 */
+    private static boolean hasMalformedId(Map<String, String> pathVars) {
+        if (pathVars == null) {
+            return false;
+        }
+        for (String key : new String[]{"projectId", "issueId", "id"}) {
+            String value = pathVars.get(key);
+            if (value == null) {
+                continue;
+            }
+            try {
+                UUID.fromString(value);
+            } catch (IllegalArgumentException e) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -122,14 +146,14 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
         return null;
     }
 
-    private void writeForbidden(HttpServletResponse response, String msg) {
+    private void writeError(HttpServletResponse response, int status, String msg) {
         try {
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setStatus(status);
             response.setContentType("application/json;charset=UTF-8");
-            String json = "{\"code\":403,\"msg\":" + escape(msg) + ",\"data\":null}";
+            String json = "{\"code\":" + status + ",\"msg\":" + escape(msg) + ",\"data\":null}";
             response.getWriter().write(json);
         } catch (Exception e) {
-            log.warn("写回 403 失败", e);
+            log.warn("写回 {} 失败", status, e);
         }
     }
 

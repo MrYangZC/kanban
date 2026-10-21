@@ -9,17 +9,30 @@ import org.apache.ibatis.annotations.Select;
 import java.util.List;
 
 /**
- * 统计报表只读聚合查询。所有方法均为 SELECT，不触碰 issue 写路径。
+ * 统计报表只读聚合查询。所有方法均为 SELECT，不触碰写路径。
+ *
+ * 工作项已从单表 issue 拆分为 task / requirement / bug 三张物理表，
+ * 因此所有统计均通过三表 UNION ALL 的公共 CTE（w）聚合，
+ * 仅取三表同构的公共列，避免统计遗漏任意类型的工作项。
  */
 @Mapper
 public interface DashboardMapper extends BaseMapper<Object> {
 
     /** 状态分布：JOIN issue_status 按名称聚合 */
     @Select("""
-            SELECT s.name AS name, COUNT(i.id) AS count
-            FROM issue i
-            JOIN issue_status s ON s.id = i.status_id
-            WHERE i.project_id = #{projectId}
+            WITH w AS (
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM task WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM requirement WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM bug WHERE project_id = #{projectId}
+            )
+            SELECT s.name AS name, COUNT(*) AS count
+            FROM w
+            JOIN issue_status s ON s.id = w.status_id
             GROUP BY s.name, s.sort_order
             ORDER BY s.sort_order
             """)
@@ -27,78 +40,125 @@ public interface DashboardMapper extends BaseMapper<Object> {
 
     /** 优先级分布：P0~P3 */
     @Select("""
-            SELECT COALESCE(i.priority, 'NONE') AS name, COUNT(i.id) AS count
-            FROM issue i
-            WHERE i.project_id = #{projectId}
-            GROUP BY i.priority
-            ORDER BY i.priority
+            WITH w AS (
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM task WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM requirement WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM bug WHERE project_id = #{projectId}
+            )
+            SELECT COALESCE(w.priority, 'NONE') AS name, COUNT(*) AS count
+            FROM w
+            GROUP BY w.priority
+            ORDER BY w.priority
             """)
     List<DashboardVO.NameCount> priorityDist(@Param("projectId") java.util.UUID projectId);
 
-    /** 按负责人分布的工作量 */
+    /** 按负责人分布的工作量（带 display_name 与头像，供度量页按人展示） */
     @Select("""
-            SELECT COALESCE(u.username, '未分配') AS name, COUNT(i.id) AS count
-            FROM issue i
-            LEFT JOIN sys_user u ON u.id = i.assignee_id
-            WHERE i.project_id = #{projectId}
-            GROUP BY u.username
+            WITH w AS (
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM task WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM requirement WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM bug WHERE project_id = #{projectId}
+            )
+            SELECT COALESCE(NULLIF(u.display_name, ''), u.username, '未分配') AS name,
+                   u.avatar_url AS avatar_url,
+                   COUNT(*) AS count
+            FROM w
+            LEFT JOIN sys_user u ON u.id = w.assignee_id
+            GROUP BY u.display_name, u.username, u.avatar_url
             ORDER BY count DESC
             """)
-    List<DashboardVO.NameCount> assigneeDist(@Param("projectId") java.util.UUID projectId);
+    List<DashboardVO.AssigneeCount> assigneeDist(@Param("projectId") java.util.UUID projectId);
 
     /** 概览：总数 / 已完成(category=DONE) / 逾期(due_date < now 且未完成) */
     @Select("""
+            WITH w AS (
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM task WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM requirement WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM bug WHERE project_id = #{projectId}
+            )
             SELECT
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE s.category = 'DONE') AS done,
-                COUNT(*) FILTER (WHERE i.due_date IS NOT NULL AND i.due_date < now() AND s.category <> 'DONE') AS overdue
-            FROM issue i
-            JOIN issue_status s ON s.id = i.status_id
-            WHERE i.project_id = #{projectId}
+                COUNT(*) FILTER (WHERE w.due_date IS NOT NULL AND w.due_date < now() AND s.category <> 'DONE') AS overdue
+            FROM w
+            JOIN issue_status s ON s.id = w.status_id
             """)
     DashboardSummaryView summary(@Param("projectId") java.util.UUID projectId);
 
-    /** 已完成 Issue 的周期时间（小时）：updated_at - created_at */
+    /** 已完成工作项的周期时间（小时）：updated_at - created_at */
     @Select("""
+            WITH w AS (
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM task WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM requirement WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM bug WHERE project_id = #{projectId}
+            )
             SELECT
-                COALESCE(AVG(EXTRACT(EPOCH FROM (i.updated_at - i.created_at)) / 3600), 0) AS avg_hours,
-                COALESCE(MAX(EXTRACT(EPOCH FROM (i.updated_at - i.created_at)) / 3600), 0) AS max_hours
-            FROM issue i
-            JOIN issue_status s ON s.id = i.status_id
-            WHERE i.project_id = #{projectId} AND s.category = 'DONE'
+                COALESCE(AVG(EXTRACT(EPOCH FROM (w.updated_at - w.created_at)) / 3600), 0) AS avg_hours,
+                COALESCE(MAX(EXTRACT(EPOCH FROM (w.updated_at - w.created_at)) / 3600), 0) AS max_hours
+            FROM w
+            JOIN issue_status s ON s.id = w.status_id
+            WHERE s.category = 'DONE'
             """)
     CycleTimeView cycleTime(@Param("projectId") java.util.UUID projectId);
 
     /** 每日完成数（按 updated_at 日期，仅 DONE） */
     @Select("""
-            SELECT TO_CHAR(i.updated_at, 'YYYY-MM-DD') AS date, COUNT(*) AS completed
-            FROM issue i
-            JOIN issue_status s ON s.id = i.status_id
-            WHERE i.project_id = #{projectId}
-              AND s.category = 'DONE'
-              AND i.updated_at >= NOW() - INTERVAL '14 days'
-            GROUP BY TO_CHAR(i.updated_at, 'YYYY-MM-DD')
+            WITH w AS (
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM task WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM requirement WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM bug WHERE project_id = #{projectId}
+            )
+            SELECT TO_CHAR(w.updated_at, 'YYYY-MM-DD') AS date, COUNT(*) AS completed
+            FROM w
+            JOIN issue_status s ON s.id = w.status_id
+            WHERE s.category = 'DONE'
+              AND w.updated_at >= NOW() - INTERVAL '14 days'
+            GROUP BY TO_CHAR(w.updated_at, 'YYYY-MM-DD')
             ORDER BY date
             """)
     List<DateCountView> dailyCompleted(@Param("projectId") java.util.UUID projectId);
 
-    /** 每日累计创建数（用于计算 remaining 基线） */
-    @Select("""
-            SELECT TO_CHAR(i.created_at, 'YYYY-MM-DD') AS date, COUNT(*) AS created
-            FROM issue i
-            WHERE i.project_id = #{projectId}
-              AND i.created_at >= NOW() - INTERVAL '14 days'
-            GROUP BY TO_CHAR(i.created_at, 'YYYY-MM-DD')
-            ORDER BY date
-            """)
-    List<DateCountView> dailyCreated(@Param("projectId") java.util.UUID projectId);
-
     /** 总完成数（用于 burndown 收尾） */
     @Select("""
+            WITH w AS (
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM task WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM requirement WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
+                FROM bug WHERE project_id = #{projectId}
+            )
             SELECT COUNT(*) AS count
-            FROM issue i
-            JOIN issue_status s ON s.id = i.status_id
-            WHERE i.project_id = #{projectId} AND s.category = 'DONE'
+            FROM w
+            JOIN issue_status s ON s.id = w.status_id
+            WHERE s.category = 'DONE'
             """)
     long totalDone(@Param("projectId") java.util.UUID projectId);
 

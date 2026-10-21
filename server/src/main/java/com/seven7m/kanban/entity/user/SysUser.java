@@ -23,4 +23,7 @@ public class SysUser extends BaseEntity {
     private String avatarUrl;
     private String passwordHash;
     private Boolean enabled;
+
+    /** 系统管理员标识：与项目级角色无关，仅此字段可进入系统管理后台 */
+    private Boolean isAdmin;
 }

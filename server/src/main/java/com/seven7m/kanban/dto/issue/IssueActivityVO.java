@@ -11,6 +11,8 @@ public class IssueActivityVO {
     private String type;
     private UUID actorId;
     private String actorName;
+    /** 操作人头像地址（/api/uploads/xxx），为空时前端回退首字头像 */
+    private String actorAvatarUrl;
     private UUID parentId;
     private String content;
     private String oldValue;

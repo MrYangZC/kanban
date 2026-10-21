@@ -50,6 +50,10 @@ public class IssueVO {
     private String assigneeName;
     private String reporterName;
     private String verifierName;
+    /** 对应人员的头像地址，列表/卡片人员列据此显示真实头像 */
+    private String assigneeAvatarUrl;
+    private String reporterAvatarUrl;
+    private String verifierAvatarUrl;
     private String statusCode;
     private List<LabelVO> labels = new ArrayList<>();
     private Long commentCount;

@@ -74,6 +74,10 @@ export interface Issue {
   assigneeId: string
   assigneeName: string | null
   reporterName: string | null
+  /** 对应人员的头像地址，列表/卡片人员列显示真实头像 */
+  assigneeAvatarUrl?: string | null
+  reporterAvatarUrl?: string | null
+  verifierAvatarUrl?: string | null
   statusCode: string
   issueTypeCode: string
   issueTypeIcon: string
@@ -97,6 +101,14 @@ export interface Issue {
   parentId: string | null
   createdAt: string
   updatedAt: string
+}
+
+/**
+ * 工作项树节点：由前端根据 parentId 组装（非接口返回结构）。
+ * 用于列表页"树形视图"的渲染。
+ */
+export interface IssueTreeNode extends Issue {
+  children: IssueTreeNode[]
 }
 
 export interface UserVO {
@@ -124,6 +136,8 @@ export interface IssueActivity {
   type: string
   actorId: string
   actorName: string
+  /** 操作人头像地址（/api/uploads/xxx），为空时用首字头像 */
+  actorAvatarUrl?: string | null
   parentId?: string | null   // 嵌套回复父评论 id，顶楼评论为 null/undefined
   deleted?: number | null    // 1=已逻辑删除（显示「已删除」占位），0/undefined=正常
   content: string | null
@@ -197,7 +211,8 @@ export interface DashboardVO {
   summary: { total: number; inProgress: number; done: number; overdue: number }
   statusDist: { name: string; count: number }[]
   priorityDist: { name: string; count: number }[]
-  assigneeDist: { name: string; count: number }[]
+  /** 按负责人工作量：name 为显示名（未分配兜底），avatarUrl 为空时前端回退首字 */
+  assigneeDist: { name: string; count: number; avatarUrl?: string | null }[]
   cycleTime: { avgHours: number; maxHours: number }
   burndown: { date: string; remaining: number; completed: number }[]
 }
@@ -213,7 +228,14 @@ export interface LoginVO {
   id: string
   username: string
   displayName: string
+  /** 头像地址（/api/uploads/xxx），为空时回退首字头像 */
+  avatarUrl?: string | null
   token: string
+  /**
+   * 是否系统管理员。由后端按 sys_user.is_admin 或种子管理员 UUID 的口径下发，
+   * 前端不应再用 username === 'admin' 自行推断（与后端 AdminAuthInterceptor 口径不一致）。
+   */
+  isAdmin?: boolean
 }
 
 /** 当前登录用户个人资料 */
@@ -279,6 +301,8 @@ export interface ProjectActivityVO {
   id: string
   actorId: string
   actorName: string | null
+  /** 操作人头像地址（/api/uploads/xxx），为空时用首字头像 */
+  actorAvatarUrl?: string | null
   action: string
   issueId: string
   issueNumber: string
@@ -352,3 +376,18 @@ export const REQUIREMENT_TYPE_CODES: string[] = ['STORY', 'FEATURE']
 export const TASK_TYPE_CODES: string[] = ['TASK']
 /** 缺陷类 */
 export const DEFECT_TYPE_CODES: string[] = ['BUG', 'FUNC_DEFECT', 'PERF_DEFECT', 'SEC_DEFECT', 'COMPAT_DEFECT', 'UI_DEFECT']
+
+/** 工作项大类：工作流、状态字典、看板列均按它隔离（与后端 ItemCategory 对应） */
+export type WorkItemCategory = 'TASK' | 'REQUIREMENT' | 'BUG'
+
+/**
+ * 由工作项类型编码推出所属大类。
+ * 任务「待办→进行中→已完成」、需求「待处理→设计中→开发中→测试中→已完成」、
+ * 缺陷「待确认→处理中→已修复→已关闭」是三套不同状态，取状态/流转规则前必须先定类别。
+ */
+export function categoryOfTypeCode(code?: string | null): WorkItemCategory {
+  const c = (code || '').toUpperCase()
+  if (DEFECT_TYPE_CODES.includes(c)) return 'BUG'
+  if (REQUIREMENT_TYPE_CODES.includes(c)) return 'REQUIREMENT'
+  return 'TASK'
+}

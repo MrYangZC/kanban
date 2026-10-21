@@ -72,8 +72,30 @@ public class RiskService {
         if (req.getStatus() != null) risk.setStatus(req.getStatus());
         if (req.getOwnerId() != null) risk.setOwnerId(req.getOwnerId());
         if (req.getDueDate() != null) risk.setDueDate(req.getDueDate());
+        // updateById 会跳过 null 字段，所以要置空的列必须用 UpdateWrapper 显式 set，
+        // 与工作项更新（BaseWorkItemService）保持同一套 clearFields 语义
+        var uw = Wrappers.<Risk>lambdaUpdate().eq(Risk::getId, id);
+        if (req.getClearFields() != null) {
+            for (String field : req.getClearFields()) {
+                switch (field) {
+                    case "ownerId" -> {
+                        risk.setOwnerId(null);
+                        uw.set(Risk::getOwnerId, null);
+                    }
+                    case "dueDate" -> {
+                        risk.setDueDate(null);
+                        uw.set(Risk::getDueDate, null);
+                    }
+                    default -> { }
+                }
+            }
+        }
         risk.setUpdatedBy(UserContext.getUserId());
-        riskMapper.updateById(risk);
+        if (uw.getSqlSet() != null && !uw.getSqlSet().isEmpty()) {
+            riskMapper.update(risk, uw);
+        } else {
+            riskMapper.updateById(risk);
+        }
         return toVO(risk, loadUserNames(List.of(risk)));
     }
 

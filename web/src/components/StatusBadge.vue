@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { FALLBACK_COLOR } from '@/theme/colorMap'
 
 export interface StatusStyle {
   label: string
   color: string
-  bg: string
+  bg?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -14,10 +15,11 @@ const props = withDefaults(defineProps<{
   fallback?: StatusStyle
 }>(), {
   size: 'sm',
-  fallback: () => ({ label: '', color: '#8F959E', bg: 'rgba(143,149,158,0.1)' })
+  fallback: () => ({ label: '', color: FALLBACK_COLOR })
 })
 
 const style = computed<StatusStyle>(() => props.dict[props.status] || props.fallback)
+const badgeBg = computed(() => `color-mix(in srgb, ${style.value.color} 10%, transparent)`)
 
 const paddingClass = computed(() => {
   if (props.size === 'xs') return 'px-1.5 py-0.5 text-[10px]'
@@ -30,6 +32,6 @@ const paddingClass = computed(() => {
   <span
     class="inline-flex items-center rounded font-medium"
     :class="paddingClass"
-    :style="{ color: style.color, backgroundColor: style.bg }"
+    :style="{ color: style.color, backgroundColor: badgeBg }"
   >{{ style.label || status }}</span>
 </template>

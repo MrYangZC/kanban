@@ -10,13 +10,13 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  color: '#1677FF',
+  color: 'var(--primary)',
   hint: ''
 })
 </script>
 
 <template>
-  <div class="rounded-lg border border-[#E9ECEF] bg-white p-4 shadow-sm transition hover:shadow-md">
+  <div class="glass-panel rounded-lg p-4 transition hover:shadow-md">
     <div class="flex items-center justify-between">
       <span class="text-sm text-ink-400">{{ props.label }}</span>
       <component :is="props.icon" :size="16" :style="{ color: props.color }" />

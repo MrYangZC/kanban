@@ -14,8 +14,9 @@ import java.util.UUID;
 public interface ProjectMapper extends BaseMapper<Project> {
 
     /**
-     * 根据项目 ID 列表一次性聚合统计：成员数、任务数、附件数。
+     * 根据项目 ID 列表一次性聚合统计：成员数、工作项数、附件数。
      * 使用 LEFT JOIN + 子查询，避免 N+1 查询。
+     * 工作项/附件按 task/requirement/bug 三表 UNION ALL 聚合（V25 拆表后旧 issue 表不再使用）。
      */
     @Select("""
             <script>
@@ -32,14 +33,26 @@ public interface ProjectMapper extends BaseMapper<Project> {
             ) m ON m.project_id = p.id
             LEFT JOIN (
                 SELECT project_id, COUNT(*) AS issue_count
-                FROM issue
+                FROM (
+                    SELECT project_id FROM task
+                    UNION ALL
+                    SELECT project_id FROM requirement
+                    UNION ALL
+                    SELECT project_id FROM bug
+                ) w
                 GROUP BY project_id
             ) i ON i.project_id = p.id
             LEFT JOIN (
-                SELECT i2.project_id, COUNT(*) AS attachment_count
+                SELECT w.project_id, COUNT(*) AS attachment_count
                 FROM attachment a
-                JOIN issue i2 ON i2.id = a.issue_id
-                GROUP BY i2.project_id
+                JOIN (
+                    SELECT id, project_id FROM task
+                    UNION ALL
+                    SELECT id, project_id FROM requirement
+                    UNION ALL
+                    SELECT id, project_id FROM bug
+                ) w ON w.id = a.issue_id
+                GROUP BY w.project_id
             ) a ON a.project_id = p.id
             WHERE p.id IN
             <foreach collection="ids" item="id" open="(" separator="," close=")">

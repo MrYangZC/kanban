@@ -20,8 +20,8 @@ public class DashboardVO {
     /** 优先级分布（P0~P3） */
     private List<NameCount> priorityDist = new ArrayList<>();
 
-    /** 按负责人分布的工作量 */
-    private List<NameCount> assigneeDist = new ArrayList<>();
+    /** 按负责人分布的工作量（带显示名与头像，度量页按人展示） */
+    private List<AssigneeCount> assigneeDist = new ArrayList<>();
 
     /** 周期时间：已完成 Issue 的平均/最长解决时长（小时） */
     private CycleTime cycleTime = new CycleTime();
@@ -41,6 +41,17 @@ public class DashboardVO {
     public static class NameCount {
         private String name;
         private long count;
+    }
+
+    /**
+     * 负责人维度计数。name 是展示用名字（display_name 优先，兜底 username，再兜底「未分配」），
+     * avatarUrl 为空时前端回退首字/图标，未分配行不带头像。
+     */
+    @Data
+    public static class AssigneeCount {
+        private String name;
+        private long count;
+        private String avatarUrl;
     }
 
     @Data

@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { BarChart3 } from 'lucide-vue-next'
 import ProjectMetricsPanel from '@/components/ProjectMetricsPanel.vue'
 
 const route = useRoute()
-const projectId = route.params.projectId as string
+// 响应式：切换项目时 prop 随之变化，度量面板可感知并重新加载
+const projectId = computed(() => route.params.projectId as string)
 </script>
 
 <template>

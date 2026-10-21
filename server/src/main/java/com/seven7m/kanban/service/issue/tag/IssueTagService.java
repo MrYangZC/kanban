@@ -1,12 +1,15 @@
 package com.seven7m.kanban.service.issue.tag;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.seven7m.kanban.common.enums.ItemCategory;
+import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.dto.issue.LabelVO;
 import com.seven7m.kanban.entity.issue.tag.IssueTag;
 import com.seven7m.kanban.entity.issue.tag.ProjectLabel;
 import com.seven7m.kanban.mapper.issue.tag.IssueTagMapper;
 import com.seven7m.kanban.mapper.issue.tag.ProjectLabelMapper;
+import com.seven7m.kanban.service.workitem.WorkItemRouter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +25,14 @@ public class IssueTagService {
 
     private final IssueTagMapper tagMapper;
     private final ProjectLabelMapper projectLabelMapper;
+    private final WorkItemRouter workItemRouter;
+
+    /** 根据工作项 id 判定所属类别（TASK/REQUIREMENT/BUG），不存在抛 404 */
+    private String categoryOf(UUID issueId) {
+        ItemCategory c = workItemRouter.categoryOf(issueId);
+        if (c == null) throw new ServiceException(404, "工作项不存在");
+        return c.name();
+    }
 
     /** 项目下所有标签（用于给 issue 打标时选择） */
     public List<LabelVO> listForProject(UUID projectId) {
@@ -36,7 +47,7 @@ public class IssueTagService {
 
     /** 某个 issue 已关联的标签 */
     public List<LabelVO> listForIssue(UUID issueId) {
-        return tagMapper.selectByIssue(issueId).stream().map(t -> {
+        return tagMapper.selectByIssue(issueId, categoryOf(issueId)).stream().map(t -> {
             LabelVO vo = new LabelVO();
             vo.setId(t.getId());
             vo.setName(t.getName());
@@ -47,6 +58,7 @@ public class IssueTagService {
 
     @Transactional
     public void addToIssue(UUID projectId, UUID issueId, String name, String color) {
+        String category = categoryOf(issueId);
         // 标签全局化：按 name 查全局标签库，不存在则创建
         IssueTag tag = tagMapper.selectOne(Wrappers.<IssueTag>lambdaQuery()
                 .eq(IssueTag::getName, name));
@@ -60,10 +72,10 @@ public class IssueTagService {
         }
         // 建立项目选用关系，保证 listForProject 可见
         ensureProjectLabel(projectId, tag.getId());
-        if (tagMapper.countIssueLabel(issueId, tag.getId()) > 0) {
+        if (tagMapper.countIssueLabel(issueId, tag.getId(), category) > 0) {
             return;
         }
-        tagMapper.insertIssueLabel(issueId, tag.getId());
+        tagMapper.insertIssueLabel(issueId, tag.getId(), category);
     }
 
     private void ensureProjectLabel(UUID projectId, UUID labelId) {
@@ -83,7 +95,7 @@ public class IssueTagService {
 
     @Transactional
     public void removeFromIssue(UUID issueId, UUID labelId) {
-        tagMapper.deleteIssueLabel(issueId, labelId);
+        tagMapper.deleteIssueLabel(issueId, labelId, categoryOf(issueId));
     }
 
     /** 全局标签库（供标签管理界面选择） */

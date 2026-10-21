@@ -6,7 +6,6 @@ import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.entity.project.ProjectCategoryKey;
-import com.seven7m.kanban.entity.project.ProjectInitializer;
 import com.seven7m.kanban.entity.project.ProjectRole;
 import com.seven7m.kanban.entity.project.ProjectStatus;
 import com.seven7m.kanban.dto.project.CreateProjectRequest;
@@ -202,8 +201,10 @@ public class ProjectService {
         }
 
         if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
-            String kw = req.getKeyword().trim();
-            query.and(w -> w.like(Project::getName, kw).or().like(Project::getProjectKey, kw));
+            // 必须转义 LIKE 通配符，否则 keyword=_ 或 % 会命中全部项目
+            String pattern = "%" + escapeLike(req.getKeyword().trim()) + "%";
+            query.and(w -> w.apply("(name LIKE {0} ESCAPE '\\' OR project_key LIKE {1} ESCAPE '\\')",
+                    pattern, pattern));
         }
 
         int page = req.getPage() == null || req.getPage() < 1 ? 1 : req.getPage();
@@ -235,6 +236,11 @@ public class ProjectService {
         }).collect(Collectors.toList());
 
         return new PageResult<>(total, page, size, voList);
+    }
+
+    /** 转义 LIKE 通配符（\\ % _），配合 SQL 中的 ESCAPE '\\' 使用 */
+    private static String escapeLike(String kw) {
+        return kw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     /** 排序字段白名单，防止 SQL 注入 */
@@ -352,8 +358,9 @@ public class ProjectService {
      * 删除顺序（遵守外键 RESTRICT 约束）：
      *   1. announcement（无外键）
      *   2. milestone（无外键）
-     *   3. issue（RESTRICT，级联清理 attachment/issue_activity/issue_cc/issue_comment/issue_label/issue_participant/issue_relation）
-     *   4. board（RESTRICT，级联清理 board_column）
+     *   3. 工作项（workItemRouter.deleteByProject 按 task/requirement/bug 三表级联清理，
+     *      各自清理 attachment/issue_activity/issue_cc/issue_comment/issue_label/issue_participant/issue_relation）
+     *   4. board（board_column 对 board 为 ON DELETE CASCADE，自动清理）
      *   5. project（CASCADE 自动清理 project_member/project_favorite/project_label/risk/sprint/user_role）
      */
     @Transactional
@@ -361,6 +368,12 @@ public class ProjectService {
         Project p = requireProject(projectId);
         if (!isAdmin(projectId, userId)) {
             throw new ServiceException(403, "仅项目管理员可删除");
+        }
+        // 有工作项时拒绝删除：此前会静默级联清空全部工作项，属误删高风险
+        long itemCount = workItemRouter.countByProject(projectId);
+        if (itemCount > 0) {
+            throw new ServiceException(400,
+                    "项目下还有 " + itemCount + " 个工作项，请先删除或归档后再删除项目");
         }
 
         announcementMapper.delete(Wrappers.<Announcement>lambdaQuery()

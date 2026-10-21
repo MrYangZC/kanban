@@ -49,3 +49,74 @@ export function priorityColor(v?: string): string {
 export function severityColor(v?: string): string {
   return (v && SEVERITY_COLOR[v]) || '#909399'
 }
+
+// ---- 迭代 / 里程碑 / 风险 状态词典 ----
+// 与上方优先级/严重程度同构：统一以「实色文字 + 10% 透明度底」胶囊呈现，
+// 避免各页面内联 statusType/levelType 三元表达式造成配色不一致。
+
+export const SPRINT_STATUS: Record<string, { label: string; color: string }> = {
+  PLANNED: { label: '规划中', color: '#E6A23C' },
+  ACTIVE: { label: '进行中', color: '#52c41a' },
+  COMPLETED: { label: '已完成', color: '#909399' }
+}
+
+export const MILESTONE_STATUS: Record<string, { label: string; color: string }> = {
+  ACTIVE: { label: '进行中', color: '#E6A23C' },
+  COMPLETED: { label: '已完成', color: '#52c41a' }
+}
+
+export const RISK_LEVEL: Record<string, { label: string; color: string }> = {
+  LOW: { label: '低', color: '#909399' },
+  MEDIUM: { label: '中', color: '#409EFF' },
+  HIGH: { label: '高', color: '#E6A23C' },
+  CRITICAL: { label: '严重', color: '#F56C6C' }
+}
+
+export const RISK_STATUS: Record<string, { label: string; color: string }> = {
+  OPEN: { label: '待处理', color: '#F56C6C' },
+  MITIGATING: { label: '缓解中', color: '#E6A23C' },
+  CLOSED: { label: '已关闭', color: '#909399' }
+}
+
+/** 将任意词典项渲染为胶囊样式：实色文字 + 10% 透明度底。
+ *  使用 color-mix 以支持 var() 令牌（如缺省色 var(--ink-secondary)）与十六进制色 alike。 */
+export function badgeStyle(entry?: { label: string; color: string }): Record<string, string> {
+  const color = entry?.color || 'var(--ink-secondary)'
+  return { color, background: `color-mix(in srgb, ${color} 10%, transparent)` }
+}
+
+// ---- 项目状态词典 ----
+// Tailwind 类名版本（用于表格/卡片内联徽标），与上方色值词典并存：
+// 类名受主题令牌约束，色值用于内联 style，两者不可互换。
+
+export interface ProjectStatusBadge {
+  label: string
+  /** 徽标底色 + 文字色 */
+  cls: string
+  /** 左侧圆点色 */
+  dot: string
+}
+
+/** 同义状态码归一化：后端历史数据存在多种等价写法 */
+export const PROJECT_STATUS_ALIAS: Record<string, string> = {
+  DONE: 'COMPLETED',
+  ACTIVE: 'IN_PROGRESS',
+  ONGOING: 'IN_PROGRESS',
+  PENDING: 'NOT_STARTED',
+  TODO: 'NOT_STARTED'
+}
+
+export const PROJECT_STATUS_BADGE: Record<string, ProjectStatusBadge> = {
+  ARCHIVED: { label: '已归档', cls: 'bg-surface-light text-ink-secondary', dot: 'bg-ink-secondary' },
+  COMPLETED: { label: '已完成', cls: 'bg-success-light text-success', dot: 'bg-success' },
+  IN_PROGRESS: { label: '进行中', cls: 'bg-primary-50 text-primary-600', dot: 'bg-primary-500' },
+  NOT_STARTED: { label: '未开始', cls: 'bg-warning-light text-warning', dot: 'bg-warning' },
+  CLOSED: { label: '已关闭', cls: 'bg-danger-light text-danger', dot: 'bg-danger' }
+}
+
+/** 项目状态 → 徽标样式；未知状态回退为"进行中"，与列表既有展示保持一致 */
+export function projectStatusBadge(status?: string): ProjectStatusBadge {
+  const raw = (status || '').toUpperCase()
+  const key = PROJECT_STATUS_ALIAS[raw] || raw
+  return PROJECT_STATUS_BADGE[key] || PROJECT_STATUS_BADGE.IN_PROGRESS
+}

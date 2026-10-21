@@ -27,7 +27,7 @@ function onClear() {
       v-model="inputValue"
       type="text"
       placeholder="搜索项目名称、Key 或描述"
-      class="w-72 rounded-lg border border-line-light bg-white py-2 pl-9 pr-9 text-sm text-ink transition-all duration-200 placeholder:text-ink-placeholder focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-100"
+      class="glass-inset w-72 rounded-lg py-2 pl-9 pr-9 text-sm text-ink transition-all duration-200 placeholder:text-ink-placeholder focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-100"
       @input="onInput"
     />
     <button

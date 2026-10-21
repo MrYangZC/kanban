@@ -13,11 +13,17 @@ public interface ProjectActivityMapper {
 
     @Select("""
             <script>
-            SELECT a.id, a.actor_id, u.display_name AS actor_name, a.action,
+            SELECT a.id, a.actor_id, u.display_name AS actor_name, u.avatar_url AS actor_avatar_url, a.action,
                    a.issue_id, i.issue_number, i.title AS issue_title,
                    a.old_value, a.new_value, a.created_at
             FROM issue_activity a
-            INNER JOIN issue i ON a.issue_id = i.id
+            INNER JOIN (
+                SELECT id, project_id, issue_number, title FROM task
+                UNION ALL
+                SELECT id, project_id, issue_number, title FROM requirement
+                UNION ALL
+                SELECT id, project_id, issue_number, title FROM bug
+            ) i ON a.issue_id = i.id
             LEFT JOIN sys_user u ON a.actor_id = u.id
             WHERE i.project_id = #{projectId}
             ORDER BY a.created_at DESC

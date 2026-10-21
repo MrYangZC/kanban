@@ -6,6 +6,7 @@ import type { Issue, Project, ProjectMember } from '@/api/types'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import IssueBasicFields from '@/components/IssueBasicFields.vue'
 import { AlertTriangle, Plus, Link2 } from 'lucide-vue-next'
+import { PRIMARY_HEX } from '@/theme/colorMap'
 
 interface Props {
   modelValue: boolean
@@ -29,8 +30,7 @@ const emit = defineEmits<{
   created: [issue: Issue]
 }>()
 
-const PRIMARY = '#409EFF'
-const PRIMARY_LIGHT = '#E1F0FF'
+
 
 const visible = ref(props.modelValue)
 watch(() => props.modelValue, (v) => (visible.value = v))
@@ -155,7 +155,7 @@ async function submit() {
 function addTagFromFields() {
   const input = fieldsRef.value?.tagInput?.trim()
   if (input && !tags.value.some((t) => t.name === input)) {
-    tags.value.push({ id: input, name: input, color: PRIMARY })
+    tags.value.push({ id: input, name: input, color: PRIMARY_HEX })
   }
   fieldsRef.value?.clearTagInput()
 }
@@ -181,14 +181,14 @@ function removeTagFromFields(id: string) {
           v-model="form.title"
           placeholder="请输入标题"
           maxlength="120"
-          class="w-full rounded border px-3 py-2 text-sm outline-none focus:border-[#409EFF]"
-          style="border-color: #dcdfe6"
+          class="w-full rounded border border-line px-3 py-2 text-sm outline-none focus:border-primary"
           @keyup.ctrl.enter="submit"
         />
         <div class="flex flex-1 flex-col">
-          <label class="mb-1.5 text-xs" style="color: #909399">描述</label>
+          <label class="mb-1.5 text-xs text-ink-secondary">描述</label>
           <RichTextEditor
             v-model="form.description"
+            :project-id="projectId"
             :rows="14"
             placeholder="支持 Markdown，建议填写验收要点、复现步骤等，可 Ctrl+V 粘贴截图"
           />
@@ -197,14 +197,14 @@ function removeTagFromFields(id: string) {
 
       <!-- ======== 右侧：基础字段 ======== -->
       <aside class="flex w-[300px] shrink-0 flex-col">
-        <div class="rounded-md border p-4" style="border-color: #ebeef5">
-          <h3 class="mb-4 text-sm font-medium" style="color: #303133">基础字段</h3>
+        <div class="rounded-md border border-line-light p-4">
+          <h3 class="mb-4 text-sm font-medium text-ink">基础字段</h3>
 
           <!-- 工作项类型 -->
           <div class="mb-4 flex items-center justify-between">
-            <label class="text-sm" style="color: #606266">工作项类型</label>
-            <div class="flex items-center gap-1.5 text-sm" style="color: #303133">
-              <AlertTriangle :size="14" style="color: #F56C6C" />
+            <label class="text-sm text-ink-regular">工作项类型</label>
+            <div class="flex items-center gap-1.5 text-sm text-ink">
+              <AlertTriangle :size="14" class="text-danger" />
               {{ issueTypeName }}
             </div>
           </div>
@@ -227,37 +227,35 @@ function removeTagFromFields(id: string) {
 
           <!-- 归属项目 -->
           <div class="mt-4">
-            <label class="mb-1 block text-sm" style="color: #606266">归属项目<span style="color: #F56C6C">*</span></label>
-            <div class="truncate rounded border px-2 py-1 text-sm" style="border-color: #dcdfe6; color: #303133" :title="project?.name">
+            <label class="mb-1 block text-sm text-ink-regular">归属项目<span class="text-danger">*</span></label>
+            <div class="truncate rounded border border-line px-2 py-1 text-sm text-ink" :title="project?.name">
               {{ project?.name || '—' }}
             </div>
           </div>
 
           <!-- 迭代 -->
           <div class="mt-4 flex items-center justify-between">
-            <label class="text-sm" style="color: #606266">迭代</label>
+            <label class="text-sm text-ink-regular">迭代</label>
             <input
               v-model="form.iteration"
               placeholder="请选择"
-              class="w-40 rounded border bg-transparent px-2 py-1 text-right text-sm outline-none"
-              style="border-color: #dcdfe6; color: #303133"
+              class="w-40 rounded border border-line bg-transparent px-2 py-1 text-right text-sm text-ink outline-none"
             />
           </div>
         </div>
 
         <!-- 附件区（创建后可上传） -->
-        <div class="mt-3 rounded-md border p-4" style="border-color: #ebeef5">
+        <div class="mt-3 rounded-md border border-line-light p-4">
           <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-sm font-medium" style="color: #303133">
-              附件 <span class="text-xs font-normal" style="color: #909399">0</span>
+            <h3 class="text-sm font-medium text-ink">
+              附件 <span class="text-xs font-normal text-ink-secondary">0</span>
             </h3>
             <button
-              class="flex h-7 w-7 cursor-not-allowed items-center justify-center rounded text-lg opacity-50"
-              style="background: #f5f7fa; color: #909399"
+              class="flex h-7 w-7 cursor-not-allowed items-center justify-center rounded bg-surface-page text-lg text-ink-secondary opacity-50"
               title="创建后可上传附件"
             ><Plus :size="16" /></button>
           </div>
-          <div class="py-2 text-center text-xs" style="color: #c0c4cc">
+          <div class="py-2 text-center text-xs text-ink-placeholder">
             创建后可上传附件
           </div>
         </div>
@@ -269,19 +267,17 @@ function removeTagFromFields(id: string) {
         <!-- 关联项控制区 -->
         <div class="flex items-center gap-2">
           <span
-            class="rounded px-2 py-0.5 text-xs"
-            :style="{ background: PRIMARY_LIGHT, color: PRIMARY }"
+            class="rounded bg-primary-light px-2 py-0.5 text-xs text-primary"
           >关联项 0</span>
-          <span class="text-xs" style="color: #909399">全部·0</span>
-          <div class="flex items-center gap-1 rounded border px-2 py-1" style="border-color: #dcdfe6">
-            <Link2 :size="13" style="color: #c0c4cc" />
+          <span class="text-xs text-ink-secondary">全部·0</span>
+          <div class="flex items-center gap-1 rounded border border-line px-2 py-1">
+            <Link2 :size="13" class="text-ink-placeholder" />
             <input
               placeholder="关联工作项"
-              class="w-24 bg-transparent text-xs outline-none"
-              style="color: #c0c4cc"
+              class="w-24 bg-transparent text-xs text-ink-placeholder outline-none"
             />
           </div>
-          <label class="flex items-center gap-1 text-xs" style="color: #606266">
+          <label class="flex items-center gap-1 text-xs text-ink-regular">
             <input v-model="continueNext" type="checkbox" class="cursor-pointer" />
             继续新建下一个
           </label>

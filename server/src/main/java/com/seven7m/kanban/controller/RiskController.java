@@ -8,6 +8,7 @@ import com.seven7m.kanban.dto.risk.RiskVO;
 import com.seven7m.kanban.dto.risk.UpdateRiskRequest;
 import com.seven7m.kanban.service.risk.RiskService;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,13 +42,13 @@ public class RiskController {
 
     @ProjectRoleAnnotation(Permission.RISK_MANAGE)
     @PostMapping
-    public R<RiskVO> create(@PathVariable UUID projectId, @RequestBody CreateRiskRequest req) {
+    public R<RiskVO> create(@PathVariable UUID projectId, @Valid @RequestBody CreateRiskRequest req) {
         return R.ok(riskService.create(projectId, req));
     }
 
     @ProjectRoleAnnotation(Permission.RISK_MANAGE)
     @PutMapping("/{id}")
-    public R<RiskVO> update(@PathVariable UUID projectId, @PathVariable UUID id, @RequestBody UpdateRiskRequest req) {
+    public R<RiskVO> update(@PathVariable UUID projectId, @PathVariable UUID id, @Valid @RequestBody UpdateRiskRequest req) {
         return R.ok(riskService.update(projectId, id, req));
     }
 

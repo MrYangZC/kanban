@@ -3,12 +3,13 @@ import { useProjectCategoryStore } from '@/stores/projectCategory'
 import { storeToRefs } from 'pinia'
 import { FolderKanban, ShieldCheck, Users, Star, Archive } from 'lucide-vue-next'
 import { computed } from 'vue'
+import type { Component } from 'vue'
 import type { ProjectCategoryKey } from '@/api/types'
 
 const store = useProjectCategoryStore()
 const { categories, selectedCategory } = storeToRefs(store)
 
-const iconMap: Record<ProjectCategoryKey, any> = {
+const iconMap: Record<ProjectCategoryKey, Component> = {
   all: FolderKanban,
   managed: ShieldCheck,
   participated: Users,

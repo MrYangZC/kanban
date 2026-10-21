@@ -15,6 +15,53 @@
   --surface-page: #f5f7fa;
   --success: #52c41a;
   --danger: #f56c6c;
+
+  /* ------------------------------------------------------------------
+     Liquid Glass 材质令牌
+     核心变化：容器不再是"实心白卡"，而是半透明白 + 背景虚化 + 1px 高光描边。
+     因此页面底层必须留出可被透视的内容（见下方 body 的环境光），
+     否则玻璃容器压在纯色底上，与实心白卡在视觉上无从区分。
+     品牌色沿用 Element Plus 蓝，本层只引入中性材质，不改动品牌与文本色值。
+     ------------------------------------------------------------------ */
+
+  /* 玻璃底色：按容器"需要被看清的程度"分档，越需要读文字越不透明 */
+  --glass-strong: rgba(255, 255, 255, 0.72);
+  --glass: rgba(255, 255, 255, 0.55);
+  --glass-subtle: rgba(255, 255, 255, 0.38);
+  /* 浮层专用：下拉 / 搜索面板 / 弹窗。它们背后是暗遮罩或整页内容，
+     沿用 0.72 会让正文与背景内容互相干扰，故单独提到接近实色 */
+  --glass-pop: rgba(255, 255, 255, 0.92);
+
+  /* 模糊：saturate 只轻微提升。
+     早先取 180%，等于把折射进来的底色饱和度放大 80%，
+     页面上会叠出一层明显的蓝，故降到 120%——既避免虚化后发灰，也不再偏色 */
+  --glass-blur: saturate(120%) blur(20px);
+  --glass-blur-lg: saturate(120%) blur(32px);
+
+  --glass-line: rgba(48, 49, 51, 0.08);
+  --glass-line-strong: rgba(48, 49, 51, 0.13);
+
+  /* specular 高光：顶部 1px 亮线 + 底部 1px 暗线，用光而非实线勾勒玻璃厚度 */
+  --specular: inset 0 1px 0 rgba(255, 255, 255, 0.72), inset 0 -1px 0 rgba(48, 49, 51, 0.04);
+
+  /* 双层阴影：近处接触影说明"贴着背景"，远处散射影说明"悬浮高度" */
+  --shadow-glass: 0 1px 2px rgba(48, 49, 51, 0.04), 0 8px 24px -8px rgba(48, 49, 51, 0.1);
+  --shadow-glass-lift: 0 2px 4px rgba(48, 49, 51, 0.05), 0 16px 40px -12px rgba(48, 49, 51, 0.16);
+  --shadow-glass-pop: 0 4px 8px rgba(48, 49, 51, 0.06), 0 24px 56px -16px rgba(48, 49, 51, 0.2);
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* 环境光：只负责让玻璃"有东西可透"，不承担品牌表达。
+     强度压到很低、色相也偏灰——玻璃本身已是半透明白，
+     底下再铺一层饱和蓝就会把整个界面染蓝。品牌蓝交给主色按钮和选中态去说。 */
+  --aurora-primary: rgba(88, 148, 220, 0.09);
+  --aurora-cyan: rgba(120, 170, 205, 0.06);
+  --aurora-indigo: rgba(140, 150, 185, 0.05);
 }
 
 html,
@@ -26,119 +73,808 @@ body,
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: #f5f7fa;
-  color: #303133;
+  color: var(--ink);
+  background-color: var(--surface-page);
+  /* 固定不随滚动移动：光斑若跟着滚，玻璃的模糊会产生拖影感 */
+  background-image:
+    radial-gradient(760px 520px at 8% -6%, var(--aurora-primary), transparent 68%),
+    radial-gradient(680px 460px at 92% 2%, var(--aurora-cyan), transparent 68%),
+    radial-gradient(620px 560px at 64% 106%, var(--aurora-indigo), transparent 70%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* 页面画布：取代原先页面根节点的 bg-surface-page。
+   页面底色必须让位给 body 的环境光，玻璃容器才有东西可透；
+   注意与 .bg-surface-page（实色浅灰填充块）区分，后者仍用于 chip / 引用块等实底场景。 */
+.app-canvas {
+  background-color: transparent;
+}
+
 @layer components {
+  /* ------------------------------------------------------------------
+     Liquid Glass 通用材质
+     三档不透明度对应"需要被看清的程度"：条 < 面板 < 浮层。
+     模板里裸写的 bg-white / ring-1 ring-black/5 一律替换为下列语义类，
+     避免材质参数在各页面被逐处硬编码、逐步漂移。
+     ------------------------------------------------------------------ */
+
+  /* 玻璃条：页头 / 工具栏 / 分页条，其上文字需高可读性，故不透明度最高 */
+  .glass-bar {
+    background-color: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-color: var(--glass-line);
+  }
+
+  /* 玻璃面板：卡片、表格容器、看板列等主要承载面 */
+  .glass-panel {
+    background-color: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-line);
+    box-shadow: var(--shadow-glass), var(--specular);
+    border-radius: var(--radius-lg);
+  }
+
+  /* 内嵌玻璃：位于面板内部，比面板更轻，避免材质堆叠导致发灰 */
+  .glass-inset {
+    background-color: var(--glass-subtle);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-line);
+    border-radius: var(--radius-md);
+  }
+
+  /* 浮层玻璃：下拉 / 搜索面板 / 对话框，需脱离页面层次并保证内容完全可读 */
+  .glass-pop {
+    background-color: var(--glass-pop);
+    -webkit-backdrop-filter: var(--glass-blur-lg);
+    backdrop-filter: var(--glass-blur-lg);
+    border: 1px solid var(--glass-line);
+    box-shadow: var(--shadow-glass-pop), var(--specular);
+  }
+
   .card {
-    @apply rounded-xl bg-white shadow-card;
+    background-color: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-line);
+    box-shadow: var(--shadow-glass), var(--specular);
+    border-radius: var(--radius-lg);
   }
 
   .card-interactive {
-    @apply rounded-xl bg-white shadow-card transition-all duration-300 ease-out-expo;
+    background-color: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-line);
+    box-shadow: var(--shadow-glass), var(--specular);
+    border-radius: var(--radius-lg);
+    transition: box-shadow 0.3s var(--ease-expo), transform 0.3s var(--ease-expo),
+      background-color 0.3s var(--ease-expo);
   }
 
+  /* hover 不再靠换色表达，改为"抬升 + 加大投影 + 略微加实"，
+     并用极淡的品牌色渐变把玻璃染上一层蓝，呼应主色 */
   .card-interactive:hover {
-    @apply shadow-card-hover-lg -translate-y-0.5;
-    background-image: linear-gradient(135deg, rgba(64,158,255,0.04) 0%, rgba(24,144,255,0.02) 100%);
+    background-color: var(--glass-strong);
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary) 6%, transparent) 0%,
+      color-mix(in srgb, var(--primary-dark) 3%, transparent) 100%
+    );
+    box-shadow: var(--shadow-glass-lift), var(--specular);
+    transform: translateY(-2px);
   }
 
   .page-container {
-    @apply h-full overflow-auto bg-surface-page p-8;
+    height: 100%;
+    overflow: auto;
+    padding: 2rem;
+    /* 原 bg-surface-page：页面底色交给 body 的环境光，容器自身保持透明 */
+    background-color: transparent;
   }
 
   .page-title {
-    @apply text-2xl font-semibold tracking-tight text-ink;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    color: var(--ink);
   }
 
   .page-subtitle {
-    @apply mt-1 text-sm text-ink-secondary;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--ink-secondary);
   }
 
   .btn-primary {
-    @apply inline-flex items-center gap-1.5 rounded-lg bg-gradient-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 ease-out-expo;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 0.5rem;
+    background-image: linear-gradient(135deg, #409eff 0%, #1890ff 100%);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: #fff;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    transition: all 0.2s var(--ease-expo);
   }
 
   .btn-primary:hover {
-    @apply shadow-md -translate-y-0.5;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    transform: translateY(-0.125rem);
     filter: brightness(1.05);
   }
 
   .btn-primary:active {
-    @apply translate-y-0;
+    transform: translateY(0);
     filter: brightness(0.98);
   }
 
   .btn-default {
-    @apply inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-3.5 py-2 text-sm text-ink-regular transition-all duration-200 hover:bg-surface-hover hover:border-primary-300;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--line);
+    background-color: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--ink-regular);
+    transition: all 0.2s;
+  }
+
+  .btn-default:hover {
+    background-color: var(--glass-strong);
+    border-color: #8cc8ff;
   }
 
   .btn-text {
-    @apply rounded-md px-2 py-1 text-sm text-ink-secondary transition hover:text-primary;
+    border-radius: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--ink-secondary);
+    transition: color 0.15s;
+  }
+
+  .btn-text:hover {
+    color: var(--primary);
   }
 
   .input-base {
-    @apply w-full rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none transition-all duration-200 focus:border-primary focus:ring-2 focus:ring-primary-100;
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid var(--line);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--ink);
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  .input-base:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px #e6f3ff;
   }
 
   .label-base {
-    @apply mb-1.5 block text-sm font-medium text-ink-regular;
+    display: block;
+    margin-bottom: 0.375rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: var(--ink-regular);
   }
 
   .nav-item {
-    @apply mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-ink-regular transition-all duration-200;
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 0.25rem;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--ink-regular);
+    transition: all 0.2s;
   }
 
   .nav-item:hover {
-    @apply bg-surface-hover text-ink;
+    background-color: rgba(255, 255, 255, 0.6);
+    color: var(--ink);
   }
 
+  /* 选中态用品牌蓝的半透明填充，而非实色 #f0f7ff：
+     玻璃容器上叠实色会显得"糊"出一块，半透明则保持通透 */
   .nav-item-active {
-    @apply bg-primary-50 text-primary-600 font-medium;
+    background-color: rgba(64, 158, 255, 0.12);
+    color: #1890ff;
+    font-weight: 500;
   }
 
   .sidebar {
-    @apply flex w-60 flex-col border-r border-line-light bg-white;
+    display: flex;
+    width: 15rem;
+    flex-direction: column;
+    border-right: 1px solid var(--glass-line);
+    background-color: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
   }
 
   .sidebar-logo {
-    @apply flex items-center gap-2 px-5 py-5;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.25rem;
   }
 
   .sidebar-logo-icon {
-    @apply flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white;
+    display: flex;
+    height: 2rem;
+    width: 2rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    background-color: var(--primary);
+    color: #fff;
   }
 
   .table-wrapper {
-    @apply overflow-hidden rounded-xl bg-white shadow-card;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    background-color: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-line);
+    box-shadow: var(--shadow-glass), var(--specular);
   }
 
   .table-head th {
-    @apply border-b border-line-light bg-surface-light px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-secondary;
+    border-bottom: 1px solid var(--line-light);
+    background-color: rgba(255, 255, 255, 0.5);
+    padding: 0.75rem 1.25rem;
+    text-align: left;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-secondary);
   }
 
   .table-row {
-    @apply border-b border-line-lighter transition last:border-0 hover:bg-primary-50/40;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.15s;
+  }
+
+  .table-row:last-child {
+    border-bottom: 0;
+  }
+
+  .table-row:hover {
+    background-color: rgba(64, 158, 255, 0.06);
   }
 
   .tag-status {
-    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
   }
 
   .avatar-sm {
-    @apply flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium;
+    display: flex;
+    height: 2rem;
+    width: 2rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
   }
 
   .avatar-primary {
-    @apply bg-primary-light text-primary;
+    background-color: rgba(64, 158, 255, 0.14);
+    color: var(--primary);
   }
 
   .stat-pill {
-    @apply inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 0.5rem;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    transition: background-color 0.15s, color 0.15s;
   }
+
+  /* ------------------------------------------------------------------
+     数据列表统一规范（视觉基准：缺陷页）
+     需求 / 任务 / 缺陷 / 迭代 / 里程碑 / 风险 六页共用。
+     与既有 .table-head/.table-row 并存：后者仍服务于用户管理、项目列表页，
+     两者规范不同，切勿混用。
+     ------------------------------------------------------------------ */
+
+  /* 顶部工具栏：横向玻璃条，下沿以极淡描边分隔，不再用实线 border-line-light */
+  .toolbar {
+    display: flex;
+    height: 3.5rem;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--glass-line);
+    background-color: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .toolbar-back {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--ink-regular);
+    transition: opacity 0.15s;
+  }
+  .toolbar-back:hover {
+    opacity: 0.8;
+  }
+  .toolbar-title {
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .count-pill {
+    border-radius: 9999px;
+    background-color: rgba(255, 255, 255, 0.6);
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--ink-secondary);
+  }
+  .search-box {
+    @apply flex items-center gap-2 rounded-lg bg-surface-page px-2.5 py-1.5;
+  }
+  .search-input {
+    @apply w-44 bg-transparent text-sm text-ink outline-none placeholder:text-ink-placeholder;
+  }
+  .btn-create {
+    @apply flex items-center gap-1 rounded-lg bg-brand px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-dark;
+  }
+  .btn-ghost {
+    @apply flex items-center gap-1 rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink-regular transition hover:bg-surface-page;
+  }
+
+  /* 列表表格 */
+  .data-table {
+    width: 100%;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    /* 不再自带白底：表格通常已处在 .glass-panel 内，
+       再叠一层会让玻璃重复虚化而发灰；单用时由父容器兜底 */
+    background-color: transparent;
+  }
+  /* 粘性表头必须保持较高不透明度，否则行内容会从表头下方透出 */
+  .data-thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
+  .data-th {
+    border-bottom: 1px solid var(--glass-line);
+    padding: 0.75rem;
+    text-align: left;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    color: var(--ink-secondary);
+  }
+  .data-th-first {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .data-tr {
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.15s;
+  }
+  .data-tr:last-child {
+    border-bottom: 0;
+  }
+  .data-tr:hover {
+    background-color: rgba(64, 158, 255, 0.07);
+  }
+  .data-td {
+    padding: 0.75rem;
+  }
+  .data-td-first {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .empty-row {
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+    text-align: center;
+    color: var(--ink-placeholder);
+  }
+
+  /* 左侧范围导航：竖向玻璃条，与 .toolbar 同一材质档位 */
+  .scope-nav {
+    display: flex;
+    width: 200px;
+    flex-shrink: 0;
+    flex-direction: column;
+    overflow-y: auto;
+    border-right: 1px solid var(--glass-line);
+    background-color: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    padding: 0.75rem 0.5rem;
+  }
+  .scope-nav-group {
+    margin-bottom: 1rem;
+  }
+  .scope-nav-title {
+    margin-bottom: 0.375rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    color: var(--ink-secondary);
+  }
+  .scope-nav-item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .scope-nav-item-active {
+    background-color: rgba(64, 158, 255, 0.12);
+    font-weight: 500;
+    color: var(--primary);
+  }
+  .scope-nav-item-idle {
+    color: var(--ink-regular);
+  }
+  .scope-nav-item-idle:hover {
+    background-color: rgba(255, 255, 255, 0.6);
+    color: var(--ink);
+  }
+  .scope-nav-count {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--ink-placeholder);
+  }
+
+  /* 视图切换：外框为浅玻璃槽，选中项用品牌蓝实底压住，保证当前视图最醒目 */
+  .view-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--glass-line);
+    background-color: rgba(255, 255, 255, 0.4);
+    padding: 0.125rem;
+  }
+  .view-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .view-tab-active {
+    background-color: var(--primary);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+  .view-tab-idle {
+    color: var(--ink-regular);
+  }
+  .view-tab-idle:hover {
+    background-color: rgba(255, 255, 255, 0.62);
+  }
+
+  /* 徽标与单元格（配色统一由 issueDict.badgeStyle 生成：实色文字 + 10% 底） */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+  }
+  .badge-solid {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    color: #fff;
+  }
+  .badge-xs {
+    padding: 0.125rem 0.375rem;
+    font-size: 10px;
+  }
+  .avatar-xs {
+    display: flex;
+    height: 1.5rem;
+    width: 1.5rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    color: #fff;
+  }
+  .cell-user {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .cell-key {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+      'Courier New', monospace;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--ink-placeholder);
+  }
+  .cell-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  .cell-text {
+    color: var(--ink-regular);
+  }
+  .cell-muted {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--ink-secondary);
+  }
+
+  /* 行内操作 */
+  .row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+  }
+  .row-action {
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .row-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .row-action-default {
+    color: var(--ink-regular);
+  }
+  .row-action-default:hover {
+    background-color: rgba(255, 255, 255, 0.7);
+    color: var(--primary);
+  }
+  .row-action-success {
+    color: #52c41a;
+  }
+  .row-action-success:hover {
+    background-color: rgba(82, 196, 26, 0.12);
+  }
+  .row-action-warning {
+    color: #faad14;
+  }
+  .row-action-warning:hover {
+    background-color: rgba(250, 173, 20, 0.12);
+  }
+  .row-action-danger {
+    color: var(--danger);
+  }
+  .row-action-danger:hover {
+    background-color: rgba(245, 108, 108, 0.12);
+  }
+
+  /* 列表内联状态切换下拉（缺陷页列表视图） */
+  .status-select {
+    cursor: pointer;
+    border-radius: 0.25rem;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    outline: none;
+  }
+  .status-select:disabled {
+    cursor: not-allowed;
+  }
+
+  /* 看板：三档材质自外层向内递增不透明度。
+     分组槽 0.3 → 列 0.3 → 卡片 0.78，
+     卡片最不透明是因为卡面承载标题等正文，必须最先被读清。 */
+  .kanban-page {
+    height: 100%;
+    overflow: auto;
+    padding: 1rem;
+    background-color: transparent;
+  }
+  .kanban-group {
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    border-radius: 0.75rem;
+    background-color: var(--glass-subtle);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-line);
+    padding: 0.75rem;
+  }
+  .kanban-group-head {
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+  .kanban-cols {
+    display: flex;
+    align-items: stretch;
+    gap: 1rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+  .kanban-col {
+    display: flex;
+    height: 100%;
+    width: 280px;
+    flex-shrink: 0;
+    flex-direction: column;
+    border-radius: 0.75rem;
+    background-color: rgba(255, 255, 255, 0.3);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-line);
+    transition: background-color 0.2s, border-color 0.2s;
+  }
+  .kanban-col-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+  .kanban-card {
+    cursor: pointer;
+    border-radius: 0.5rem;
+    background-color: rgba(255, 255, 255, 0.78);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-line);
+    padding: 0.75rem;
+    box-shadow: 0 1px 2px rgba(48, 49, 51, 0.05);
+    transition: box-shadow 0.2s, transform 0.2s, background-color 0.2s;
+  }
+  .kanban-card:hover {
+    background-color: rgba(255, 255, 255, 0.92);
+    box-shadow: var(--shadow-glass-lift);
+    transform: translateY(-1px);
+  }
+
+  /* 树形 */
+  .tree-page {
+    height: 100%;
+    padding: 1rem;
+    background-color: transparent;
+  }
+  .tree-node {
+    margin-bottom: 0.25rem;
+    display: flex;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition: background-color 0.15s;
+  }
+  .tree-node:hover {
+    background-color: rgba(255, 255, 255, 0.6);
+  }
+}
+
+/* ------------------------------------------------------------------
+   Element Plus 表格主题对齐
+   el-table 保留了排序、固定列、行内编辑等能力，不重写为原生 table；
+   这里仅覆写表头/行/圆角等视觉令牌，使其与 .table-head/.table-row 一致。
+   ------------------------------------------------------------------ */
+.el-table {
+  --el-table-border-color: var(--glass-line);
+  --el-table-header-text-color: var(--ink-secondary);
+  --el-table-text-color: var(--ink);
+  --el-table-row-hover-bg-color: rgba(64, 158, 255, 0.07);
+  /* 剥掉 el-table 自带的实色底，否则外层玻璃面板会被这层白盖住、失去通透 */
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: transparent;
+  font-size: 14px;
+  background-color: transparent;
+}
+
+/* 表头保持较高不透明度：它是 sticky 的，滚动时行内容会从下方穿过 */
+.el-table th.el-table__cell {
+  background-color: rgba(255, 255, 255, 0.72) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  padding: 12px 0;
+}
+
+.el-table td.el-table__cell {
+  padding: 12px 0;
+}
+
+.el-table .el-table__row {
+  transition: background-color 0.2s;
+}
+
+/* 去掉表格外围描边，交由外层容器统一提供圆角与描边 */
+.el-table::before,
+.el-table--border::after {
+  display: none;
+}
+
+.el-table .cell {
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 ::-webkit-scrollbar {
@@ -149,18 +885,18 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d0d3d9;
+  background: var(--line-light);
   border-radius: 4px;
   transition: background 0.2s;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #b8bcc4;
+  background: var(--ink-placeholder);
 }
 
 .sortable-ghost {
   opacity: 1;
   background: #fff !important;
-  outline: 1px dashed #409EFF;
+  outline: 1px dashed var(--primary);
   outline-offset: -1px;
   border-radius: 8px;
 }
@@ -177,13 +913,13 @@ body {
   -webkit-user-select: none;
 }
 .kanban-col-allow {
-  background-color: rgba(64, 158, 255, 0.10) !important;
-  outline: 2px dashed #409EFF;
+  background-color: color-mix(in srgb, var(--primary) 10%, transparent) !important;
+  outline: 2px dashed var(--primary);
   outline-offset: -2px;
 }
 .kanban-col-deny {
-  background-color: rgba(245, 108, 108, 0.10) !important;
-  outline: 2px dashed #F56C6C;
+  background-color: color-mix(in srgb, var(--danger) 10%, transparent) !important;
+  outline: 2px dashed var(--danger);
   outline-offset: -2px;
   cursor: not-allowed;
 }

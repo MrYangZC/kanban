@@ -3,21 +3,19 @@ import { onMounted, ref, reactive, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   filterIssues, updateIssue, listProjectStatuses,
-  listProjectTags, listProjectMembers, listUsers, getProject,
-  listActivities, addComment, deleteComment, listAttachments, addAttachment, deleteAttachment,
-  uploadImage, uploadAttachment,
-  listLinks, addLink, deleteLink, listIssueTags, addIssueTag, removeIssueTag
+  listProjectTags, listProjectMembers, listUsers, getProject
 } from '@/api'
 import type {
   Issue, LabelVO, ProjectMember, UserVO, IssueStatusVO,
-  IssueActivity, AttachmentVO, LinkVO, Project
+  IssueActivity, Project
 } from '@/api/types'
-import { REQUIREMENT_TYPE_CODES, TASK_TYPE_CODES, DEFECT_TYPE_CODES } from '@/api/types'
-import { ElMessage } from 'element-plus'
+import { REQUIREMENT_TYPE_CODES, TASK_TYPE_CODES, DEFECT_TYPE_CODES, categoryOfTypeCode } from '@/api/types'
+import type { WorkItemCategory } from '@/api/types'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Plus, X,
   Paperclip, Link2, Trash2,
-  AlertTriangle, Send, MoreHorizontal, Search, Check
+  AlertTriangle, Send, MoreHorizontal, Search
 } from 'lucide-vue-next'
 import CommentThread from '@/components/CommentThread.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
@@ -25,10 +23,11 @@ import IssueBasicFields from '@/components/IssueBasicFields.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import { useUserStore } from '@/stores/user'
 import { useProjectPermission } from '@/composables/useProjectPermission'
-import { avatarChar, avatarColor } from '@/utils/avatar'
+import { useIssueTabs } from '@/composables/useIssueTabs'
+import { buildCommentTree, type CommentNode } from '@/utils/commentTree'
+import ActivityItem from '@/components/ActivityItem.vue'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import { fmtTime, fmtDate } from '@/utils/datetime'
-
-type CommentNode = IssueActivity & { children?: CommentNode[] }
 
 const props = withDefaults(defineProps<{
   projectId?: string
@@ -47,9 +46,7 @@ const route = useRoute()
 const router = useRouter()
 const pid = computed(() => props.projectId || (route.params.projectId as string) || '')
 
-const PRIMARY = '#409EFF'
-const PRIMARY_LIGHT = '#E1F0FF'
-const PRIMARY_LIGHTER = '#DBECFF'
+
 
 const project = ref<Project | null>(null)
 const loading = ref(false)
@@ -66,6 +63,17 @@ const currentIssue = ref<Issue | null>(null)
 const currentIndex = computed(() =>
   currentIssue.value ? allIssues.value.findIndex((i) => i.id === currentIssue.value!.id) : -1
 )
+
+// 按工作项类型区分标题/字段（任务/需求不再展示缺陷专属文案）
+const issueTypeCode = computed(() => currentIssue.value?.issueTypeCode || '')
+const isDefect = computed(() => DEFECT_TYPE_CODES.includes(issueTypeCode.value))
+const typeLabel = computed(() => {
+  if (TASK_TYPE_CODES.includes(issueTypeCode.value)) return '任务'
+  if (REQUIREMENT_TYPE_CODES.includes(issueTypeCode.value)) return '需求'
+  if (DEFECT_TYPE_CODES.includes(issueTypeCode.value)) return '缺陷'
+  return '工作项'
+})
+const titlePlaceholder = computed(() => `${typeLabel.value}标题`)
 const prevIssue = computed(() => currentIndex.value > 0 ? allIssues.value[currentIndex.value - 1] : null)
 const nextIssue = computed(() =>
   currentIndex.value >= 0 && currentIndex.value < allIssues.value.length - 1
@@ -85,12 +93,30 @@ const severityOptions = [
   { v: 'S4', label: '轻微' }
 ]
 
+// 动态&评论 / 附件 / 关联 / 标签四个页签的数据与增删逻辑收敛到共享 composable
+// （与 IssueDetailPanel 共用，避免两处实现漂移）
+const {
+  activities,
+  attachments,
+  links,
+  tags,
+  reload: reloadTabs,
+  sendComment: sendCommentApi,
+  uploadFile: uploadFileApi,
+  addNamedAttachment,
+  addLinkItems,
+  removeComment,
+  removeAttachment: removeAttach,
+  removeLink: removeLinkApi,
+  addTag: addTagApi,
+  removeTag
+} = useIssueTabs({
+  issueId: () => currentIssue.value?.id || '',
+  projectId: () => pid.value
+})
+
 const mainTab = ref<'activity' | 'link' | 'other'>('activity')
 const subTab = ref<'all' | 'comment' | 'dynamic'>('all')
-const activities = ref<IssueActivity[]>([])
-const attachments = ref<AttachmentVO[]>([])
-const links = ref<LinkVO[]>([])
-const tags = ref<LabelVO[]>([])
 const commentText = ref('')
 const commenting = ref(false)
 const replyTo = ref<IssueActivity | null>(null)   // 当前回复目标评论（嵌套回复）
@@ -131,7 +157,6 @@ const form = reactive({
   source: '',
   dueDate: '' as string | null,
   planStart: '' as string | null,
-  planEnd: '',
   noFixReason: '',
   iteration: '',
   ccUsers: [] as string[],
@@ -147,87 +172,94 @@ const filteredActivities = computed(() => {
 })
 const commentCount = computed(() => activities.value.filter((a) => a.type === 'COMMENT').length)
 
-// 评论树：把 COMMENT 类型按 parentId 组装为嵌套楼层（顶层 parentId 为空），状态活动保持平铺展示
-const commentTree = computed<(IssueActivity | CommentNode)[]>(() => {
-  const base = filteredActivities.value
-  const byId = new Map<string, CommentNode>()
-  const roots: CommentNode[] = []
-  for (const a of base) {
-    if (a.type !== 'COMMENT') continue
-    byId.set(a.id, { ...a, children: [] })
-  }
-  for (const a of base) {
-    if (a.type !== 'COMMENT') continue
-    const node = byId.get(a.id)!
-    const parent = a.parentId ? byId.get(a.parentId) : null
-    if (parent) parent.children!.push(node)
-    else roots.push(node)
-  }
-  roots.sort((x, y) => (x.createdAt || '').localeCompare(y.createdAt || ''))
-  const sortChildren = (n: CommentNode) => {
-    n.children!.sort((x, y) => (x.createdAt || '').localeCompare(y.createdAt || ''))
-    n.children!.forEach(sortChildren)
-  }
-  roots.forEach(sortChildren)
-  // 顶层评论作为「评论树根」，状态活动与之按时间平铺
-  const result: (IssueActivity | CommentNode)[] = []
-  for (const a of base) {
-    if (a.type !== 'COMMENT') result.push(a)
-    else if (!a.parentId) result.push(byId.get(a.id)!)
-  }
-  result.sort((x, y) => (x.createdAt || '').localeCompare(y.createdAt || ''))
-  return result
-})
+// 评论楼层：由纯函数构建，与抽屉面板共用同一套嵌套/排序规则
+const commentTree = computed<(IssueActivity | CommentNode)[]>(() =>
+  buildCommentTree(filteredActivities.value)
+)
 const userStore = useUserStore()
 // 当前登录用户真实 id（避免硬编码 admin 导致角色/权限误判）
-const currentUserId = computed(() => userStore.user?.id || '')
 const currentUserName = computed(() => userStore.user?.displayName || userStore.user?.username || '')
 
+// 元数据（项目/状态/标签/成员/用户）各自独立加载：任一失败只降级对应下拉数据，
+// 不阻塞详情正文渲染；错误提示由 api 拦截器统一给出，此处不重复弹出。
 async function loadMeta() {
-  try { project.value = await getProject(pid.value) } catch { /* ignore */ }
-  try { statuses.value = await listProjectStatuses(pid.value) } catch { /* ignore */ }
-  try { allTags.value = await listProjectTags(pid.value) } catch { /* ignore */ }
-  try { members.value = await listProjectMembers(pid.value) } catch { /* ignore */ }
-  try { users.value = await listUsers() } catch { /* ignore */ }
+  try { project.value = await getProject(pid.value) } catch { /* 项目名降级为标题占位 */ }
+  // 状态下拉按工作项类别取（任务/需求/缺陷各一套工作流），在 selectIssue 拿到类型后再加载
+  try { allTags.value = await listProjectTags(pid.value) } catch { /* 项目标签库为空 */ }
+  try { members.value = await listProjectMembers(pid.value) } catch { /* 负责人候选为空 */ }
+  try { users.value = await listUsers() } catch { /* 创建人/报告人名称显示为 '—' */ }
   refreshPermission()
+}
+
+/** 同类工作项的类型码集合：上一条/下一条只在同一类之间导航 */
+function siblingTypeCodes(code?: string | null): string[] {
+  switch (categoryOfTypeCode(code)) {
+    case 'BUG': return DEFECT_TYPE_CODES
+    case 'REQUIREMENT': return REQUIREMENT_TYPE_CODES
+    default: return TASK_TYPE_CODES
+  }
 }
 
 async function loadIssues() {
   loading.value = true
   try {
-    const res = await filterIssues({ projectId: pid.value, page: 1, size: 500 })
-    allIssues.value = res.list
     const targetId = props.embedded
       ? props.issueId
       : route.params.issueId as string | undefined
+    // 这里只做定位用：一次拉回项目内全部工作项，找到当前项后再按它的类别收窄
+    const res = await filterIssues({ projectId: pid.value, page: 1, size: 500 })
     const target = targetId
-      ? allIssues.value.find((i) => i.id === targetId)
-      : allIssues.value[0]
-    if (target) selectIssue(target)
+      ? res.list.find((i) => i.id === targetId)
+      : res.list[0]
+    // 上一条/下一条只在同类工作项间导航。此前三类全量入列，
+    // 在缺陷页一路翻页会翻到任务/需求，右栏「工作项类型」随即显示成「故事」，
+    // 看着像类型取错了，其实是列表把三类混在了一起。
+    const codes = target ? siblingTypeCodes(target.issueTypeCode) : null
+    allIssues.value = codes
+      ? res.list.filter((i) => codes.includes(i.issueTypeCode || ''))
+      : res.list
+    if (target) await selectIssue(target)
+  } catch {
+    // 列表加载失败已在请求层提示；保留空列表展示空态，避免抛未捕获的 rejection
   } finally {
     loading.value = false
   }
 }
 
-function selectIssue(issue: Issue) {
+/**
+ * 按当前工作项的类别加载状态下拉。
+ * 同一个详情组件承接任务/需求/缺陷，三类状态的节点不同，必须跟随 issueTypeCode 切换；
+ * 类别未变时跳过，避免相邻工作项间来回切换时空转。
+ */
+let statusCategory: WorkItemCategory | '' = ''
+async function ensureStatuses(category: WorkItemCategory) {
+  if (statusCategory === category) return
+  statusCategory = category
+  try {
+    statuses.value = await listProjectStatuses(pid.value, category)
+  } catch {
+    statuses.value = []
+  }
+}
+
+async function selectIssue(issue: Issue) {
   currentIssue.value = issue
+  await ensureStatuses(categoryOfTypeCode(issue.issueTypeCode))
   if (props.embedded) {
     emit('update:issueId', issue.id)
   } else {
     router.replace(`/projects/${pid.value}/defects/${issue.id}`)
   }
-  loadDetail(issue.id)
+  await loadDetail(issue.id)
 }
 
 async function loadDetail(issueId: string) {
-  try { activities.value = await listActivities(issueId) } catch { /* ignore */ }
-  try { attachments.value = await listAttachments(issueId) } catch { /* ignore */ }
-  try { links.value = await listLinks(issueId) } catch { /* ignore */ }
+  // 四个页签并行加载（读取失败时保留上一次数据，不阻断下方表单回填）
+  await reloadTabs()
   // 重置关联区临时状态，确保不同工作项之间数据隔离
   linkFilter.value = 'all'
   linkOptions.value = []
   linkSelected.value = []
-  try { tags.value = await listIssueTags(issueId) } catch { /* ignore */ }
   const issue = allIssues.value.find((i) => i.id === issueId)
   if (issue) {
     form.title = issue.title
@@ -253,7 +285,9 @@ watch(() => props.issueId, (id) => {
   if (!props.embedded || !id) return
   if (currentIssue.value?.id !== id) {
     const issue = allIssues.value.find((i) => i.id === id)
+    // 列表已按当前类别收窄，跨类跳转时不在其中 → 重新装载，否则页面停在旧工作项上
     if (issue) selectIssue(issue)
+    else loadIssues()
   }
 })
 
@@ -262,6 +296,7 @@ watch(() => route.params.issueId, (id) => {
   if (id && currentIssue.value?.id !== id) {
     const issue = allIssues.value.find((i) => i.id === id)
     if (issue) selectIssue(issue)
+    else loadIssues()
   }
 })
 
@@ -324,31 +359,24 @@ function cancelComment() {
   replyTo.value = null
 }
 async function sendComment() {
-  if (!currentIssue.value || !commentText.value.trim() || !canComment.value) {
-    if (!canComment.value) ElMessage.warning('无评论权限')
+  if (!commentText.value.trim()) return
+  if (!canComment.value) {
+    ElMessage.warning('无评论权限')
     return
   }
-  try {
-    await addComment(currentIssue.value.id, commentText.value.trim(), replyTo.value?.id || null)
-    commentText.value = ''
-    commenting.value = false
-    replyTo.value = null
-    activities.value = await listActivities(currentIssue.value.id)
-  } catch {
-    ElMessage.error('评论发送失败')
-  }
+  const ok = await sendCommentApi(commentText.value, replyTo.value?.id || null)
+  if (!ok) return
+  commentText.value = ''
+  commenting.value = false
+  replyTo.value = null
 }
-function onAttachChange(e: Event) {
+async function onAttachChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (file && currentIssue.value) {
-    uploadAttachment(currentIssue.value.id, file)
-      .then(() => {
-        commentEditorRef.value?.insert(`\n[附件](${file.name})\n`)
-        return listAttachments(currentIssue.value!.id)
-      })
-      .then((list) => (attachments.value = list))
-      .catch(() => ElMessage.error('附件上传失败'))
+    // 上传成功后把附件引用插入评论文本，失败提示由接口层统一给出
+    const ok = await uploadFileApi(file)
+    if (ok) commentEditorRef.value?.insert(`\n[附件](${file.name})\n`)
   }
   input.value = ''
 }
@@ -361,7 +389,7 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 function renderDescription(content: string | null | undefined): string {
-  if (!content) return '<span style="color:#c0c4cc">暂无描述</span>'
+  if (!content) return '<span class="text-ink-placeholder">暂无描述</span>'
   const imgRe = /!\[([^\]]*)\]\(([^)\s]+)\)/g
   let out = ''
   let last = 0
@@ -394,23 +422,38 @@ const descriptionImages = computed(() => {
   return res
 })
 
-async function removeComment(id: string) {
-  if (!currentIssue.value) return
-  await deleteComment(currentIssue.value.id, id)
-  activities.value = await listActivities(currentIssue.value.id)
-}
-
 async function addAttach() {
-  if (!currentIssue.value || !attachName.value.trim()) return
-  await addAttachment(currentIssue.value.id, attachName.value.trim(), 'application/octet-stream', 0)
-  attachName.value = ''
-  attachments.value = await listAttachments(currentIssue.value.id)
+  if (await addNamedAttachment(attachName.value)) attachName.value = ''
 }
 
-async function removeAttach(id: string) {
-  if (!currentIssue.value) return
-  await deleteAttachment(currentIssue.value.id, id)
-  attachments.value = await listAttachments(currentIssue.value.id)
+/**
+ * 删除类操作统一二次确认：评论与附件一旦删除不可恢复，
+ * 直接落库容易因误触丢失协作记录。
+ */
+async function confirmRemove(text: string, title: string): Promise<boolean> {
+  try {
+    await ElMessageBox.confirm(text, title, {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消'
+    })
+    return true
+  } catch {
+    // 用户取消：静默返回，不触发接口
+    return false
+  }
+}
+
+async function onRemoveComment(commentId: string) {
+  if (await confirmRemove('确定删除该评论吗？删除后不可恢复。', '删除评论')) {
+    await removeComment(commentId)
+  }
+}
+
+async function onRemoveAttach(attachmentId: string) {
+  if (await confirmRemove('确定删除该附件吗？', '删除附件')) {
+    await removeAttach(attachmentId)
+  }
 }
 
 async function searchLinks(keyword?: string) {
@@ -458,19 +501,14 @@ async function onLinkSelectionChange(val: string[]) {
   if (!currentIssue.value) return
   const linkedIds = new Set(links.value.map((l) => l.targetIssueId))
   const added = val.filter((id) => !linkedIds.has(id))
-  if (added.length) {
-    await Promise.all(added.map((t) => addLink(currentIssue.value!.id, t, linkType.value)))
-    links.value = await listLinks(currentIssue.value.id)
-  }
+  if (added.length) await addLinkItems(added, linkType.value)
   // 选中后立即清空临时选择，便于下次再选，且不会触发误删
   linkSelected.value = []
 }
 
 async function removeLink(id: string) {
-  if (!currentIssue.value) return
-  await deleteLink(currentIssue.value.id, id)
-  links.value = await listLinks(currentIssue.value.id)
-  await searchLinks()
+  // 移除成功后刷新候选列表，避免刚删除的项仍留在下拉中
+  if (await removeLinkApi(id)) await searchLinks()
 }
 
 watch(() => mainTab.value, (v) => {
@@ -481,21 +519,12 @@ watch(() => mainTab.value, (v) => {
 })
 
 async function onAddTag() {
-  const input = fieldsRef.value?.tagInput?.trim()
-  if (!currentIssue.value || !input) return
-  await addIssueTag(currentIssue.value.id, pid.value, input, PRIMARY)
-  fieldsRef.value?.clearTagInput()
-  tags.value = await listIssueTags(currentIssue.value.id)
-}
-
-async function removeTag(labelId: string) {
-  if (!currentIssue.value) return
-  await removeIssueTag(currentIssue.value.id, labelId)
-  tags.value = tags.value.filter((t) => t.id !== labelId)
+  if (await addTagApi(fieldsRef.value?.tagInput || '')) fieldsRef.value?.clearTagInput()
 }
 
 function back() {
-  router.push(`/projects/${pid.value}/table`)
+  // 返回缺陷列表，保留「缺陷」上下文（此前跳到 /table 会退化为「默认看板」）
+  router.push(`/projects/${pid.value}/defects`)
 }
 function close() {
   emit('close')
@@ -503,54 +532,50 @@ function close() {
 function goPrev() { if (prevIssue.value) selectIssue(prevIssue.value) }
 function goNext() { if (nextIssue.value) selectIssue(nextIssue.value) }
 
-const statusColor = (id: string) => statuses.value.find((s) => s.id === id)?.color || PRIMARY
+
 const userName = (id: string | null) => users.value.find((u) => u.id === id)?.displayName || '—'
-const memberName = (m: ProjectMember) => m.displayName || m.username
 
 
-onMounted(() => {
-  loadMeta().then(loadIssues)
+
+onMounted(async () => {
+  // 元数据与列表串行：先拿到状态/成员字典，列表回落表单时下拉才有可选项
+  await loadMeta()
+  await loadIssues()
 })
 </script>
 
 <template>
-  <div class="flex h-full flex-col" style="background:#f5f7fa">
+  <div class="app-canvas flex h-full flex-col">
     <!-- ======== 顶部导航（embedded：紧凑顶栏） ======== -->
     <header
       v-if="embedded"
-      class="flex h-12 shrink-0 items-center gap-2 border-b bg-white px-3"
-      style="border-color:#e4e7ed"
+      class="glass-bar flex h-12 shrink-0 items-center gap-2 border-b px-3"
     >
-      <AlertTriangle :size="16" class="shrink-0" style="color:#F56C6C" />
+      <AlertTriangle :size="16" class="shrink-0 text-danger" />
       <span
-        class="shrink-0 rounded px-1.5 py-0.5 font-mono text-xs text-white"
-        :style="{ background: PRIMARY }"
+        class="shrink-0 rounded bg-primary px-1.5 py-0.5 font-mono text-xs text-white"
       >{{ currentIssue?.issueKey || '—' }}</span>
       <button
-        class="flex h-7 w-7 shrink-0 items-center justify-center rounded transition hover:bg-[#f5f7fa]"
-        style="color:#909399"
+        class="flex h-7 w-7 shrink-0 items-center justify-center rounded text-ink-secondary transition hover:bg-surface-page"
         title="更多操作"
       ><MoreHorizontal :size="16" /></button>
       <div class="ml-auto flex items-center gap-2">
         <button
-          class="flex h-7 w-7 items-center justify-center rounded border disabled:opacity-40"
-          style="border-color:#dcdfe6"
+          class="flex h-7 w-7 items-center justify-center rounded border border-line disabled:opacity-40"
           :disabled="!prevIssue"
           @click="goPrev"
         ><ChevronLeft :size="16" /></button>
-        <span class="text-xs tabular-nums" style="color:#909399">
+        <span class="text-xs tabular-nums text-ink-secondary">
           {{ currentIndex >= 0 ? currentIndex + 1 : 0 }} / {{ allIssues.length }}
         </span>
         <button
-          class="flex h-7 w-7 items-center justify-center rounded border disabled:opacity-40"
-          style="border-color:#dcdfe6"
+          class="flex h-7 w-7 items-center justify-center rounded border border-line disabled:opacity-40"
           :disabled="!nextIssue"
           @click="goNext"
         ><ChevronRight :size="16" /></button>
-        <span style="color:#dcdfe6">|</span>
+        <span class="text-line">|</span>
         <button
-          class="flex h-7 w-7 items-center justify-center rounded transition hover:bg-[#f5f7fa] hover:text-[#F56C6C]"
-          style="color:#909399"
+          class="flex h-7 w-7 items-center justify-center rounded text-ink-secondary transition hover:bg-surface-page hover:text-danger"
           title="关闭"
           @click="close"
         ><X :size="16" /></button>
@@ -560,27 +585,24 @@ onMounted(() => {
     <!-- ======== 顶部导航（路由模式） ======== -->
     <header
       v-else
-      class="flex h-12 shrink-0 items-center gap-3 border-b bg-white px-4"
-      style="border-color:#e4e7ed"
+      class="glass-bar flex h-12 shrink-0 items-center gap-3 border-b px-4"
     >
-      <button class="flex items-center gap-1 text-sm hover:opacity-80" style="color:#606266" @click="back">
+      <button class="flex items-center gap-1 text-sm text-ink-regular hover:opacity-80" @click="back">
         <ArrowLeft :size="16" /> 返回列表
       </button>
-      <span style="color:#dcdfe6">|</span>
-      <span class="text-sm" style="color:#606266">{{ project?.name || '缺陷详情' }}</span>
+      <span class="text-line">|</span>
+      <span class="text-sm text-ink-regular">{{ project?.name || '工作项详情' }}</span>
       <div class="ml-auto flex items-center gap-2">
         <button
-          class="flex h-7 w-7 items-center justify-center rounded border disabled:opacity-40"
-          style="border-color:#dcdfe6"
+          class="flex h-7 w-7 items-center justify-center rounded border border-line disabled:opacity-40"
           :disabled="!prevIssue"
           @click="goPrev"
         ><ChevronLeft :size="16" /></button>
-        <span class="text-xs" style="color:#909399">
+        <span class="text-xs text-ink-secondary">
           {{ currentIndex >= 0 ? currentIndex + 1 : 0 }} / {{ allIssues.length }}
         </span>
         <button
-          class="flex h-7 w-7 items-center justify-center rounded border disabled:opacity-40"
-          style="border-color:#dcdfe6"
+          class="flex h-7 w-7 items-center justify-center rounded border border-line disabled:opacity-40"
           :disabled="!nextIssue"
           @click="goNext"
         ><ChevronRight :size="16" /></button>
@@ -593,15 +615,14 @@ onMounted(() => {
         <!-- ======== 左侧主内容 ======== -->
         <main class="flex min-w-0 flex-1 flex-col">
           <!-- 标题区：缺陷名称 + 元信息行（白卡片） -->
-          <section class="mb-4 rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
+          <section class="glass-panel mb-4 rounded-md p-4">
             <input
               v-model="form.title"
-              class="w-full border-none bg-transparent text-xl font-semibold outline-none"
-              style="color:#303133"
-              placeholder="缺陷标题"
+              class="w-full border-none bg-transparent text-xl font-semibold text-ink outline-none"
+              :placeholder="titlePlaceholder"
               @blur="saveTitle"
             />
-            <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style="color:#909399">
+            <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-secondary">
               <span>ID {{ currentIssue.issueKey }}</span>
               <span>·</span>
               <span>{{ userName(currentIssue.reporterId) }} {{ fmtTime(currentIssue.createdAt) }}创建</span>
@@ -611,25 +632,22 @@ onMounted(() => {
           </section>
 
           <!-- 描述卡片（支持编辑） -->
-          <section class="rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
+          <section class="glass-panel rounded-md p-4">
             <div class="mb-3 flex items-center justify-between">
-              <h3 class="text-sm font-medium" style="color:#303133">描述</h3>
+              <h3 class="text-sm font-medium text-ink">描述</h3>
               <div v-if="canWrite" class="flex items-center gap-2">
                 <button
                   v-if="!editingDescription"
-                  class="text-xs transition hover:opacity-75"
-                  style="color:#409EFF"
+                  class="text-xs text-primary transition hover:opacity-75"
                   @click="startEditDescription"
                 >编辑</button>
                 <template v-else>
                   <button
-                    class="rounded px-3 py-1 text-xs text-white transition hover:opacity-90"
-                    style="background:#409EFF"
+                    class="rounded bg-primary px-3 py-1 text-xs text-white transition hover:opacity-90"
                     @click="saveDescription"
                   >保存</button>
                   <button
-                    class="rounded px-3 py-1 text-xs transition"
-                    style="background:#f5f7fa;color:#606266"
+                    class="rounded bg-surface-page px-3 py-1 text-xs text-ink-regular transition"
                     @click="cancelEditDescription"
                   >取消</button>
                 </template>
@@ -639,15 +657,15 @@ onMounted(() => {
             <RichTextEditor
               v-if="editingDescription"
               v-model="form.description"
+              :project-id="projectId"
               :rows="8"
-              placeholder="请输入缺陷描述，支持 Markdown，可 Ctrl+V 粘贴截图"
+              :placeholder="`请输入${typeLabel}描述，支持 Markdown，可 Ctrl+V 粘贴截图`"
             />
             <!-- 只读态：渲染描述正文，支持 ![alt](url) 图片语法 -->
             <template v-else>
               <div
                 v-if="currentIssue"
-                class="description-content whitespace-pre-wrap rounded px-3 py-2 text-sm"
-                style="background:#f5f7fa;color:#606266"
+                class="description-content whitespace-pre-wrap rounded bg-surface-page px-3 py-2 text-sm text-ink-regular"
                 v-html="renderDescription(currentIssue.description)"
               ></div>
               <!-- 描述中若含图片，在此以缩略图形式回显（只读） -->
@@ -655,8 +673,7 @@ onMounted(() => {
                 <div
                   v-for="img in descriptionImages"
                   :key="img.url"
-                  class="overflow-hidden rounded-lg border"
-                  style="border-color:#e4e7ed"
+                  class="overflow-hidden rounded-lg border border-line-light"
                 >
                   <img :src="img.url" :alt="img.name" class="h-44 w-full object-cover" />
                 </div>
@@ -665,9 +682,9 @@ onMounted(() => {
           </section>
 
           <!-- 评论区（动态&评论 / 关联项 / 其他）→ 描述卡片下方，flex-1 拉伸填满至底部 -->
-          <section class="mt-4 flex-1 rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
+          <section class="glass-panel mt-4 flex-1 rounded-md p-4">
             <!-- 主标签页 -->
-            <div class="mb-4 flex items-center gap-1 border-b" style="border-color:#e4e7ed">
+            <div class="mb-4 flex items-center gap-1 border-b border-line-light">
               <button
                 v-for="t in [
                   { k: 'activity', label: '动态&评论', count: commentCount },
@@ -676,15 +693,14 @@ onMounted(() => {
                 ]"
                 :key="t.k"
                 class="relative px-4 py-2.5 text-sm transition"
-                :style="mainTab === t.k ? { color: PRIMARY } : { color: '#909399' }"
+                :class="mainTab === t.k ? 'text-primary' : 'text-ink-secondary'"
                 @click="mainTab = t.k as 'activity' | 'link' | 'other'"
               >
                 {{ t.label }}
                 <span class="ml-1 text-xs">{{ t.count }}</span>
                 <span
                   v-if="mainTab === t.k"
-                  class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full"
-                  :style="{ background: PRIMARY }"
+                  class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary"
                 />
               </button>
             </div>
@@ -701,9 +717,9 @@ onMounted(() => {
                   ]"
                   :key="s.k"
                   class="rounded-full px-3 py-1 text-xs transition"
-                  :style="subTab === s.k
-                    ? { background: PRIMARY_LIGHTER, color: PRIMARY }
-                    : { background: '#f5f7fa', color: '#909399' }"
+                  :class="subTab === s.k
+                    ? 'bg-primary-light text-primary'
+                    : 'bg-surface-page text-ink-secondary'"
                   @click="subTab = s.k as 'all' | 'comment' | 'dynamic'"
                 >{{ s.label }}</button>
               </div>
@@ -718,38 +734,13 @@ onMounted(() => {
                     :can-write="canComment"
                     :current-user-name="currentUserName"
                     @reply="startReply"
-                    @remove="removeComment"
+                    @remove="onRemoveComment"
                   />
-                  <div v-else class="flex gap-3">
-                    <div
-                      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs"
-                      style="background:#f5f7fa;color:#909399"
-                    >·</div>
-                    <div class="min-w-0 flex-1">
-                      <div class="flex items-center gap-1 text-xs" style="color:#909399">
-                        <span>{{ a.actorName }}</span>
-                        <span>{{ fmtTime(a.createdAt) }}</span>
-                        <span class="ml-1">{{ a.type === 'STATUS_CHANGED' ? '变更了状态' : '更新了字段' }}</span>
-                        <code class="rounded px-1.5 py-0.5" style="background:#f5f7fa;color:#606266">{{ a.oldValue || '—' }}</code>
-                        <span>→</span>
-                        <code class="rounded px-1.5 py-0.5" :style="{ background: PRIMARY_LIGHT, color: PRIMARY }">{{ a.newValue || '—' }}</code>
-                      </div>
-                    </div>
-                  </div>
+                  <!-- 动态与评论共用 ActivityItem：同款头像 + 姓名 + 时间 + 正文 -->
+                  <ActivityItem v-else :node="a" />
                 </template>
-                <div v-if="!filteredActivities.length" class="py-8 text-center text-sm" style="color:#c0c4cc">
+                <div v-if="!filteredActivities.length" class="py-8 text-center text-sm text-ink-placeholder">
                   暂无内容
-                </div>
-                <!-- 添加评论按钮：非编辑状态时显示在评论列表下方 -->
-                <div v-if="!commenting" class="mt-4 flex justify-center">
-                  <button
-                    v-if="canWrite"
-                    class="flex items-center gap-1 rounded px-4 py-1.5 text-sm text-white transition-opacity hover:opacity-90"
-                    :style="{ background: PRIMARY }"
-                    @click="startComment"
-                  >
-                    <Plus :size="14" /> 添加评论
-                  </button>
                 </div>
               </div>
             </div>
@@ -775,15 +766,15 @@ onMounted(() => {
                   @visible-change="onLinkSelectVisible"
                   @change="onLinkSelectionChange"
                 >
-                  <template #prefix><Search :size="14" style="color:#c0c4cc" /></template>
+                  <template #prefix><Search :size="14" class="text-ink-placeholder" /></template>
                   <template #header>
-                    <div class="flex items-center gap-2 border-b px-3 py-2" style="border-color:#e4e7ed">
-                      <span class="text-xs" style="color:#909399">类型</span>
+                    <div class="flex items-center gap-2 border-b border-line-light px-3 py-2">
+                      <span class="text-xs text-ink-secondary">类型</span>
                       <button
                         v-for="f in linkFilters"
                         :key="f.k"
                         class="rounded-full px-3 py-0.5 text-xs transition"
-                        :style="linkFilter === f.k ? { background: PRIMARY_LIGHTER, color: PRIMARY } : { background: '#f5f7fa', color: '#909399' }"
+                        :class="linkFilter === f.k ? 'bg-primary-light text-primary' : 'bg-surface-page text-ink-secondary'"
                         @click="onLinkFilterChange(f.k)"
                       >{{ f.label }}</button>
                     </div>
@@ -795,9 +786,9 @@ onMounted(() => {
                     :value="opt.id"
                   >
                     <span class="shrink-0 text-base leading-none">{{ opt.issueTypeIcon }}</span>
-                    <span class="shrink-0 font-mono text-xs" style="color:#909399">{{ opt.issueKey }}</span>
+                    <span class="shrink-0 font-mono text-xs text-ink-secondary">{{ opt.issueKey }}</span>
                     <span class="min-w-0 flex-1 truncate">{{ opt.title }}</span>
-                    <span class="shrink-0 items-center gap-1 text-xs" style="color:#909399">
+                    <span class="shrink-0 items-center gap-1 text-xs text-ink-secondary">
                       {{ opt.assigneeName || '未分配' }}
                     </span>
                   </el-option>
@@ -815,24 +806,24 @@ onMounted(() => {
               </div>
 
               <!-- 新建工作项入口 -->
-              <button class="mt-2 flex items-center gap-1 text-sm transition hover:opacity-80" style="color: PRIMARY" @click="createDialogVisible = true">
+              <button class="mt-2 flex items-center gap-1 text-sm text-primary transition hover:opacity-80" @click="createDialogVisible = true">
                 <Plus :size="14" /> 新建工作项
               </button>
 
               <!-- 已关联列表 -->
-              <div class="mt-4 border-t pt-3" style="border-color:#e4e7ed">
-                <div class="mb-2 text-xs" style="color:#909399">已关联</div>
+              <div class="mt-4 border-t border-line-light pt-3">
+                <div class="mb-2 text-xs text-ink-secondary">已关联</div>
                 <div class="space-y-2">
-                  <div v-for="l in links" :key="l.id" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm" style="background:#f5f7fa">
+                  <div v-for="l in links" :key="l.id" class="flex items-center justify-between rounded-lg bg-surface-page px-3 py-2 text-sm">
                     <div class="flex items-center gap-2">
-                      <Link2 :size="14" style="color:#909399" />
-                      <span class="rounded px-1.5 py-0.5 text-xs text-white" :style="{ background: PRIMARY }">{{ l.relationType }}</span>
-                      <span class="font-mono" style="color:#303133">{{ l.targetKey }}</span>
-                      <span style="color:#909399">{{ l.targetTitle }}</span>
+                      <Link2 :size="14" class="text-ink-secondary" />
+                      <span class="rounded bg-primary px-1.5 py-0.5 text-xs text-white">{{ l.relationType }}</span>
+                      <span class="font-mono text-ink">{{ l.targetKey }}</span>
+                      <span class="text-ink-secondary">{{ l.targetTitle }}</span>
                     </div>
-                    <button class="hover:text-[#F56C6C]" style="color:#c0c4cc" @click="removeLink(l.id)"><Trash2 :size="14" /></button>
+                    <button class="text-ink-placeholder hover:text-danger" @click="removeLink(l.id)"><Trash2 :size="14" /></button>
                   </div>
-                  <div v-if="!links.length" class="py-8 text-center text-sm" style="color:#c0c4cc">暂无关联</div>
+                  <div v-if="!links.length" class="py-8 text-center text-sm text-ink-placeholder">暂无关联</div>
                 </div>
               </div>
 
@@ -852,70 +843,60 @@ onMounted(() => {
                 <input
                   v-model="attachName"
                   placeholder="文件名，如 crash.log"
-                  class="flex-1 rounded border px-3 py-1.5 text-sm outline-none"
-                  style="border-color:#dcdfe6"
+                  class="flex-1 rounded border border-line px-3 py-1.5 text-sm outline-none"
                   @keyup.enter="addAttach"
                 />
                 <button
-                  class="flex items-center gap-1 rounded px-3 text-sm text-white hover:opacity-90"
-                  :style="{ background: PRIMARY }"
+                  class="flex items-center gap-1 rounded bg-primary px-3 text-sm text-white hover:opacity-90"
                   @click="addAttach"
                 ><Paperclip :size="14" /> 添加</button>
               </div>
               <div class="space-y-2">
-                <div v-for="a in attachments" :key="a.id" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm" style="background:#f5f7fa">
+                <div v-for="a in attachments" :key="a.id" class="flex items-center justify-between rounded-lg bg-surface-page px-3 py-2 text-sm">
                   <div class="flex items-center gap-2">
-                    <Paperclip :size="14" style="color:#909399" />
-                    <span style="color:#303133">{{ a.fileName }}</span>
-                    <span class="text-xs" style="color:#c0c4cc">{{ a.uploaderName }} · {{ fmtTime(a.createdAt) }}</span>
+                    <Paperclip :size="14" class="text-ink-secondary" />
+                    <span class="text-ink">{{ a.fileName }}</span>
+                    <span class="text-xs text-ink-placeholder">{{ a.uploaderName }} · {{ fmtTime(a.createdAt) }}</span>
                   </div>
-                  <button class="hover:text-[#F56C6C]" style="color:#c0c4cc" @click="removeAttach(a.id)"><Trash2 :size="14" /></button>
+                  <button class="text-ink-placeholder hover:text-danger" @click="onRemoveAttach(a.id)"><Trash2 :size="14" /></button>
                 </div>
-                <div v-if="!attachments.length" class="py-8 text-center text-sm" style="color:#c0c4cc">暂无附件</div>
+                <div v-if="!attachments.length" class="py-8 text-center text-sm text-ink-placeholder">暂无附件</div>
               </div>
             </div>
           </section>
 
           <!-- 评论输入框：始终钉在左侧面板最底部，默认占位，点击展开富文本编辑器 -->
           <section
-            class="sticky bottom-0 z-10"
-            style="background:#f5f7fa;box-shadow:0 -6px 12px -6px rgba(0,0,0,0.06)"
+            class="glass-bar sticky bottom-0 z-10 shadow-[0_-6px_12px_-6px_rgba(0,0,0,0.06)]"
           >
             <!-- 默认占位：未编辑时显示，点击展开富文本 -->
             <div
               v-if="!commenting"
-              class="flex cursor-text items-center gap-3 rounded-md bg-white p-3"
-              style="box-shadow:0 1px 2px rgba(0,0,0,0.04)"
+              class="glass-inset flex cursor-text items-center gap-3 rounded-md p-3"
               @click="startComment"
             >
-              <div
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium text-white"
-                :style="{ background: avatarColor(userName(currentIssue.reporterId)) }"
-              >{{ avatarChar(userName(currentIssue.reporterId)) }}</div>
-              <span class="text-sm" style="color:#c0c4cc">点击输入评论…</span>
+              <UserAvatar :name="currentUserName" :src="userStore.user?.avatarUrl" :size="36" />
+              <span class="text-sm text-ink-placeholder">点击输入评论…</span>
             </div>
 
             <!-- 编辑态：富文本（Markdown 工具栏） -->
             <div
               v-else
-              class="rounded-md bg-white p-3"
-              style="box-shadow:0 1px 2px rgba(0,0,0,0.04)"
+              class="glass-inset rounded-md p-3"
             >
-              <div class="mb-2 flex items-center gap-2 text-xs" style="color:#909399">
-                <span v-if="replyTo">正在回复 <b style="color:#409EFF">@{{ replyTo.actorName }}</b></span>
+              <div class="mb-2 flex items-center gap-2 text-xs text-ink-secondary">
+                <span v-if="replyTo">正在回复 <b class="text-primary">@{{ replyTo.actorName }}</b></span>
                 <span v-else>发表评论</span>
-                <button v-if="replyTo" class="hover:underline" style="color:#c0c4cc" @click="cancelComment">取消回复</button>
+                <button v-if="replyTo" class="text-ink-placeholder hover:underline" @click="cancelComment">取消回复</button>
               </div>
               <div class="flex items-start gap-3">
-                <div
-                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium text-white"
-                  :style="{ background: avatarColor(userName(currentIssue.reporterId)) }"
-                >{{ avatarChar(userName(currentIssue.reporterId)) }}</div>
+                <UserAvatar :name="currentUserName" :src="userStore.user?.avatarUrl" :size="36" />
                 <div class="flex-1">
                   <!-- 富文本编辑器（含 Markdown 工具栏 / 图片上传 / Ctrl+V 粘贴） -->
                   <RichTextEditor
                     ref="commentEditorRef"
                     v-model="commentText"
+                    :project-id="projectId"
                     :rows="4"
                     :disabled="!canWrite"
                     placeholder="Ctrl+V 直接上传截图，支持 Markdown"
@@ -940,16 +921,14 @@ onMounted(() => {
 
                   <!-- 底部操作 -->
                   <div class="mt-2 flex items-center justify-between">
-                    <span class="text-xs" style="color:#c0c4cc">Ctrl + Enter 发送</span>
+                    <span class="text-xs text-ink-placeholder">Ctrl + Enter 发送</span>
                     <div class="flex gap-2">
                       <button
-                        class="rounded px-4 py-1.5 text-sm hover:opacity-90"
-                        style="background:#f5f7fa;color:#606266;border:1px solid #dcdfe6"
+                        class="rounded border border-line bg-surface-page px-4 py-1.5 text-sm text-ink-regular hover:opacity-90"
                         @click="cancelComment"
                       >取消</button>
                       <button
-                        class="flex items-center gap-1 rounded px-4 py-1.5 text-sm text-white transition hover:opacity-90 disabled:opacity-50"
-                        :style="{ background: PRIMARY }"
+                        class="flex items-center gap-1 rounded bg-primary px-4 py-1.5 text-sm text-white transition hover:opacity-90 disabled:opacity-50"
                         :disabled="!commentText.trim()"
                         @click="sendComment"
                       ><Send :size="14" /> 提交</button>
@@ -963,15 +942,15 @@ onMounted(() => {
 
         <!-- ======== 右侧信息栏 ======== -->
         <aside class="flex w-[380px] shrink-0 flex-col self-start">
-          <div class="rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
-            <h3 class="mb-4 text-sm font-medium" style="color:#303133">基础字段</h3>
+          <div class="glass-panel rounded-md p-4">
+            <h3 class="mb-4 text-sm font-medium text-ink">基础字段</h3>
 
             <!-- 工作项类型 -->
             <div class="mb-4 flex items-center justify-between">
-              <label class="text-sm" style="color:#606266">工作项类型</label>
-              <div class="flex items-center gap-1.5 text-sm" style="color:#303133">
-                <AlertTriangle :size="14" style="color:#F56C6C" />
-                {{ currentIssue.issueTypeName || '缺陷' }}
+              <label class="text-sm text-ink-regular">工作项类型</label>
+              <div class="flex items-center gap-1.5 text-sm text-ink">
+                <span>{{ currentIssue.issueTypeIcon || '📋' }}</span>
+                {{ currentIssue.issueTypeName || typeLabel }}
               </div>
             </div>
 
@@ -985,7 +964,8 @@ onMounted(() => {
               :severity-options="severityOptions"
               :tags="tags"
               :can-write="canWrite"
-              :show-severity="true"
+              :show-severity="isDefect"
+              :show-no-fix-reason="isDefect"
               @field-change="(e) => saveField(e.field, e.payload.patch, e.payload.clear)"
               @add-tag="onAddTag"
               @remove-tag="(id) => removeTag(id)"
@@ -993,20 +973,19 @@ onMounted(() => {
 
             <!-- 归属项目（缺陷专属，新建走 props） -->
             <div class="mt-4">
-              <label class="mb-1 block text-sm" style="color:#606266">归属项目<span style="color:#F56C6C">*</span></label>
-              <div class="truncate rounded border px-2 py-1 text-sm" style="border-color:#dcdfe6;color:#303133" :title="project?.name">
+              <label class="mb-1 block text-sm text-ink-regular">归属项目<span class="text-danger">*</span></label>
+              <div class="truncate rounded border border-line px-2 py-1 text-sm text-ink" :title="project?.name">
                 {{ project?.name || '—' }}
               </div>
             </div>
 
             <!-- 迭代 -->
             <div class="mt-4 flex items-center justify-between">
-              <label class="text-sm" style="color:#606266">迭代</label>
+              <label class="text-sm text-ink-regular">迭代</label>
               <input
                 v-model="form.iteration"
                 placeholder="请选择"
-                class="w-44 rounded border bg-transparent px-2 py-1 text-sm outline-none"
-                style="border-color:#dcdfe6;color:#303133"
+                class="w-44 rounded border border-line bg-transparent px-2 py-1 text-sm text-ink outline-none"
                 :disabled="!canWrite"
                 @blur="saveField('迭代', { iteration: form.iteration || null }, form.iteration ? [] : ['iteration'])"
               />
@@ -1014,14 +993,13 @@ onMounted(() => {
           </div>
 
           <!-- 附件区 -->
-          <div class="mt-4 rounded-md bg-white p-4" style="box-shadow:0 1px 2px rgba(0,0,0,0.04)">
+          <div class="glass-panel mt-4 rounded-md p-4">
             <div class="mb-3 flex items-center justify-between">
-              <h3 class="text-sm font-medium" style="color:#303133">
-                附件 <span class="text-xs font-normal" style="color:#909399">{{ attachments.length }}</span>
+              <h3 class="text-sm font-medium text-ink">
+                附件 <span class="text-xs font-normal text-ink-secondary">{{ attachments.length }}</span>
               </h3>
               <button
-                class="flex h-7 w-7 items-center justify-center rounded text-lg"
-                style="background:#f5f7fa;color:#909399"
+                class="flex h-7 w-7 items-center justify-center rounded bg-surface-page text-lg text-ink-secondary"
                 @click="addAttach"
               ><Plus :size="16" /></button>
             </div>
@@ -1031,12 +1009,12 @@ onMounted(() => {
                 :key="a.id"
                 class="flex items-center gap-2 rounded-lg px-2 py-2 text-sm"
               >
-                <Paperclip :size="14" style="color:#909399" />
-                <span class="flex-1 truncate" style="color:#303133">{{ a.fileName }}</span>
-                <span class="text-xs" style="color:#c0c4cc">{{ fmtDate(a.createdAt) }}</span>
-                <button class="hover:text-[#F56C6C]" style="color:#c0c4cc" @click="removeAttach(a.id)"><Trash2 :size="13" /></button>
+                <Paperclip :size="14" class="text-ink-secondary" />
+                <span class="flex-1 truncate text-ink">{{ a.fileName }}</span>
+                <span class="text-xs text-ink-placeholder">{{ fmtDate(a.createdAt) }}</span>
+                <button class="text-ink-placeholder hover:text-danger" @click="onRemoveAttach(a.id)"><Trash2 :size="13" /></button>
               </div>
-              <div v-if="!attachments.length" class="py-4 text-center text-xs" style="color:#c0c4cc">
+              <div v-if="!attachments.length" class="py-4 text-center text-xs text-ink-placeholder">
                 暂无附件，点击 + 上传
               </div>
             </div>
@@ -1046,7 +1024,7 @@ onMounted(() => {
     </div>
 
     <!-- 加载/空状态 -->
-    <div v-else class="flex flex-1 items-center justify-center text-sm" style="color:#909399">
+    <div v-else class="flex flex-1 items-center justify-center text-sm text-ink-secondary">
       <span v-if="loading">加载中…</span>
       <span v-else>暂无缺陷</span>
     </div>

@@ -11,10 +11,11 @@ import MilestoneCard from '@/components/overview/MilestoneCard.vue'
 import AnnouncementCard from '@/components/overview/AnnouncementCard.vue'
 import ActivityCard from '@/components/overview/ActivityCard.vue'
 import MemberCard from '@/components/overview/MemberCard.vue'
+import { PRIMARY, WARNING, SUCCESS, DANGER } from '@/theme/colorMap'
 
 const route = useRoute()
 const projectStore = useProjectStore()
-const projectId = route.params.projectId as string
+const projectId = computed(() => route.params.projectId as string)
 
 const dashboard = ref<DashboardVO | null>(null)
 const members = ref<ProjectMember[]>([])
@@ -29,21 +30,28 @@ const leadName = computed(() => {
   return m?.displayName || ''
 })
 
+/** 概览各区块刷新入口：卡片内新建里程碑/发布公告后由子组件 emit('refresh') 触发 */
+async function load() {
+  // 各区块数据相互独立：单块失败降级为空，避免整页空白（接口层已统一提示错误）
+  const pid = projectId.value
+  const [dashRes, memRes, msRes, annRes, actRes] = await Promise.all([
+    getDashboard(pid).catch(() => null),
+    listProjectMembers(pid).catch(() => []),
+    listMilestones(pid).catch(() => []),
+    listAnnouncements(pid).catch(() => []),
+    listProjectActivities(pid, 10).catch(() => [])
+  ])
+  dashboard.value = dashRes
+  members.value = memRes as ProjectMember[]
+  milestones.value = msRes as MilestoneVO[]
+  announcements.value = annRes as AnnouncementVO[]
+  activities.value = actRes as ProjectActivityVO[]
+}
+
 onMounted(async () => {
   loading.value = true
   try {
-    const [dashRes, memRes, msRes, annRes, actRes] = await Promise.all([
-      getDashboard(projectId).catch(() => null),
-      listProjectMembers(projectId).catch(() => []),
-      listMilestones(projectId).catch(() => []),
-      listAnnouncements(projectId).catch(() => []),
-      listProjectActivities(projectId, 10).catch(() => [])
-    ])
-    dashboard.value = dashRes
-    members.value = memRes as ProjectMember[]
-    milestones.value = msRes as MilestoneVO[]
-    announcements.value = annRes as AnnouncementVO[]
-    activities.value = actRes as ProjectActivityVO[]
+    await load()
   } finally {
     loading.value = false
   }
@@ -57,15 +65,15 @@ onMounted(async () => {
       <ProjectInfoCard v-if="projectStore.current" :project="projectStore.current" :lead-name="leadName" />
 
       <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="工作项总数" :value="dashboard?.summary.total ?? 0" :icon="FileText" color="#1677FF" />
-        <StatCard label="进行中" :value="dashboard?.summary.inProgress ?? 0" :icon="Clock" color="#FFC107" />
-        <StatCard label="已完成" :value="dashboard?.summary.done ?? 0" :icon="CheckCircle2" color="#22C55E" />
-        <StatCard label="逾期" :value="dashboard?.summary.overdue ?? 0" :icon="AlertTriangle" color="#DC3545" />
+        <StatCard label="工作项总数" :value="dashboard?.summary.total ?? 0" :icon="FileText" :color="PRIMARY" />
+        <StatCard label="进行中" :value="dashboard?.summary.inProgress ?? 0" :icon="Clock" :color="WARNING" />
+        <StatCard label="已完成" :value="dashboard?.summary.done ?? 0" :icon="CheckCircle2" :color="SUCCESS" />
+        <StatCard label="逾期" :value="dashboard?.summary.overdue ?? 0" :icon="AlertTriangle" :color="DANGER" />
       </div>
 
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <MilestoneCard :milestones="milestones" />
-        <AnnouncementCard :announcements="announcements" />
+        <MilestoneCard :milestones="milestones" :project-id="projectId" @refresh="load" />
+        <AnnouncementCard :announcements="announcements" :project-id="projectId" @refresh="load" />
       </div>
 
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">

@@ -28,7 +28,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.FileInputStream;
 import java.nio.file.Path;
@@ -61,6 +61,7 @@ public class ExcelImportService {
     private final UserService userService;
     private final SysUserMapper sysUserMapper;
     private final ProjectMapper projectMapper;
+    private final TransactionTemplate transactionTemplate;
 
     public ExcelImportService(ProjectService projectService,
                               ProjectMemberService projectMemberService,
@@ -69,7 +70,8 @@ public class ExcelImportService {
                               TaskMapper taskMapper,
                               UserService userService,
                               SysUserMapper sysUserMapper,
-                              ProjectMapper projectMapper) {
+                              ProjectMapper projectMapper,
+                              TransactionTemplate transactionTemplate) {
         this.projectService = projectService;
         this.projectMemberService = projectMemberService;
         this.taskService = taskService;
@@ -78,6 +80,7 @@ public class ExcelImportService {
         this.userService = userService;
         this.sysUserMapper = sysUserMapper;
         this.projectMapper = projectMapper;
+        this.transactionTemplate = transactionTemplate;
     }
 
     public ExcelImportResult run(String filePath) {
@@ -91,7 +94,9 @@ public class ExcelImportService {
                 Sheet sheet = wb.getSheetAt(si);
                 String sheetName = sheet.getSheetName();
                 try {
-                    SheetResult sr = importSheet(sheet, sheetName, adminId);
+                    // 编程式事务：importSheet 由同类直接调用（self-invocation），@Transactional 注解不生效，
+                    // 改用 TransactionTemplate 保证每个 sheet 的导入具备整体原子性
+                    SheetResult sr = transactionTemplate.execute(tx -> importSheet(sheet, sheetName, adminId));
                     result.addSheet(sr);
                     log.info("[import] sheet='{}' 项目建='{}' 任务={} 失败={}",
                             sheetName, sr.projectCreated(), sr.issueCount(), sr.failCount());
@@ -107,7 +112,7 @@ public class ExcelImportService {
         return result;
     }
 
-    @Transactional
+
     protected SheetResult importSheet(Sheet sheet, String sheetName, UUID adminId) {
         SheetResult sr = new SheetResult(sheetName);
 
@@ -321,7 +326,8 @@ public class ExcelImportService {
         CreateUserRequest req = new CreateUserRequest();
         req.setUsername("imp_" + UUID.randomUUID().toString().substring(0, 8));
         req.setDisplayName(displayName);
-        req.setPassword("admin123");
+        // 导入场景不设默认密码：随机密码不可登录，如需启用由管理员另行重置
+        req.setPassword(UUID.randomUUID().toString());
         return userService.create(req).getId();
     }
 

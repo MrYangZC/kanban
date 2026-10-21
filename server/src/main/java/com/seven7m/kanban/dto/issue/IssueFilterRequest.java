@@ -15,6 +15,8 @@ public class IssueFilterRequest {
     private String scope;
 
     private UUID statusId;
+    /** 迭代（冲刺）过滤：为空表示不过滤。三表均有 sprint_id 列 */
+    private UUID sprintId;
     private String priority;
     private String severity;
     private UUID labelId;

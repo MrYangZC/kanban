@@ -12,10 +12,13 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   rows?: number
   disabled?: boolean
+  /** 内嵌图片所属项目：用于服务端登记归属，缺省则作为全站共享图片 */
+  projectId?: string
 }>(), {
   placeholder: '支持 Markdown，Ctrl+V 直接粘贴截图',
   rows: 4,
   disabled: false,
+  projectId: '',
 })
 
 const emit = defineEmits<{ 'update:modelValue': [val: string] }>()
@@ -87,7 +90,7 @@ async function uploadAndInsert(file: File) {
   }
   imageUploading.value = true
   try {
-    const res = await uploadImage(file)
+    const res = await uploadImage(file, props.projectId || undefined)
     insertAtCursor(`\n![${file.name}](${res.url})\n`)
     images.value.push({ url: res.url, name: file.name })
   } catch {
@@ -150,11 +153,11 @@ defineExpose({ focus, insert })
 </script>
 
 <template>
-  <div class="overflow-hidden rounded border bg-white" style="border-color:#e4e7ed">
+  <div class="glass-inset overflow-hidden rounded">
     <!-- 工具栏 -->
     <div
       class="flex items-center gap-1 border-b px-1.5 py-1"
-      style="border-color:#e4e7ed;background:#fafbfc"
+      style="border-color:var(--line-light);background:var(--surface-page)"
     >
       <button
         v-for="t in toolbar"
@@ -168,7 +171,7 @@ defineExpose({ focus, insert })
         <component :is="t.icon" :size="14" />
       </button>
       <span class="mx-1 text-gray-300">|</span>
-      <span class="px-1 text-xs" style="color:#909399">Markdown</span>
+      <span class="px-1 text-xs" style="color:var(--ink-secondary)">Markdown</span>
     </div>
 
     <textarea
@@ -178,7 +181,7 @@ defineExpose({ focus, insert })
       :disabled="disabled"
       :placeholder="imageUploading ? '图片上传中…' : placeholder"
       class="block w-full resize-none border-none px-3 py-2 text-sm leading-6 outline-none"
-      style="color:#303133;background:transparent"
+      style="color:var(--ink);background:transparent"
       @input="setText(($event.target as HTMLTextAreaElement).value)"
       @paste="onPaste"
     />
@@ -187,13 +190,13 @@ defineExpose({ focus, insert })
     <div
       v-if="images.length"
       class="flex flex-wrap gap-2 rounded-md p-2"
-      style="background:#fafafa;border-top:1px solid #ebeef5"
+      style="background:var(--surface-page);border-top:1px solid var(--line-light)"
     >
       <div
         v-for="(img, idx) in images"
         :key="img.url"
         class="group relative h-20 w-20 overflow-hidden rounded"
-        style="border:1px solid #e4e7ed"
+        style="border:1px solid var(--line-light)"
       >
         <img :src="img.url" :alt="img.name" class="h-full w-full object-cover" />
         <button

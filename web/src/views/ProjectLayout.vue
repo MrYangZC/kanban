@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
 import { useProjectPermission } from '@/composables/useProjectPermission'
-import { ElMessage } from 'element-plus'
 import {
   LayoutDashboard, FileText, ListTodo, Bug,
   Repeat, Target, ShieldAlert, BarChart3, Settings,
-  Search, X, ArrowRight
+  ArrowRight
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -17,9 +16,9 @@ const projectStore = useProjectStore()
 const projectId = computed(() => route.params.projectId as string)
 const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId.value)
 
-const showSearchDialog = ref(false)
-const searchKeyword = ref('')
 const sidebarCollapsed = ref(false)
+/** 项目详情返回 403（非成员）时整区展示无权限提示 */
+const accessDenied = ref(false)
 
 interface NavItem {
   name: string
@@ -49,12 +48,18 @@ const currentNav = computed(() => {
   return segments[3] || 'overview'
 })
 
+// 子视图 key：项目切换或工作项数据变更（顶部快捷新建等）时重建视图，保证列表重新拉取
+const viewKey = computed(() => `${projectId.value}-${projectStore.refreshKey}`)
+
 async function loadCurrent() {
   if (!projectId.value) return
+  accessDenied.value = false
   try {
     await projectStore.loadCurrent(projectId.value)
-  } catch {
-    // ignore
+  } catch (e: any) {
+    // 403 = 非项目成员且非系统管理员：直接给明确的无权限页，避免整页空白只剩一条 toast
+    if (e?.code === 403 || e?.status === 403) accessDenied.value = true
+    // 其余错误（网络抖动等）沿用 store 中的当前项目，不阻断导航渲染
   }
 }
 
@@ -62,49 +67,14 @@ function navigate(name: string) {
   router.push(`/projects/${projectId.value}/${name}`)
 }
 
-function openSearch() {
-  showSearchDialog.value = true
-  searchKeyword.value = ''
-  setTimeout(() => {
-    const input = document.querySelector('#global-search-input') as HTMLInputElement | null
-    input?.focus()
-  }, 50)
-}
-
-function closeSearch() {
-  showSearchDialog.value = false
-}
-
-function executeSearch() {
-  const kw = searchKeyword.value.trim()
-  if (!kw) return
-  ElMessage.info(`搜索“${kw}”功能开发中`)
-  closeSearch()
-}
-
-function onKeydown(e: KeyboardEvent) {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-    e.preventDefault()
-    openSearch()
-  }
-  if (e.key === 'Escape' && showSearchDialog.value) {
-    closeSearch()
-  }
-}
-
 watch(projectId, () => { loadCurrent().then(() => refreshPermission()) }, { immediate: false })
 
 onMounted(async () => {
   if (!projectStore.loaded) {
-    try { await projectStore.loadList() } catch { /* ignore */ }
+    try { await projectStore.loadList() } catch { /* 切换项目下拉降级为空列表 */ }
   }
   await loadCurrent()
   await refreshPermission()
-  window.addEventListener('keydown', onKeydown)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKeydown)
 })
 </script>
 
@@ -138,41 +108,23 @@ onBeforeUnmount(() => {
       </button>
     </aside>
 
-    <!-- 主内容区 -->
-    <main class="flex-1 overflow-hidden bg-surface-page">
-      <RouterView />
-    </main>
-
-    <!-- 全局搜索弹窗 -->
-    <div
-      v-if="showSearchDialog"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[15vh]"
-      @click="closeSearch"
-    >
-      <div
-        class="w-full max-w-xl rounded-xl bg-white shadow-2xl"
-        @click.stop
-      >
-        <div class="flex items-center gap-3 border-b border-line px-4 py-3">
-          <Search :size="18" class="text-ink-secondary" />
-          <input
-            id="global-search-input"
-            v-model="searchKeyword"
-            class="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-secondary"
-            placeholder="搜索任务、缺陷、需求…"
-            @keydown.enter="executeSearch"
-            @keydown.escape="closeSearch"
-          />
-          <button class="text-ink-secondary transition hover:text-ink" @click="closeSearch">
-            <X :size="18" />
-          </button>
+    <!--
+      主内容区。
+      :key 绑定 viewKey：切换项目时路径参数变化但路由记录相同，
+      不加 key 会复用同一组件实例（onMounted 不再触发），导致子视图展示上一个项目的数据。
+    -->
+    <main class="app-canvas flex-1 overflow-hidden">
+      <RouterView v-if="!accessDenied" :key="viewKey" />
+      <div v-else class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+        <div class="flex h-12 w-12 items-center justify-center rounded-full bg-danger-light">
+          <ShieldAlert :size="22" class="text-danger" />
         </div>
-        <div class="max-h-80 overflow-y-auto p-2">
-          <div class="px-3 py-6 text-center text-sm text-ink-secondary">
-            输入关键词后按回车搜索
-          </div>
-        </div>
+        <h2 class="text-base font-semibold text-ink">无权访问该项目</h2>
+        <p class="max-w-sm text-sm text-ink-secondary">
+          你当前不是该项目成员，无法查看其中的工作项、迭代与设置。请联系项目管理员将你加入成员。
+        </p>
+        <button class="btn-primary mt-1" @click="router.push('/projects')">返回项目列表</button>
       </div>
-    </div>
+    </main>
   </div>
 </template>

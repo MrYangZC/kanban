@@ -2,6 +2,7 @@ package com.seven7m.kanban.service.project;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.exception.ServiceException;
+import com.seven7m.kanban.common.security.PermissionService;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.entity.project.ProjectRole;
 import com.seven7m.kanban.dto.project.AddMemberRequest;
@@ -38,6 +39,13 @@ public class ProjectMemberService {
     @Autowired
     @Lazy
     private ProjectService projectService;
+    /**
+     * 用于角色变更后失效 Spring 的 projectPermissions 缓存。
+     * 该类被 PermissionService 依赖，此处必须 @Lazy 注入以打破循环依赖。
+     */
+    @Autowired
+    @Lazy
+    private PermissionService permissionService;
     private final SysUserMapper userMapper;
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
@@ -46,6 +54,15 @@ public class ProjectMemberService {
     private final java.util.Map<String, CacheEntry> roleCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     private static final long ROLE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+    /** 容量上限：超限整体清空，防止"用户数 × 项目数"很大时单例 Bean 内存无界增长 */
+    private static final int ROLE_CACHE_MAX_SIZE = 50_000;
+
+    private void ensureRoleCacheCapacity() {
+        if (roleCache.size() >= ROLE_CACHE_MAX_SIZE) {
+            roleCache.clear();
+        }
+    }
 
     private static class CacheEntry {
         final Set<String> roles;
@@ -106,6 +123,7 @@ public class ProjectMemberService {
         projectMemberMapper.insert(m);
         grantRoles(projectId, req.getUserId(), req.getRoles());
         evictRoleCache(projectId, req.getUserId());
+        permissionService.evictUserPermissions(req.getUserId(), projectId);
         return toVO(m);
     }
 
@@ -126,6 +144,7 @@ public class ProjectMemberService {
                 .eq(UserRole::getProjectId, projectId)
                 .eq(UserRole::getUserId, userId));
         evictRoleCache(projectId, userId);
+        permissionService.evictUserPermissions(userId, projectId);
     }
 
     @Transactional
@@ -148,6 +167,7 @@ public class ProjectMemberService {
                 .eq(UserRole::getUserId, userId));
         grantRoles(projectId, userId, roles);
         evictRoleCache(projectId, userId);
+        permissionService.evictUserPermissions(userId, projectId);
         return toVO(m);
     }
 
@@ -165,10 +185,12 @@ public class ProjectMemberService {
             return entry.roles;
         }
         if (!projectService.isMember(projectId, userId)) {
+            ensureRoleCacheCapacity();
             roleCache.put(cacheKey, new CacheEntry(Set.of()));
             return Set.of();
         }
         Set<String> roles = new LinkedHashSet<>(userRoleMapper.selectRoleCodesByProjectAndUser(projectId, userId));
+        ensureRoleCacheCapacity();
         roleCache.put(cacheKey, new CacheEntry(roles));
         return roles;
     }
@@ -186,13 +208,22 @@ public class ProjectMemberService {
         return new LinkedHashSet<>(userRoleMapper.selectRoleIdsByProjectAndUser(projectId, userId));
     }
 
-    /** 角色变更后使缓存失效，保证权限及时生效 */
+    /**
+     * 角色变更后使缓存失效，保证权限及时生效。
+     * userId 为 null 时失效该项目下的全部用户（原实现只删 "pid:null" 这个不存在的键，等同空操作）。
+     */
     public void evictRoleCache(UUID projectId, UUID userId) {
-        roleCache.remove(projectId + ":" + userId);
         if (projectId == null) {
-            // 全量失效（极少使用）
+            // 项目维度未知，只能全量失效（极少使用）
             roleCache.clear();
+            return;
         }
+        if (userId == null) {
+            String prefix = projectId + ":";
+            roleCache.keySet().removeIf(k -> k.startsWith(prefix));
+            return;
+        }
+        roleCache.remove(projectId + ":" + userId);
     }
 
     /** 写入用户-角色关联（RBAC：一人可多角色），供项目创建等内部逻辑调用 */

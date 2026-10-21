@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive } from 'vue'
-import { listUsers, createUser, updateUser, deleteUser } from '@/api'
+import { computed, onMounted, ref, reactive, watch } from 'vue'
+import { listUsersPage, createUser, updateUser, deleteUser } from '@/api'
 import type { UserVO } from '@/api/types'
-import { Plus, Trash2, Pencil } from 'lucide-vue-next'
+import { Plus, Search, Trash2, Pencil, X } from 'lucide-vue-next'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const users = ref<UserVO[]>([])
+const total = ref(0)
+const page = ref(1)
+const size = ref(20)
 const loading = ref(false)
 const dialogOpen = ref(false)
 const editing = ref<UserVO | null>(null)
@@ -17,13 +21,37 @@ const form = reactive({
   password: ''
 })
 
+/** 检索关键词：交由服务端按 username/显示名/邮箱匹配，避免前端全量过滤掩盖分页问题 */
+const keyword = ref('')
+const filteredUsers = computed(() => users.value)
+
 async function load() {
   loading.value = true
   try {
-    users.value = await listUsers()
+    const r = await listUsersPage({
+      page: page.value,
+      size: size.value,
+      keyword: keyword.value.trim() || undefined
+    })
+    users.value = r.list
+    total.value = r.total
   } finally {
     loading.value = false
   }
+}
+
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(keyword, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    page.value = 1
+    load()
+  }, 300)
+})
+
+function onPageChange(p: number) {
+  page.value = p
+  load()
 }
 
 function openCreate() {
@@ -51,6 +79,10 @@ async function save() {
     ElMessage.warning('用户名与显示名必填')
     return
   }
+  if (!editing.value && !form.password) {
+    ElMessage.warning('新建用户必须设置初始密码')
+    return
+  }
   if (editing.value) {
     await updateUser(editing.value.id, {
       displayName: form.displayName,
@@ -68,7 +100,7 @@ async function save() {
       avatarUrl: form.avatarUrl,
       password: form.password || undefined
     })
-    ElMessage.success('用户已创建（默认密码 admin123）')
+    ElMessage.success('用户已创建')
   }
   dialogOpen.value = false
   await load()
@@ -104,7 +136,14 @@ onMounted(load)
         <h1 class="page-title">用户管理</h1>
         <p class="page-subtitle">维护系统成员，支持新建、编辑、启用/禁用与删除</p>
       </div>
-      <button class="btn-primary" @click="openCreate"><Plus :size="16" /> 新建用户</button>
+      <div class="flex items-center gap-3">
+        <div class="search-box">
+          <Search :size="15" class="text-ink-secondary" />
+          <input v-model="keyword" class="search-input" placeholder="检索昵称，如 刘超" />
+          <button v-if="keyword" class="text-ink-placeholder transition hover:text-ink-regular" title="清空" @click="keyword = ''"><X :size="13" /></button>
+        </div>
+        <button class="btn-primary" @click="openCreate"><Plus :size="16" /> 新建用户</button>
+      </div>
     </div>
 
     <div class="table-wrapper">
@@ -115,10 +154,10 @@ onMounted(load)
           </tr>
         </thead>
         <tbody>
-          <tr v-for="u in users" :key="u.id" class="table-row">
+          <tr v-for="u in filteredUsers" :key="u.id" class="table-row">
             <td class="px-5 py-3">
               <div class="flex items-center gap-3">
-                <div class="avatar-sm avatar-primary">{{ u.displayName?.charAt(0) || 'U' }}</div>
+                <UserAvatar :name="u.displayName" :src="u.avatarUrl" :size="32" />
                 <span class="font-medium text-ink">{{ u.displayName }}</span>
               </div>
             </td>
@@ -141,16 +180,29 @@ onMounted(load)
               </div>
             </td>
           </tr>
-          <tr v-if="!users.length">
-            <td colspan="5" class="px-5 py-12 text-center text-sm text-ink-secondary">暂无用户</td>
+          <tr v-if="!filteredUsers.length">
+            <td colspan="5" class="px-5 py-12 text-center text-sm text-ink-secondary">
+              {{ keyword ? `未找到与「${keyword}」匹配的用户` : (loading ? '加载中…' : '暂无用户') }}
+            </td>
           </tr>
         </tbody>
       </table>
     </div>
 
+    <div class="mt-4 flex justify-end">
+      <el-pagination
+        v-model:current-page="page"
+        :page-size="size"
+        :total="total"
+        layout="total, prev, pager, next"
+        background
+        @current-change="onPageChange"
+      />
+    </div>
+
     <div v-if="dialogOpen" class="fixed inset-0 z-40 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/30" @click="dialogOpen = false" />
-      <div class="relative z-50 w-[420px] rounded-lg bg-white p-6 shadow-modal">
+      <div class="glass-pop relative z-50 w-[420px] rounded-lg p-6">
         <h3 class="mb-4 text-base font-semibold text-ink">{{ editing ? '编辑用户' : '新建用户' }}</h3>
         <div class="space-y-3">
           <div>
@@ -170,8 +222,8 @@ onMounted(load)
             <input v-model="form.avatarUrl" placeholder="可选" class="input-base" />
           </div>
           <div>
-            <label class="label-base">{{ editing ? '重置密码（留空不改）' : '密码（留空默认 admin123）' }}</label>
-            <input v-model="form.password" type="password" placeholder="留空则使用默认密码" class="input-base" />
+            <label class="label-base">{{ editing ? '重置密码（留空不改）' : '初始密码（必填，至少 6 位）' }}</label>
+            <input v-model="form.password" type="password" :placeholder="editing ? '留空则不修改密码' : '请输入初始密码'" class="input-base" />
           </div>
         </div>
         <div class="mt-6 flex justify-end gap-2">

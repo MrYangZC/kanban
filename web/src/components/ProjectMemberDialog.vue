@@ -10,7 +10,10 @@ import {
 import type { ProjectMember, UserVO } from '@/api/types'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Users, UserPlus, Trash2, Crown } from 'lucide-vue-next'
+import { errorMessage } from '@/utils/error'
+import { UserPlus, Trash2, Crown } from 'lucide-vue-next'
+import UserAvatar from '@/components/common/UserAvatar.vue'
+import UserSelect from '@/components/common/UserSelect.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -96,20 +99,43 @@ async function onRemove(m: ProjectMember) {
   await load()
 }
 
-// 行内编辑角色（popover）
+// 行内编辑角色
+// 注意：不要用「popover + el-select」组合——el-select 的下拉默认 teleport 到 body，
+// 点选选项会被外层 popover 当作「点击外部」而关闭，导致「保存」按钮消失、角色无法提交。
 const editingUser = ref<string>('')
 const editingRoles = ref<string[]>([])
+const savingRoles = ref<string>('')
 
-function startEditRoles(m: ProjectMember) {
+function toggleEdit(m: ProjectMember) {
+  if (editingUser.value === m.userId) {
+    cancelEditRoles()
+    return
+  }
   editingUser.value = m.userId
   editingRoles.value = [...m.roles]
 }
 
-async function saveRoles(m: ProjectMember) {
-  await updateProjectMemberRoles(props.projectId, m.userId, editingRoles.value)
-  ElMessage.success('角色已更新')
+function cancelEditRoles() {
   editingUser.value = ''
-  await load()
+  editingRoles.value = []
+}
+
+async function saveRoles(m: ProjectMember) {
+  if (!editingRoles.value.length) {
+    ElMessage.warning('请至少保留一个角色')
+    return
+  }
+  savingRoles.value = m.userId
+  try {
+    await updateProjectMemberRoles(props.projectId, m.userId, editingRoles.value)
+    ElMessage.success('角色已更新')
+    cancelEditRoles()
+    await load()
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '角色更新失败'))
+  } finally {
+    savingRoles.value = ''
+  }
 }
 
 onMounted(() => {
@@ -122,68 +148,90 @@ onMounted(() => {
     <div v-loading="loading">
       <div v-if="!members.length" class="py-8 text-center text-sm text-ink-400">暂无成员</div>
       <ul v-else class="space-y-2">
-        <li
-          v-for="m in members"
-          :key="m.id"
-          class="flex items-center gap-3 rounded-lg border border-surface-muted px-3 py-2"
-        >
-          <div class="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-sm font-medium text-white">
-            {{ m.displayName?.charAt(0) || 'U' }}
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="text-sm font-medium text-ink-900">{{ m.displayName }}</div>
-            <div class="text-xs text-ink-400">@{{ m.username }}</div>
-            <div class="mt-1 flex flex-wrap gap-1">
-              <span
-                v-for="r in m.roles"
-                :key="r"
-                class="rounded px-1.5 py-0.5 text-xs"
-                :class="r === 'OWNER' ? 'bg-amber-100 text-amber-700' : 'bg-surface-muted text-ink-500'"
-              >
-                <Crown v-if="r === 'OWNER'" :size="11" class="mr-0.5 inline" />{{ roleLabel(r) }}
-              </span>
-            </div>
-          </div>
-          <el-popover
-            v-if="canManageResolved"
-            placement="top"
-            :width="240"
-            trigger="click"
-            :disabled="editingUser !== m.userId"
-          >
-            <template #reference>
-              <el-button link type="primary" size="small" @click="startEditRoles(m)">编辑角色</el-button>
-            </template>
-            <div class="space-y-2">
-              <el-select v-model="editingRoles" multiple placeholder="选择角色（可多选）" class="w-full">
-                <el-option v-for="o in ROLE_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-              <div class="flex justify-end">
-                <el-button size="small" type="primary" @click="saveRoles(m)">保存</el-button>
+        <li v-for="m in members" :key="m.id" class="rounded-lg border border-surface-muted">
+          <div class="flex items-center gap-3 px-3 py-2">
+            <UserAvatar :name="m.displayName" :src="m.avatarUrl" :size="32" />
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-medium text-ink-900">{{ m.displayName }}</div>
+              <div class="text-xs text-ink-400">@{{ m.username }}</div>
+              <div class="mt-1 flex flex-wrap gap-1">
+                <span
+                  v-for="r in m.roles"
+                  :key="r"
+                  class="rounded px-1.5 py-0.5 text-xs"
+                  :class="r === 'OWNER' ? 'bg-warning-bg text-warning' : 'bg-surface-muted text-ink-600'"
+                >
+                  <Crown v-if="r === 'OWNER'" :size="11" class="mr-0.5 inline" />{{ roleLabel(r) }}
+                </span>
               </div>
             </div>
-          </el-popover>
-          <el-button
-            v-if="canManageResolved"
-            link
-            type="danger"
-            size="small"
-            :icon="Trash2"
-            @click="onRemove(m)"
-          />
+            <el-button
+              v-if="canManageResolved"
+              link
+              type="primary"
+              size="small"
+              @click="toggleEdit(m)"
+            >
+              {{ editingUser === m.userId ? '收起' : '编辑角色' }}
+            </el-button>
+            <el-button
+              v-if="canManageResolved"
+              link
+              type="danger"
+              size="small"
+              :icon="Trash2"
+              @click="onRemove(m)"
+            />
+          </div>
+
+          <!-- 行内角色编辑：避免 popover 内嵌 el-select 时点选选项触发「点击外部」而误关外层浮层 -->
+          <div
+            v-if="canManageResolved && editingUser === m.userId"
+            class="border-t border-surface-muted px-3 py-3"
+          >
+            <div class="mb-2 text-xs text-ink-400">调整「{{ m.displayName }}」的角色（可多选）</div>
+            <div class="flex flex-wrap gap-2">
+              <label
+                v-for="o in ROLE_OPTIONS"
+                :key="o.value"
+                class="cursor-pointer select-none rounded-full border px-2.5 py-1 text-xs transition"
+                :class="
+                  editingRoles.includes(o.value)
+                    ? 'border-brand bg-brand-light text-brand'
+                    : 'border-line-light text-ink-400 hover:border-brand'
+                "
+              >
+                <input v-model="editingRoles" type="checkbox" class="sr-only" :value="o.value" />
+                {{ o.label }}
+              </label>
+            </div>
+            <div class="mt-3 flex justify-end gap-2">
+              <el-button size="small" @click="cancelEditRoles">取消</el-button>
+              <el-button
+                size="small"
+                type="primary"
+                :disabled="!editingRoles.length"
+                :loading="savingRoles === m.userId"
+                @click="saveRoles(m)"
+              >
+                保存角色
+              </el-button>
+            </div>
+          </div>
         </li>
       </ul>
 
       <div v-if="canManageResolved" class="mt-4 border-t border-surface-muted pt-4">
         <div class="flex items-center gap-2">
-          <el-select v-model="selectedUser" placeholder="选择用户" class="w-40" :disabled="!candidateUsers.length">
-            <el-option
-              v-for="u in candidateUsers"
-              :key="u.id"
-              :label="`${u.displayName} (@${u.username})`"
-              :value="u.id"
-            />
-          </el-select>
+          <UserSelect
+            :model-value="selectedUser"
+            :users="candidateUsers"
+            placeholder="选择用户"
+            show-username
+            width-class="w-64"
+            :disabled="!candidateUsers.length"
+            @update:model-value="(v) => (selectedUser = (v as string) || '')"
+          />
           <el-select v-model="selectedRoles" multiple placeholder="选择角色（可多选）" class="flex-1">
             <el-option v-for="o in ROLE_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>

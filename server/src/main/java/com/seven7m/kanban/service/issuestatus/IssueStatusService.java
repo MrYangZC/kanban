@@ -1,11 +1,11 @@
 package com.seven7m.kanban.service.issuestatus;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.entity.issuestatus.IssueStatus;
-import com.seven7m.kanban.mapper.issuestatus.IssueStatusMapper;
 import com.seven7m.kanban.entity.project.Project;
 import com.seven7m.kanban.mapper.project.ProjectMapper;
+import com.seven7m.kanban.service.workflow.WorkflowService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,17 +16,18 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class IssueStatusService {
 
-    private final IssueStatusMapper issueStatusMapper;
+    private final WorkflowService workflowService;
     private final ProjectMapper projectMapper;
 
-    /** 全局状态字典（全局化后状态不再按项目隔离），按 sortOrder 升序 */
-    public List<IssueStatus> listByProject(UUID projectId) {
-        // 仍校验项目存在（接口以项目为入口），但状态本身为全局字典
+    /**
+     * 某类别工作流的节点状态（全局字典 issue_status 的类别子集），按模板列顺序。
+     * issue_status 是全局字典，三类工作项各有自己的节点，不能直接全量返回。
+     */
+    public List<IssueStatus> listByProject(UUID projectId, ItemCategory category) {
         Project project = projectMapper.selectById(projectId);
         if (project == null) {
             throw new ServiceException(404, "项目不存在");
         }
-        return issueStatusMapper.selectList(Wrappers.<IssueStatus>lambdaQuery()
-                .orderByAsc(IssueStatus::getSortOrder));
+        return workflowService.statusesOf(projectId, category);
     }
 }

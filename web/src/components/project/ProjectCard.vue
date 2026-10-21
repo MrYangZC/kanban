@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { Project } from '@/api/types'
 import { useProjectCategoryStore } from '@/stores/projectCategory'
-import { Users, Star, UserPlus, Lock, ListTodo, Lightbulb, Trash2 } from 'lucide-vue-next'
+import { Users, Star, UserPlus, Lock, ListTodo, Lightbulb, Trash2, Archive, ArchiveRestore } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
+import { errorMessage } from '@/utils/error'
 
 const props = defineProps<{
   project: Project
@@ -24,8 +25,18 @@ async function onFavorite(p: Project) {
   try {
     await store.toggleFavorite(p.id)
     ElMessage.success(wasFavorited ? '已取消收藏' : '已收藏')
-  } catch (e: any) {
-    ElMessage.error(e?.message || '操作失败')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '操作失败'))
+  }
+}
+
+async function onArchive(p: Project) {
+  const isArchived = p.status === 'ARCHIVED'
+  try {
+    await store.toggleArchive(p.id)
+    ElMessage.success(isArchived ? '已取消归档' : '已归档')
+  } catch (e: unknown) {
+    ElMessage.error(errorMessage(e, '操作失败'))
   }
 }
 
@@ -40,7 +51,7 @@ function goRequirements() {
 
 <template>
   <div
-    class="group relative flex h-[160px] cursor-pointer flex-col overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-100 transition-all duration-[400ms] ease-spring hover:shadow-card-hover-lg hover:ring-primary-200"
+    class="card-interactive group relative flex h-[160px] cursor-pointer flex-col overflow-hidden rounded-xl transition-all duration-[400ms] ease-spring hover:shadow-card-hover-lg hover:ring-primary-200"
     @click="emit('openBoard', project)"
   >
     <!-- 顶部渐变封面区：默认 88px，悬停收缩到 52px -->
@@ -104,13 +115,23 @@ function goRequirements() {
             <UserPlus :size="15" />
             <span>添加成员</span>
           </button>
-          <button
-            class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
-            title="删除项目"
-            @click.stop="emit('delete', project)"
-          >
-            <Trash2 :size="15" />
-          </button>
+          <div class="flex items-center gap-1">
+            <button
+              class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-primary-50 hover:text-primary"
+              :title="project.status === 'ARCHIVED' ? '取消归档' : '归档'"
+              @click.stop="onArchive(project)"
+            >
+              <ArchiveRestore v-if="project.status === 'ARCHIVED'" :size="15" />
+              <Archive v-else :size="15" />
+            </button>
+            <button
+              class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
+              title="删除项目"
+              @click.stop="emit('delete', project)"
+            >
+              <Trash2 :size="15" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

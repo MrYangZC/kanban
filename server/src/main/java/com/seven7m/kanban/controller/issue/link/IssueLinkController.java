@@ -6,6 +6,7 @@ import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
 import com.seven7m.kanban.dto.issue.AddLinkRequest;
 import com.seven7m.kanban.dto.issue.LinkVO;
 import com.seven7m.kanban.service.issue.link.IssueLinkService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,7 +28,7 @@ public class IssueLinkController {
 
     @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
     @PostMapping("/{issueId}/links")
-    public R<LinkVO> add(@PathVariable UUID issueId, @RequestBody AddLinkRequest body) {
+    public R<LinkVO> add(@PathVariable UUID issueId, @Valid @RequestBody AddLinkRequest body) {
         return R.ok(linkService.add(issueId, body.getTargetIssueId(), body.getRelationType()));
     }
 

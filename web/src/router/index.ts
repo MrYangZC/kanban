@@ -28,7 +28,9 @@ const router = createRouter({
         { path: 'table', name: 'table', component: () => import('@/views/TableView.vue') },
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') }
       ]
-    }
+    },
+    // 兜底路由：未匹配任何规则时渲染 404 页，避免直接白屏
+    { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('@/views/NotFoundView.vue') }
   ]
 })
 
@@ -38,7 +40,8 @@ router.beforeEach((to) => {
   if (to.path !== '/login' && !userStore.token) {
     return '/login'
   }
-  if ((to.path === '/users' || to.path === '/rbac') && userStore.user?.username !== 'admin') {
+  // 管理员判定与后端口径一致：由登录接口下发的 isAdmin 决定（is_admin 字段或种子管理员）
+  if ((to.path === '/users' || to.path === '/rbac') && !userStore.isAdmin) {
     return '/projects'
   }
   return true

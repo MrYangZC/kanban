@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller;
 
+import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.RequireAdmin;
 import com.seven7m.kanban.common.security.UserContext;
@@ -14,6 +15,7 @@ import com.seven7m.kanban.dto.user.UpdateUserRequest;
 import com.seven7m.kanban.dto.user.UserVO;
 import com.seven7m.kanban.service.user.UserService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -38,11 +40,33 @@ public class UserController {
         return R.ok(vo);
     }
 
-    /** 用户管理列表（含 username/email/enabled） */
+    /**
+     * 登出：销毁服务端 HttpSession。
+     * 此前前端仅在本地清理凭证，服务端会话仍存活（会话劫持/复用风险）。
+     */
+    @PostMapping("/logout")
+    public R<Void> logout(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        return R.ok();
+    }
+
+    /** 用户管理列表（含 username/email/enabled）：分页 + 关键字检索 */
     @RequireAdmin
     @GetMapping
-    public R<List<UserVO>> list() {
-        return R.ok(userService.listForAdmin());
+    public R<PageResult<UserVO>> list(@RequestParam(defaultValue = "1") int page,
+                                      @RequestParam(defaultValue = "20") int size,
+                                      @RequestParam(required = false) String keyword) {
+        return R.ok(userService.pageForAdmin(page, size, keyword));
+    }
+
+    /** 全量用户简表：仅供「添加项目成员」等人员下拉使用 */
+    @RequireAdmin
+    @GetMapping("/options")
+    public R<List<UserVO>> options() {
+        return R.ok(userService.list());
     }
 
     @RequireAdmin
@@ -53,7 +77,7 @@ public class UserController {
 
     @RequireAdmin
     @PutMapping("/{id}")
-    public R<UserVO> update(@PathVariable UUID id, @RequestBody UpdateUserRequest req) {
+    public R<UserVO> update(@PathVariable UUID id, @Valid @RequestBody UpdateUserRequest req) {
         return R.ok(userService.update(id, req));
     }
 
@@ -72,7 +96,7 @@ public class UserController {
 
     /** 当前用户修改个人资料 */
     @PutMapping("/me")
-    public R<ProfileVO> updateMe(@RequestBody UpdateProfileRequest req) {
+    public R<ProfileVO> updateMe(@Valid @RequestBody UpdateProfileRequest req) {
         return R.ok(userService.updateProfile(UserContext.getUserId(), req));
     }
 

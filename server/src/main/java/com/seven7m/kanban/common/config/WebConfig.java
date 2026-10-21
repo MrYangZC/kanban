@@ -2,7 +2,9 @@ package com.seven7m.kanban.common.config;
 
 import com.seven7m.kanban.common.security.AdminAuthInterceptor;
 import com.seven7m.kanban.common.security.ProjectPermissionInterceptor;
+import com.seven7m.kanban.common.security.UploadsAuthInterceptor;
 import com.seven7m.kanban.common.security.UserContextInterceptor;
+import com.seven7m.kanban.common.upload.UploadProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +25,8 @@ public class WebConfig implements WebMvcConfigurer {
     private final UserContextInterceptor userContextInterceptor;
     private final ProjectPermissionInterceptor projectPermissionInterceptor;
     private final AdminAuthInterceptor adminAuthInterceptor;
+    private final UploadsAuthInterceptor uploadsAuthInterceptor;
+    private final UploadProperties uploadProperties;
 
     /** 业务 API 版本前缀，来自配置项 kanban.api.prefix */
     @Value("${kanban.api.prefix:/v1}")
@@ -60,15 +64,21 @@ public class WebConfig implements WebMvcConfigurer {
                         apiPrefix + "/users/**",
                         apiPrefix + "/projects",
                         apiPrefix + "/upload/**");
-        // 系统管理员后台：标注 @RequireAdmin 的接口由本拦截器校验管理员身份
-        // 拦截 /admin/** 和 /users/**（用户管理接口），无 @RequireAdmin 注解的方法自动放行
+        // 系统管理员后台：标注 @RequireAdmin 的接口由本拦截器校验管理员身份。
+        // 拦截全部业务 API 而非仅 /admin、/users：拦截器内部对"无 @RequireAdmin 注解"
+        // 的方法直接放行，因此不会误伤其他接口；若只拦截固定路径前缀，将来把带注解的
+        // 接口放到其他路径下会被静默跳过，形成"以为受保护实则裸奔"的越权风险。
         registry.addInterceptor(adminAuthInterceptor)
-                .addPathPatterns(apiPrefix + "/admin/**", apiPrefix + "/users/**");
+                .addPathPatterns(apiPrefix + "/**");
+        // 附件文件访问鉴权：工作项附件按项目 issue:view 校验归属（在 UserContextInterceptor 之后执行）
+        registry.addInterceptor(uploadsAuthInterceptor)
+                .addPathPatterns("/uploads/**");
     }
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // 目录来自 kanban.upload.dir，与落盘位置保持一致（原先硬编码 ./uploads 会与之脱节）
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:./uploads/");
+                .addResourceLocations(uploadProperties.rootUri());
     }
 }

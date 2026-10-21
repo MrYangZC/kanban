@@ -4,8 +4,11 @@ import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.RequireAdmin;
 import com.seven7m.kanban.entity.rbac.Menu;
 import com.seven7m.kanban.entity.rbac.PermissionDef;
+import com.seven7m.kanban.dto.rbac.MenuRequest;
+import com.seven7m.kanban.dto.rbac.RoleRequest;
 import com.seven7m.kanban.entity.rbac.Role;
 import com.seven7m.kanban.service.rbac.RbacAdminService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,15 +41,17 @@ public class RbacAdminController {
     }
 
     @RequireAdmin
+    // 入参用请求 DTO 而非 Role 实体：实体含 id/createdBy/updatedBy，
+    // 直接接参会让调用方注入这些字段（mass assignment）
     @PostMapping("/roles")
-    public R<Role> createRole(@RequestBody Role role) {
-        return R.ok(rbacAdminService.createRole(role));
+    public R<Role> createRole(@Valid @RequestBody RoleRequest req) {
+        return R.ok(rbacAdminService.createRole(req));
     }
 
     @RequireAdmin
     @PutMapping("/roles/{id}")
-    public R<Role> updateRole(@PathVariable UUID id, @RequestBody Role role) {
-        return R.ok(rbacAdminService.updateRole(id, role));
+    public R<Role> updateRole(@PathVariable UUID id, @Valid @RequestBody RoleRequest req) {
+        return R.ok(rbacAdminService.updateRole(id, req));
     }
 
     @RequireAdmin
@@ -86,14 +91,14 @@ public class RbacAdminController {
 
     @RequireAdmin
     @PostMapping("/menus")
-    public R<Menu> createMenu(@RequestBody Menu menu) {
-        return R.ok(rbacAdminService.createMenu(menu));
+    public R<Menu> createMenu(@Valid @RequestBody MenuRequest req) {
+        return R.ok(rbacAdminService.createMenu(req));
     }
 
     @RequireAdmin
     @PutMapping("/menus/{id}")
-    public R<Menu> updateMenu(@PathVariable UUID id, @RequestBody Menu menu) {
-        return R.ok(rbacAdminService.updateMenu(id, menu));
+    public R<Menu> updateMenu(@PathVariable UUID id, @Valid @RequestBody MenuRequest req) {
+        return R.ok(rbacAdminService.updateMenu(id, req));
     }
 
     @RequireAdmin

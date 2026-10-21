@@ -23,7 +23,7 @@ function onSwitch(mode: typeof viewMode.value) {
   <div class="inline-flex items-center rounded-lg border border-line-light bg-surface-light p-1">
     <button
       class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200 ease-out-expo"
-      :class="viewMode === 'card' ? 'bg-white text-primary-600 shadow-sm' : 'text-ink-secondary hover:text-ink'"
+      :class="viewMode === 'card' ? 'bg-white/80 text-primary-600 shadow-sm' : 'text-ink-secondary hover:text-ink'"
       title="卡片视图"
       @click="onSwitch('card')"
     >
@@ -32,7 +32,7 @@ function onSwitch(mode: typeof viewMode.value) {
     </button>
     <button
       class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200 ease-out-expo"
-      :class="viewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-ink-secondary hover:text-ink'"
+      :class="viewMode === 'list' ? 'bg-white/80 text-primary-600 shadow-sm' : 'text-ink-secondary hover:text-ink'"
       title="列表视图"
       @click="onSwitch('list')"
     >

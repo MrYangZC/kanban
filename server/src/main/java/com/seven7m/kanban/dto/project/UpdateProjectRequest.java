@@ -1,5 +1,6 @@
 package com.seven7m.kanban.dto.project;
 
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.UUID;
@@ -10,6 +11,8 @@ import java.util.UUID;
 @Data
 public class UpdateProjectRequest {
 
+    /** 与 project.name 的 varchar(200) 对齐 */
+    @Size(max = 200, message = "项目名称不能超过 200 个字符")
     private String name;
 
     private String description;

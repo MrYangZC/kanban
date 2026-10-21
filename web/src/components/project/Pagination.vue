@@ -61,7 +61,7 @@ function onPageSize(e: Event) {
         <span class="hidden sm:inline">每页</span>
         <select
           :value="pageSize"
-          class="cursor-pointer rounded-md border border-line-light bg-white px-2 py-1 text-xs text-ink-regular transition hover:border-primary-300 focus:border-primary focus:outline-none"
+          class="glass-inset cursor-pointer rounded-md px-2 py-1 text-xs text-ink-regular transition hover:border-primary-300 focus:border-primary focus:outline-none"
           @change="onPageSize"
         >
           <option v-for="opt in pageSizeOptions" :key="opt" :value="opt">{{ opt }} 条/页</option>
