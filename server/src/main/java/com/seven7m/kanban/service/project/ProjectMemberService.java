@@ -6,6 +6,7 @@ import com.seven7m.kanban.common.security.PermissionService;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.entity.project.ProjectRole;
 import com.seven7m.kanban.dto.project.AddMemberRequest;
+import com.seven7m.kanban.dto.project.MemberCandidateVO;
 import com.seven7m.kanban.dto.project.ProjectMemberVO;
 import com.seven7m.kanban.entity.project.ProjectMember;
 import com.seven7m.kanban.mapper.project.ProjectMemberMapper;
@@ -92,6 +93,36 @@ public class ProjectMemberService {
                         .collect(Collectors.toMap(SysUser::getId, Function.identity()));
         Map<UUID, Set<String>> roleMap = buildRoleMap(projectId);
         return memberList.stream().map(m -> toVO(m, userMap, roleMap)).collect(Collectors.toList());
+    }
+
+    /**
+     * 「添加成员」的可选用户：尚未加入该项目的用户，按关键字（账号/显示名）模糊匹配。
+     * 前端因此不必再拉取全量用户（GET /users 仅系统管理员可读，项目管理员拿不到），
+     * 也不会再把整张用户表塞进一个下拉里。
+     */
+    public List<MemberCandidateVO> candidates(UUID projectId, String keyword, int limit) {
+        Set<UUID> memberIds = projectMemberMapper.selectList(Wrappers.<ProjectMember>lambdaQuery()
+                        .eq(ProjectMember::getProjectId, projectId))
+                .stream().map(ProjectMember::getUserId).collect(Collectors.toSet());
+        String kw = keyword == null ? "" : keyword.trim();
+        var q = Wrappers.<SysUser>lambdaQuery()
+                .select(SysUser::getId, SysUser::getUsername, SysUser::getDisplayName, SysUser::getAvatarUrl)
+                .orderByAsc(SysUser::getUsername)
+                .last("LIMIT " + Math.min(Math.max(limit, 1), 50));
+        if (!memberIds.isEmpty()) {
+            q.notIn(SysUser::getId, memberIds);
+        }
+        if (!kw.isEmpty()) {
+            q.and(w -> w.like(SysUser::getUsername, kw).or().like(SysUser::getDisplayName, kw));
+        }
+        return userMapper.selectList(q).stream().map(u -> {
+            MemberCandidateVO vo = new MemberCandidateVO();
+            vo.setId(u.getId());
+            vo.setUsername(u.getUsername());
+            vo.setDisplayName(u.getDisplayName());
+            vo.setAvatarUrl(u.getAvatarUrl());
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     private Map<UUID, Set<String>> buildRoleMap(UUID projectId) {
@@ -259,9 +290,15 @@ public class ProjectMemberService {
                 .inSql(UserRole::getRoleId, "SELECT id FROM role WHERE code = '" + ProjectRole.OWNER + "'"));
     }
 
+    /**
+     * 成员维护权限：OWNER/ADMIN/PM。
+     * 与接口上的 {@code @ProjectRoleAnnotation(Permission.PROJECT_MEMBER)} 口径保持一致
+     * （role_permission 里 OWNER/ADMIN/PM 都持有 project:member），
+     * 之前这里用的是 isOwner，导致前端提示可管理的 ADMIN/PM 一操作就 403。
+     */
     private void requireAdmin(UUID projectId) {
-        if (!projectService.isOwner(projectId, UserContext.getUserId())) {
-            throw new ServiceException(403, "仅项目所有者可管理成员");
+        if (!projectService.canManage(projectId, UserContext.getUserId())) {
+            throw new ServiceException(403, "仅项目所有者/管理员/项目经理可管理成员");
         }
     }
 

@@ -97,6 +97,14 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
         q.eq("project_id", req.getProjectId());
 
         if (req.getStatusId() != null) q.eq("status_id", req.getStatusId());
+        if (req.getStatusCategory() != null && !req.getStatusCategory().isBlank()) {
+            q.apply("status_id IN (SELECT id FROM issue_status WHERE category = {0})", req.getStatusCategory());
+        }
+        if (Boolean.TRUE.equals(req.getOverdue())) {
+            q.isNotNull("due_date")
+                    .lt("due_date", java.time.LocalDate.now())
+                    .apply("status_id NOT IN (SELECT id FROM issue_status WHERE category = 'DONE')");
+        }
         if (req.getSprintId() != null) q.eq("sprint_id", req.getSprintId());
         if (req.getPriority() != null) q.eq("priority", req.getPriority());
         if (req.getSeverity() != null && this instanceof com.seven7m.kanban.service.workitem.BugService)

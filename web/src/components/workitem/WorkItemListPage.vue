@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   filterIssues, listProjectStatuses, listProjectMembers,
   getBoardGrouped, listTransitions, moveIssue
@@ -47,6 +47,7 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
+const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 
 type ViewMode = 'list' | 'tree' | 'board'
@@ -158,12 +159,51 @@ async function loadMeta() {
   try { members.value = await listProjectMembers(projectId.value) } catch { /* 成员筛选降级为空 */ }
 }
 
+/**
+ * 度量页点统计数字跳过来时带的筛选（?statusCategory=TODO|IN_PROGRESS|DONE / ?overdue=1）。
+ * 只在进入页面时读一次 query，之后由顶部的「清除」按钮管理，避免和用户手选的筛选互相覆盖。
+ */
+const statusCategoryFilter = ref('')
+const overdueFilter = ref(false)
+const activeFilterLabel = computed(() => {
+  if (overdueFilter.value) return '逾期'
+  return ({ TODO: '待处理', IN_PROGRESS: '处理中', DONE: '已完成' } as Record<string, string>)[statusCategoryFilter.value] || ''
+})
+
+function clearQueryFilter() {
+  statusCategoryFilter.value = ''
+  overdueFilter.value = false
+  page.value = 1
+  // 顺手把地址栏里的筛选参数去掉，免得刷新后又「复活」
+  if (route.query.statusCategory || route.query.overdue) {
+    router.replace({ path: route.path, query: { ...route.query, statusCategory: undefined, overdue: undefined } })
+  }
+  load()
+}
+
+// 同一路由只改 query 时组件不会重建（例如从度量页带筛选进来后再点左侧导航），
+// 这里跟 query 双向同步，避免筛选「粘」在页面上出不去
+watch(
+  () => [route.query.statusCategory, route.query.overdue],
+  ([sc, od]) => {
+    const nextSc = sc ? String(sc) : ''
+    const nextOd = od === '1'
+    if (nextSc === statusCategoryFilter.value && nextOd === overdueFilter.value) return
+    statusCategoryFilter.value = nextSc
+    overdueFilter.value = nextOd
+    page.value = 1
+    load()
+  }
+)
+
 function baseParams(extra: Record<string, unknown> = {}) {
   return {
     projectId: projectId.value,
     scope: scope.value || undefined,
     keyword: keyword.value || undefined,
     issueTypeCodes: props.typeCodes,
+    statusCategory: statusCategoryFilter.value || undefined,
+    overdue: overdueFilter.value || undefined,
     ...extra
   }
 }
@@ -284,6 +324,9 @@ async function openCreate() {
 onMounted(() => {
   const saved = localStorage.getItem(`kanban:${props.storageKey}:${projectId.value}`)
   if (saved === 'list' || saved === 'tree' || saved === 'board') view.value = saved
+  // 度量页跳转带来的筛选
+  if (route.query.statusCategory) statusCategoryFilter.value = String(route.query.statusCategory)
+  if (route.query.overdue === '1') overdueFilter.value = true
   refreshPermission()
   loadMeta().then(() => {
     load()
@@ -317,6 +360,12 @@ onMounted(() => {
     @refresh="reloadAll"
     @create="openCreate"
   >
+    <template #header-extra>
+      <div v-if="activeFilterLabel" class="flex items-center gap-1.5">
+        <span class="rounded-full bg-brand-light px-2.5 py-1 text-xs text-brand">筛选：{{ activeFilterLabel }}</span>
+        <button class="text-xs text-ink-400 hover:text-brand" @click="clearQueryFilter">清除</button>
+      </div>
+    </template>
     <!-- 列表视图 -->
     <DataTable v-if="view === 'list'" :columns="columns">
       <tr

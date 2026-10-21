@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { createProject, updateProject, deleteProject } from '@/api'
@@ -70,9 +70,18 @@ function openBoard(p: Project) {
   router.push(`/projects/${p.id}/${path}`)
 }
 
+const memberDialogRef = ref<{ openAddDialog: () => void } | null>(null)
+
 function openMembers(p: Project) {
   memberProjectId.value = p.id
   memberDialogVisible.value = true
+}
+
+/** 卡片「添加成员」：先开成员弹窗，再直接拉起检索弹窗 */
+function openAddMember(p: Project) {
+  memberProjectId.value = p.id
+  memberDialogVisible.value = true
+  nextTick(() => memberDialogRef.value?.openAddDialog())
 }
 
 function openEdit(p: Project) {
@@ -258,6 +267,7 @@ onMounted(async () => {
             :project="p"
             @open-board="openBoard"
             @open-members="openMembers"
+            @add-member="openAddMember"
             @open-edit="openEdit"
             @delete="onDelete"
           />
@@ -290,7 +300,7 @@ onMounted(async () => {
           </template>
         </el-dialog>
 
-        <ProjectMemberDialog v-model:visible="memberDialogVisible" :project-id="memberProjectId" />
+        <ProjectMemberDialog ref="memberDialogRef" v-model:visible="memberDialogVisible" :project-id="memberProjectId" />
       </div>
 
       <div

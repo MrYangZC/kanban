@@ -22,6 +22,22 @@ public class DashboardService {
 
     private final DashboardMapper dashboardMapper;
 
+    /** 类型码 → 展示名，同时决定度量页卡片的顺序 */
+    private static final Map<String, String> TYPE_NAMES = new LinkedHashMap<>();
+
+    static {
+        TYPE_NAMES.put("REQUIREMENT", "需求");
+        TYPE_NAMES.put("BUG", "缺陷");
+        TYPE_NAMES.put("TASK", "任务");
+    }
+
+    private DashboardVO.TypeSummary emptyTypeSummary(String typeCode) {
+        DashboardVO.TypeSummary ts = new DashboardVO.TypeSummary();
+        ts.setTypeCode(typeCode);
+        ts.setTypeName(TYPE_NAMES.get(typeCode));
+        return ts;
+    }
+
     @Transactional(readOnly = true)
     public DashboardVO getDashboard(UUID projectId) {
         DashboardVO vo = new DashboardVO();
@@ -29,9 +45,30 @@ public class DashboardService {
         // 概览
         DashboardMapper.DashboardSummaryView s = dashboardMapper.summary(projectId);
         vo.getSummary().setTotal(s.total);
+        vo.getSummary().setTodo(s.todo);
         vo.getSummary().setDone(s.done);
         vo.getSummary().setOverdue(s.overdue);
-        vo.getSummary().setInProgress(Math.max(0, s.total - s.done));
+        // 之前这里是 total - done（其实是「未完成」），会把待处理的活儿算进行中；
+        // 现在按 issue_status.category 真实统计，前端卡片也据此拆分「待处理 / 处理中」
+        vo.getSummary().setInProgress(s.inProgress);
+
+        // 分类型概览：需求 / 缺陷 / 任务，顺序固定（前端按此顺序渲染并决定跳转目标）
+        Map<String, DashboardVO.TypeSummary> byCode = new LinkedHashMap<>();
+        for (DashboardMapper.TypeSummaryView t : dashboardMapper.typeSummaries(projectId)) {
+            DashboardVO.TypeSummary ts = new DashboardVO.TypeSummary();
+            ts.setTypeCode(t.typeCode);
+            ts.setTypeName(TYPE_NAMES.getOrDefault(t.typeCode, t.typeCode));
+            ts.setTotal(t.total);
+            ts.setTodo(t.todo);
+            ts.setInProgress(t.inProgress);
+            ts.setDone(t.done);
+            ts.setOverdue(t.overdue);
+            byCode.put(t.typeCode, ts);
+        }
+        // 某类型一条都没有时 SQL 不会返回该行，这里补 0，保证度量页三张卡片始终齐全
+        for (String code : TYPE_NAMES.keySet()) {
+            vo.getTypeSummaries().add(byCode.getOrDefault(code, emptyTypeSummary(code)));
+        }
 
         // 分布
         vo.setStatusDist(dashboardMapper.statusDist(projectId));

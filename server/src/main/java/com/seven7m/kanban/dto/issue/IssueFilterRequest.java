@@ -15,6 +15,14 @@ public class IssueFilterRequest {
     private String scope;
 
     private UUID statusId;
+    /**
+     * 状态类别过滤：TODO / IN_PROGRESS / DONE。
+     * 度量页的统计数字要能点进对应列表，而一张卡片对应的是「一整类状态」而不是某个具体节点，
+     * 所以这里按 issue_status.category 过滤，而不是按 statusId。
+     */
+    private String statusCategory;
+    /** 只看逾期：未完成且 due_date < 今天。度量页「逾期」数字跳转用 */
+    private Boolean overdue;
     /** 迭代（冲刺）过滤：为空表示不过滤。三表均有 sprint_id 列 */
     private UUID sprintId;
     private String priority;

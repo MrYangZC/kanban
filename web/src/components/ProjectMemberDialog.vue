@@ -2,18 +2,16 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import {
   listProjectMembers,
-  addProjectMember,
   removeProjectMember,
-  updateProjectMemberRoles,
-  listUsers
+  updateProjectMemberRoles
 } from '@/api'
-import type { ProjectMember, UserVO } from '@/api/types'
+import type { ProjectMember } from '@/api/types'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { errorMessage } from '@/utils/error'
 import { UserPlus, Trash2, Crown } from 'lucide-vue-next'
 import UserAvatar from '@/components/common/UserAvatar.vue'
-import UserSelect from '@/components/common/UserSelect.vue'
+import AddMemberDialog from '@/components/project/AddMemberDialog.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -49,17 +47,14 @@ const canManageResolved = computed(() => {
 })
 
 const members = ref<ProjectMember[]>([])
-const allUsers = ref<UserVO[]>([])
 const loading = ref(false)
+const addDialogVisible = ref(false)
 
 async function load() {
   if (!props.projectId) return
   loading.value = true
   try {
     members.value = await listProjectMembers(props.projectId)
-    if (canManageResolved.value) {
-      allUsers.value = await listUsers()
-    }
   } finally {
     loading.value = false
   }
@@ -68,25 +63,6 @@ async function load() {
 watch(visible, (v) => {
   if (v) load()
 })
-
-const candidateUsers = computed(() =>
-  allUsers.value.filter((u) => !members.value.some((m) => m.userId === u.id))
-)
-
-const selectedUser = ref<string>('')
-const selectedRoles = ref<string[]>(['MEMBER'])
-
-async function onAdd() {
-  if (!selectedUser.value) {
-    ElMessage.warning('请选择要添加的用户')
-    return
-  }
-  await addProjectMember(props.projectId, selectedUser.value, selectedRoles.value)
-  ElMessage.success('已添加成员')
-  selectedUser.value = ''
-  selectedRoles.value = ['MEMBER']
-  await load()
-}
 
 async function onRemove(m: ProjectMember) {
   try {
@@ -141,11 +117,22 @@ async function saveRoles(m: ProjectMember) {
 onMounted(() => {
   if (visible.value) load()
 })
+
+/** 供调用方（如项目卡片的「添加成员」）直接拉起检索弹窗，省掉再点一次 */
+function openAddDialog() {
+  addDialogVisible.value = true
+}
+defineExpose({ openAddDialog })
 </script>
 
 <template>
   <el-dialog v-model="visible" title="项目成员" width="560px">
     <div v-loading="loading">
+      <div v-if="canManageResolved" class="mb-3 flex justify-end">
+        <el-button type="primary" size="small" :icon="UserPlus" @click="addDialogVisible = true">
+          添加成员
+        </el-button>
+      </div>
       <div v-if="!members.length" class="py-8 text-center text-sm text-ink-400">暂无成员</div>
       <ul v-else class="space-y-2">
         <li v-for="m in members" :key="m.id" class="rounded-lg border border-surface-muted">
@@ -221,26 +208,8 @@ onMounted(() => {
         </li>
       </ul>
 
-      <div v-if="canManageResolved" class="mt-4 border-t border-surface-muted pt-4">
-        <div class="flex items-center gap-2">
-          <UserSelect
-            :model-value="selectedUser"
-            :users="candidateUsers"
-            placeholder="选择用户"
-            show-username
-            width-class="w-64"
-            :disabled="!candidateUsers.length"
-            @update:model-value="(v) => (selectedUser = (v as string) || '')"
-          />
-          <el-select v-model="selectedRoles" multiple placeholder="选择角色（可多选）" class="flex-1">
-            <el-option v-for="o in ROLE_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
-          </el-select>
-          <el-button type="primary" :icon="UserPlus" :disabled="!candidateUsers.length" @click="onAdd">添加</el-button>
-        </div>
-        <div v-if="!candidateUsers.length" class="mt-2 text-xs text-ink-400">
-          所有用户均已加入该项目
-        </div>
-      </div>
     </div>
+
+    <AddMemberDialog v-model:visible="addDialogVisible" :project-id="projectId" @added="load" />
   </el-dialog>
 </template>

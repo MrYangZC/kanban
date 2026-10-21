@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import draggable from 'vuedraggable'
 import {
@@ -159,17 +159,59 @@ function statusOptionsFor(fromStatusId: string): IssueStatusVO[] {
   return statuses.value.filter((s) => s.id === fromStatusId || reachable.has(s.id))
 }
 
+/**
+ * 度量页点统计数字跳过来时带的筛选（?statusCategory=TODO|IN_PROGRESS|DONE / ?overdue=1）。
+ * 进入页面时读一次 query，之后交给顶部的「清除」按钮管理。
+ */
+const statusCategoryFilter = ref('')
+const overdueFilter = ref(false)
+const activeFilterLabel = computed(() => {
+  if (overdueFilter.value) return '逾期'
+  return ({ TODO: '待处理', IN_PROGRESS: '处理中', DONE: '已完成' } as Record<string, string>)[statusCategoryFilter.value] || ''
+})
+
+function clearQueryFilter() {
+  statusCategoryFilter.value = ''
+  overdueFilter.value = false
+  page.value = 1
+  // 顺手把地址栏里的筛选参数去掉，免得刷新后又「复活」
+  if (route.query.statusCategory || route.query.overdue) {
+    router.replace({ path: route.path, query: { ...route.query, statusCategory: undefined, overdue: undefined } })
+  }
+  load()
+}
+
+// 同路由仅 query 变化时组件不重建，需跟 query 同步，否则筛选会一直粘着
+watch(
+  () => [route.query.statusCategory, route.query.overdue],
+  ([sc, od]) => {
+    const nextSc = sc ? String(sc) : ''
+    const nextOd = od === '1'
+    if (nextSc === statusCategoryFilter.value && nextOd === overdueFilter.value) return
+    statusCategoryFilter.value = nextSc
+    overdueFilter.value = nextOd
+    page.value = 1
+    load()
+  }
+)
+
+/** 列表/树/看板共用的筛选参数，保证三个视图口径一致 */
+function filterParams(extra: Record<string, unknown> = {}) {
+  return {
+    projectId: projectId.value,
+    scope: scope.value || undefined,
+    keyword: keyword.value || undefined,
+    issueTypeCodes: DEFECT_TYPE_CODES,
+    statusCategory: statusCategoryFilter.value || undefined,
+    overdue: overdueFilter.value || undefined,
+    ...extra
+  }
+}
+
 async function loadList() {
   loading.value = true
   try {
-    const res = await filterIssues({
-      projectId: projectId.value,
-      scope: scope.value || undefined,
-      keyword: keyword.value || undefined,
-      issueTypeCodes: DEFECT_TYPE_CODES,
-      page: page.value,
-      size: size.value,
-    })
+    const res = await filterIssues(filterParams({ page: page.value, size: size.value }))
     tableData.value = res.list
     total.value = res.total
   } finally {
@@ -178,7 +220,7 @@ async function loadList() {
 }
 
 async function loadAllIssues() {
-  const res = await filterIssues({ projectId: projectId.value, scope: scope.value || undefined, keyword: keyword.value || undefined, issueTypeCodes: DEFECT_TYPE_CODES, page: 1, size: 1000 })
+  const res = await filterIssues(filterParams({ page: 1, size: 1000 }))
   allIssues.value = res.list
   total.value = res.total
 }
@@ -192,13 +234,7 @@ async function loadBoard() {
     ])
     board.value = boardRes
     transitionMap.value = buildTransitionMap(transitions)
-    const issues = await filterIssues({
-      projectId: projectId.value,
-      scope: scope.value || undefined,
-      keyword: keyword.value || undefined,
-      issueTypeCodes: DEFECT_TYPE_CODES,
-      size: 1000,
-    })
+    const issues = await filterIssues(filterParams({ size: 1000 }))
     filteredIds.value = new Set(issues.list.map((i: Issue) => i.id))
     // 看板视图同样要回写 total，否则顶栏与「全部缺陷」在看板下恒为 0
     total.value = issues.total
@@ -349,6 +385,9 @@ onMounted(() => {
     // 历史脏值（含旧版写入的非法 scope）：清掉，否则会把导航钉在空范围上并显示 0
     localStorage.removeItem(`kanban:defectScope:${pid}`)
   }
+  // 度量页跳转带来的筛选
+  if (route.query.statusCategory) statusCategoryFilter.value = String(route.query.statusCategory)
+  if (route.query.overdue === '1') overdueFilter.value = true
   loadMeta().then(() => {
     load()
     refreshScopeCounts()
@@ -383,6 +422,13 @@ onMounted(() => {
     @create="onNewIssue"
     @back="back"
   >
+    <template #header-extra>
+      <div v-if="activeFilterLabel" class="flex items-center gap-1.5">
+        <span class="rounded-full bg-brand-light px-2.5 py-1 text-xs text-brand">筛选：{{ activeFilterLabel }}</span>
+        <button class="text-xs text-ink-400 hover:text-brand" @click="clearQueryFilter">清除</button>
+      </div>
+    </template>
+
     <!-- 列表视图 -->
     <DataTable v-if="view === 'list'" :columns="columns">
       <tr

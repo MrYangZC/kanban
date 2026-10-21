@@ -241,6 +241,9 @@ public class WorkItemRouter {
         c.setProjectId(req.getProjectId());
         c.setScope(req.getScope());
         c.setStatusId(req.getStatusId());
+        // 跨表合并时这些条件必须一并带过去，否则「全部工作项」视图会静默丢掉筛选
+        c.setStatusCategory(req.getStatusCategory());
+        c.setOverdue(req.getOverdue());
         c.setPriority(req.getPriority());
         c.setSeverity(req.getSeverity());
         c.setLabelId(req.getLabelId());

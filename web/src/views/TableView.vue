@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive, computed } from 'vue'
+import { onMounted, ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   filterIssues, listIssueChildren, updateIssue, getBoardGrouped,
@@ -129,6 +129,42 @@ async function loadMeta() {
   refreshPermission()
 }
 
+/**
+ * 度量页点统计数字跳过来时带的筛选（?statusCategory=TODO|IN_PROGRESS|DONE / ?overdue=1）。
+ * 与页面上手选的筛选互不覆盖：这里只负责「来自度量页的那一层」，用顶部 chip 单独清除。
+ */
+const statusCategoryFilter = ref('')
+const overdueFilter = ref(false)
+const activeFilterLabel = computed(() => {
+  if (overdueFilter.value) return '逾期'
+  return ({ TODO: '待处理', IN_PROGRESS: '处理中', DONE: '已完成' } as Record<string, string>)[statusCategoryFilter.value] || ''
+})
+
+function clearQueryFilter() {
+  statusCategoryFilter.value = ''
+  overdueFilter.value = false
+  page.value = 1
+  // 顺手把地址栏里的筛选参数去掉，免得刷新后又「复活」
+  if (route.query.statusCategory || route.query.overdue) {
+    router.replace({ path: route.path, query: { ...route.query, statusCategory: undefined, overdue: undefined } })
+  }
+  load()
+}
+
+// 同路由仅 query 变化时组件不重建，需跟 query 同步，否则筛选会一直粘着
+watch(
+  () => [route.query.statusCategory, route.query.overdue],
+  ([sc, od]) => {
+    const nextSc = sc ? String(sc) : ''
+    const nextOd = od === '1'
+    if (nextSc === statusCategoryFilter.value && nextOd === overdueFilter.value) return
+    statusCategoryFilter.value = nextSc
+    overdueFilter.value = nextOd
+    page.value = 1
+    load()
+  }
+)
+
 async function load() {
   loading.value = true
   try {
@@ -139,6 +175,8 @@ async function load() {
       priority: filter.priority || undefined,
       severity: filter.severity || undefined,
       statusId: filter.statusId || undefined,
+      statusCategory: statusCategoryFilter.value || undefined,
+      overdue: overdueFilter.value || undefined,
       labelId: filter.labelId || undefined,
       issueTypeCodes: TYPE_CODE_MAP[typeKey.value]?.length ? TYPE_CODE_MAP[typeKey.value] : undefined,
       page: page.value,
@@ -224,6 +262,9 @@ function onScopeChange(v: string) {
 }
 
 onMounted(() => {
+  // 度量页跳转带来的筛选（进入时读一次）
+  if (route.query.statusCategory) statusCategoryFilter.value = String(route.query.statusCategory)
+  if (route.query.overdue === '1') overdueFilter.value = true
   loadMeta().then(load)
 })
 </script>
@@ -256,6 +297,10 @@ onMounted(() => {
     @back="back"
   >
     <template #header-extra>
+      <div v-if="activeFilterLabel" class="flex items-center gap-1.5">
+        <span class="rounded-full bg-brand-light px-2.5 py-1 text-xs text-brand">筛选：{{ activeFilterLabel }}</span>
+        <button class="text-xs text-ink-400 hover:text-brand" @click="clearQueryFilter">清除</button>
+      </div>
       <button class="btn-ghost" @click="toDashboard"><BarChart3 :size="15" /> 报表</button>
     </template>
 

@@ -4,17 +4,15 @@ import { useRoute } from 'vue-router'
 import {
   updateProject,
   listProjectMembers,
-  addProjectMember,
   removeProjectMember,
-  updateProjectMemberRoles,
-  listUsers
+  updateProjectMemberRoles
 } from '@/api'
 import { useProjectStore } from '@/stores/project'
 import { useUserStore } from '@/stores/user'
-import type { ProjectMember, UserVO } from '@/api/types'
+import type { ProjectMember } from '@/api/types'
 import { Settings, Users, UserPlus, Trash2, Crown, Pencil } from 'lucide-vue-next'
 import UserAvatar from '@/components/common/UserAvatar.vue'
-import UserSelect from '@/components/common/UserSelect.vue'
+import AddMemberDialog from '@/components/project/AddMemberDialog.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { errorMessage } from '@/utils/error'
 
@@ -26,7 +24,6 @@ const userStore = useUserStore()
 const form = ref({ name: '', description: '', status: 'ACTIVE' })
 const saving = ref(false)
 const members = ref<ProjectMember[]>([])
-const allUsers = ref<UserVO[]>([])
 const loadingMembers = ref(false)
 
 const STATUS_OPTIONS = [
@@ -57,29 +54,12 @@ const canManage = computed(() => {
   return rs.includes('OWNER') || rs.includes('ADMIN') || rs.includes('PM')
 })
 
-/** 尚未加入项目的用户，供「添加成员」下拉选择 */
-const candidateUsers = computed(() => allUsers.value.filter((u) => !members.value.some((m) => m.userId === u.id)))
-
 async function loadMembers() {
   try {
     members.value = await listProjectMembers(projectId.value)
   } catch {
     // 成员列表加载失败降级为空（接口层已提示错误），不阻断设置页其余功能
     members.value = []
-    return
-  }
-  /*
-   * 全量用户列表只服务于「添加成员」下拉，且仅系统管理员可读（GET /users 由 AdminAuthInterceptor 拦截）。
-   * 这里必须单独 try，并且只在确实读得到时才请求：
-   * 之前与成员列表串在同一个 try 里，项目级 ADMIN/PM（非系统管理员）打开设置页时
-   * /users 必然 403，catch 把已经成功加载的成员列表一起清空，页面显示「共 0 人 / 暂无成员」。
-   */
-  if (canManage.value && userStore.isAdmin) {
-    try {
-      allUsers.value = await listUsers()
-    } catch {
-      allUsers.value = []
-    }
   }
 }
 
@@ -92,33 +72,8 @@ async function reloadMembers() {
   }
 }
 
-// ---- 添加成员（页内） ----
-const selectedUser = ref('')
-const selectedRoles = ref<string[]>(['MEMBER'])
-const adding = ref(false)
-
-async function onAddMember() {
-  if (!selectedUser.value) {
-    ElMessage.warning('请选择要添加的用户')
-    return
-  }
-  if (!selectedRoles.value.length) {
-    ElMessage.warning('请至少选择一个角色')
-    return
-  }
-  adding.value = true
-  try {
-    await addProjectMember(projectId.value, selectedUser.value, selectedRoles.value)
-    ElMessage.success('已添加成员')
-    selectedUser.value = ''
-    selectedRoles.value = ['MEMBER']
-    await loadMembers()
-  } catch (e: unknown) {
-    ElMessage.error(errorMessage(e, '添加成员失败'))
-  } finally {
-    adding.value = false
-  }
-}
+// ---- 添加成员（弹窗搜索后一键加入） ----
+const addDialogVisible = ref(false)
 
 // ---- 移除成员（页内） ----
 async function onRemoveMember(m: ProjectMember) {
@@ -250,7 +205,14 @@ onMounted(async () => {
             <Users :size="16" /> 成员管理
             <span class="text-xs font-normal text-ink-400">共 {{ members.length }} 人</span>
           </div>
-          <span v-if="!canManage" class="text-xs text-ink-400">仅所有者/管理员/项目经理可调整成员</span>
+          <button
+            v-if="canManage"
+            class="flex items-center gap-1 rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white transition hover:bg-brand-dark"
+            @click="addDialogVisible = true"
+          >
+            <UserPlus :size="13" /> 添加成员
+          </button>
+          <span v-else class="text-xs text-ink-400">仅所有者/管理员/项目经理可调整成员</span>
         </div>
 
         <div v-loading="loadingMembers" class="space-y-2">
@@ -317,42 +279,9 @@ onMounted(async () => {
 
           <div v-if="!members.length && !loadingMembers" class="py-6 text-center text-sm text-ink-400">暂无成员</div>
         </div>
-
-        <!-- 添加成员（页内） -->
-        <div v-if="canManage" class="mt-4 border-t border-line-lighter pt-4">
-          <div class="flex flex-wrap items-center gap-2">
-            <UserSelect
-              :model-value="selectedUser"
-              :users="candidateUsers"
-              placeholder="选择用户"
-              show-username
-              size="default"
-              width-class="w-64"
-              :disabled="!candidateUsers.length"
-              @update:model-value="(v) => (selectedUser = (v as string) || '')"
-            />
-            <div class="flex flex-wrap gap-1.5">
-              <label
-                v-for="o in ROLE_OPTIONS"
-                :key="o.value"
-                class="cursor-pointer rounded-full border px-2.5 py-1 text-xs transition"
-                :class="selectedRoles.includes(o.value) ? 'border-brand bg-brand-light text-brand' : 'border-line-light text-ink-400 hover:border-brand'"
-              >
-                <input v-model="selectedRoles" type="checkbox" class="hidden" :value="o.value" />
-                {{ o.label }}
-              </label>
-            </div>
-            <button
-              class="flex items-center gap-1 rounded-md bg-brand px-3 py-2 text-sm font-medium text-white transition hover:bg-brand-dark disabled:opacity-50"
-              :disabled="adding || !candidateUsers.length"
-              @click="onAddMember"
-            >
-              <UserPlus :size="14" /> {{ adding ? '添加中…' : '添加成员' }}
-            </button>
-          </div>
-          <div v-if="!candidateUsers.length" class="mt-2 text-xs text-ink-400">所有用户均已加入该项目</div>
-        </div>
       </div>
     </div>
+
+    <AddMemberDialog v-model:visible="addDialogVisible" :project-id="projectId" @added="reloadMembers" />
   </div>
 </template>

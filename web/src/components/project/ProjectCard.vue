@@ -13,6 +13,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'openBoard', p: Project): void
   (e: 'openMembers', p: Project): void
+  /** 卡片上的「添加成员」：直接拉起检索弹窗，不必先进成员列表 */
+  (e: 'addMember', p: Project): void
   (e: 'openEdit', p: Project): void
   (e: 'delete', p: Project): void
 }>()
@@ -110,7 +112,7 @@ function goRequirements() {
           <button
             class="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-slate-500 transition hover:bg-primary-50 hover:text-primary"
             title="添加成员"
-            @click.stop="emit('openMembers', project)"
+            @click.stop="emit('addMember', project)"
           >
             <UserPlus :size="15" />
             <span>添加成员</span>

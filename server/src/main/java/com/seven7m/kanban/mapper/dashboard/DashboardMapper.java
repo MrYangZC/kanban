@@ -79,7 +79,7 @@ public interface DashboardMapper extends BaseMapper<Object> {
             """)
     List<DashboardVO.AssigneeCount> assigneeDist(@Param("projectId") java.util.UUID projectId);
 
-    /** 概览：总数 / 已完成(category=DONE) / 逾期(due_date < now 且未完成) */
+    /** 概览：总数 / 待处理(TODO) / 处理中(IN_PROGRESS) / 已完成(DONE) / 逾期(due_date < now 且未完成) */
     @Select("""
             WITH w AS (
                 SELECT status_id, priority, assignee_id, due_date, created_at, updated_at
@@ -93,12 +93,39 @@ public interface DashboardMapper extends BaseMapper<Object> {
             )
             SELECT
                 COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE s.category = 'TODO') AS todo,
+                COUNT(*) FILTER (WHERE s.category = 'IN_PROGRESS') AS in_progress,
                 COUNT(*) FILTER (WHERE s.category = 'DONE') AS done,
                 COUNT(*) FILTER (WHERE w.due_date IS NOT NULL AND w.due_date < now() AND s.category <> 'DONE') AS overdue
             FROM w
             JOIN issue_status s ON s.id = w.status_id
             """)
     DashboardSummaryView summary(@Param("projectId") java.util.UUID projectId);
+
+    /**
+     * 分类型概览：需求 / 缺陷 / 任务各一张表，用 UNION ALL 带出类型标签后按类型聚合，
+     * 口径与 {@link #summary} 完全一致（同一套 issue_status.category 判定）。
+     */
+    @Select("""
+            WITH w AS (
+                SELECT 'TASK' AS type_code, status_id, due_date FROM task WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT 'REQUIREMENT' AS type_code, status_id, due_date FROM requirement WHERE project_id = #{projectId}
+                UNION ALL
+                SELECT 'BUG' AS type_code, status_id, due_date FROM bug WHERE project_id = #{projectId}
+            )
+            SELECT
+                w.type_code AS type_code,
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE s.category = 'TODO') AS todo,
+                COUNT(*) FILTER (WHERE s.category = 'IN_PROGRESS') AS in_progress,
+                COUNT(*) FILTER (WHERE s.category = 'DONE') AS done,
+                COUNT(*) FILTER (WHERE w.due_date IS NOT NULL AND w.due_date < now() AND s.category <> 'DONE') AS overdue
+            FROM w
+            JOIN issue_status s ON s.id = w.status_id
+            GROUP BY w.type_code
+            """)
+    List<TypeSummaryView> typeSummaries(@Param("projectId") java.util.UUID projectId);
 
     /** 已完成工作项的周期时间（小时）：updated_at - created_at */
     @Select("""
@@ -164,6 +191,17 @@ public interface DashboardMapper extends BaseMapper<Object> {
 
     class DashboardSummaryView {
         public long total;
+        public long todo;
+        public long inProgress;
+        public long done;
+        public long overdue;
+    }
+
+    class TypeSummaryView {
+        public String typeCode;
+        public long total;
+        public long todo;
+        public long inProgress;
         public long done;
         public long overdue;
     }

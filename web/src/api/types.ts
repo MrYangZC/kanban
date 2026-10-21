@@ -208,7 +208,18 @@ export interface BoardGroupView {
 }
 
 export interface DashboardVO {
-  summary: { total: number; inProgress: number; done: number; overdue: number }
+  /** todo/inProgress/done 按 issue_status.category 真实统计（inProgress 不再等同于「未完成」） */
+  summary: { total: number; todo: number; inProgress: number; done: number; overdue: number }
+  /** 分类型概览，顺序固定：需求(REQUIREMENT) / 缺陷(BUG) / 任务(TASK) */
+  typeSummaries: {
+    typeCode: 'REQUIREMENT' | 'BUG' | 'TASK'
+    typeName: string
+    total: number
+    todo: number
+    inProgress: number
+    done: number
+    overdue: number
+  }[]
   statusDist: { name: string; count: number }[]
   priorityDist: { name: string; count: number }[]
   /** 按负责人工作量：name 为显示名（未分配兜底），avatarUrl 为空时前端回退首字 */
@@ -271,6 +282,14 @@ export interface ProjectMember {
   avatarUrl: string | null
   roles: string[]
   createdAt: string
+}
+
+/** 「添加成员」检索出的候选用户（尚未加入项目） */
+export interface MemberCandidate {
+  id: string
+  username: string
+  displayName: string
+  avatarUrl: string | null
 }
 
 export interface MilestoneVO {

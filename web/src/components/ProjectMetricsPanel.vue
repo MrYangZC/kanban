@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, shallowRef, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts/core'
 import { PieChart, BarChart, LineChart } from 'echarts/charts'
 import { TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { getDashboard } from '@/api'
 import type { DashboardVO } from '@/api/types'
-import { TrendingUp, CheckCircle2, Clock, AlertTriangle, UserRound } from 'lucide-vue-next'
+import { UserRound, FileText, Bug, ListTodo } from 'lucide-vue-next'
+import type { LucideIcon } from 'lucide-vue-next'
 import ProgressBar from '@/components/ProgressBar.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import { CHART_PALETTE, CHART_AXIS_LINE, CHART_SPLIT_LINE, METRIC_DONE, METRIC_OVERDUE } from '@/theme/colorMap'
@@ -27,11 +29,6 @@ const burndownEl = ref<HTMLElement | null>(null)
 const charts = shallowRef<echarts.ECharts[]>([])
 const priorityLabel: Record<string, string> = { P0: '紧急', P1: '高', P2: '中', P3: '低' }
 
-const cardClass = computed(() =>
-  props.variant === 'ring'
-    ? 'glass-panel rounded-xl p-4 transition hover:shadow-md'
-    : 'glass-panel rounded-lg p-4'
-)
 const panelClass = computed(() =>
   props.variant === 'ring' ? 'glass-panel rounded-xl p-4' : 'glass-panel rounded-lg p-4'
 )
@@ -101,26 +98,70 @@ onBeforeUnmount(() => {
 
 const doneColor = computed(() => METRIC_DONE[props.variant])
 const overdueColor = computed(() => METRIC_OVERDUE[props.variant])
+
+const router = useRouter()
+
+/** 分类型 → 列表页路由与图标；键与后端 typeCode 对应 */
+const TYPE_META: Record<string, { path: string; icon: LucideIcon }> = {
+  REQUIREMENT: { path: 'requirements', icon: FileText },
+  BUG: { path: 'defects', icon: Bug },
+  TASK: { path: 'tasks', icon: ListTodo }
+}
+
+type StatusFilter = { statusCategory?: 'TODO' | 'IN_PROGRESS' | 'DONE'; overdue?: boolean }
+
+/** 点数字 → 跳到对应列表页并带上筛选参数，列表页读 query 后会自动套用 */
+function jump(path: string, filter: StatusFilter = {}) {
+  const query: Record<string, string> = {}
+  if (filter.statusCategory) query.statusCategory = filter.statusCategory
+  if (filter.overdue) query.overdue = '1'
+  router.push({ path: `/projects/${props.projectId}/${path}`, query })
+}
+
+/** 每个类型卡片下排的可点数字：全部 / 待处理 / 处理中 / 已完成 / 逾期 */
+const TYPE_FILTERS: { key: string; label: string; filter: StatusFilter }[] = [
+  { key: 'total', label: '全部', filter: {} },
+  { key: 'todo', label: '待处理', filter: { statusCategory: 'TODO' } },
+  { key: 'inProgress', label: '处理中', filter: { statusCategory: 'IN_PROGRESS' } },
+  { key: 'done', label: '已完成', filter: { statusCategory: 'DONE' } },
+  { key: 'overdue', label: '逾期', filter: { overdue: true } }
+]
+
+const typeCards = computed(() => (data.value?.typeSummaries ?? []).map((t) => ({
+  ...t,
+  icon: TYPE_META[t.typeCode]?.icon ?? FileText,
+  path: TYPE_META[t.typeCode]?.path ?? 'table'
+})))
 </script>
 
 <template>
   <div v-if="data" class="space-y-4">
-    <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-      <div :class="cardClass">
-        <div class="flex items-center gap-2 text-ink-400"><TrendingUp :size="16" /><span class="text-xs">总数</span></div>
-        <div class="mt-2 text-2xl font-semibold text-ink-900">{{ data.summary.total }}</div>
-      </div>
-      <div :class="cardClass">
-        <div class="flex items-center gap-2 text-ink-400"><Clock :size="16" /><span class="text-xs">进行中</span></div>
-        <div class="mt-2 text-2xl font-semibold text-brand">{{ data.summary.inProgress }}</div>
-      </div>
-      <div :class="cardClass">
-        <div class="flex items-center gap-2 text-ink-400"><CheckCircle2 :size="16" /><span class="text-xs">已完成</span></div>
-        <div class="mt-2 text-2xl font-semibold" :style="{ color: doneColor }">{{ data.summary.done }}</div>
-      </div>
-      <div :class="cardClass">
-        <div class="flex items-center gap-2 text-ink-400"><AlertTriangle :size="16" /><span class="text-xs">逾期</span></div>
-        <div class="mt-2 text-2xl font-semibold" :style="{ color: overdueColor }">{{ data.summary.overdue }}</div>
+    <!-- 分类型概览：需求 / 缺陷 / 任务，数字可点进对应列表 -->
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div v-for="t in typeCards" :key="t.typeCode" :class="panelClass">
+        <div class="mb-3 flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm font-medium text-ink-900">
+            <component :is="t.icon" :size="15" class="text-brand" />
+            {{ t.typeName }}
+          </div>
+          <span class="text-xs text-ink-400">共 {{ t.total }}</span>
+        </div>
+        <div class="grid grid-cols-5 gap-1">
+          <button
+            v-for="f in TYPE_FILTERS"
+            :key="f.key"
+            class="rounded-md px-1 py-1.5 text-center transition hover:bg-surface-muted"
+            :title="`查看${f.label}的${t.typeName}`"
+            @click="jump(t.path, f.filter)"
+          >
+            <div
+              class="text-lg font-semibold leading-tight"
+              :class="f.key === 'overdue' && (t[f.key] as number) > 0 ? '' : 'text-ink-900'"
+              :style="f.key === 'overdue' ? { color: (t[f.key] as number) > 0 ? overdueColor : undefined } : {}"
+            >{{ t[f.key as keyof typeof t] }}</div>
+            <div class="mt-0.5 text-[11px] text-ink-400">{{ f.label }}</div>
+          </button>
+        </div>
       </div>
     </div>
 

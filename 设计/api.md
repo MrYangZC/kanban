@@ -581,6 +581,32 @@ GET /api/v1/projects/{projectId}
 
 这里的 `statistics` 就是 Dashboard 的基础。
 
+## 可加入项目的成员候选
+
+「添加成员」弹窗的检索接口：返回**尚未加入本项目**的用户，供按账号/姓名搜索后一键加入。
+
+```http
+GET /api/v1/projects/{projectId}/members/candidates?keyword=zh&limit=20
+```
+
+| 参数 | 说明 |
+|---|---|
+| `keyword` | 可选，按 `username` 或 `display_name` 模糊匹配 |
+| `limit` | 可选，默认 20，上限 50 |
+
+```json
+{
+  "code": 200,
+  "data": [
+    { "id": "…", "username": "zhangjunwei", "displayName": "张俊伟", "avatarUrl": null }
+  ]
+}
+```
+
+权限：`project:member`（OWNER/ADMIN/PM）。
+
+> 不要用 `GET /users/options` 做这件事：那接口受 `AdminAuthInterceptor` 保护，只有系统管理员可读，项目管理员加成员时必然 403。该候选接口按项目鉴权，且天然排除了已有成员，前端不必拉全量用户再自行过滤。
+
 ---
 
 # 11. Issue API
@@ -606,7 +632,16 @@ assigneeId
 reporterId
 sprintId
 labelId
+statusCategory
+overdue
 ```
+
+两个「阶段类」参数（列表、树、看板三视图共用，供度量页的数字跳转使用）：
+
+- `statusCategory`：`TODO` / `IN_PROGRESS` / `DONE`，按 `issue_status.category` 过滤，**不绑定具体状态**——任务「待办」、需求「待处理」、缺陷「待确认」都归 `TODO`，跨类型视图（`/table` 的「全部工作项」）也能用同一个参数取到「待处理/处理中/已完成」三类。
+- `overdue`：`true` 表示「已逾期」= `due_date < 今天` 且状态类别不为 `DONE`（已完成即使超期也不算逾期）。
+
+> 落地形态：当前实现为 `POST /api/v1/issues/filter`（请求体同上述参数，body 形式），响应结构一致。注意多表合并分页时（不带 `issueTypeCodes` 的「全部工作项」视图）这些条件必须在 `WorkItemRouter.copyForMerge` 里一并复制到子查询，否则会静默失效、返回全量数据。
 
 例如：
 
@@ -1322,6 +1357,7 @@ Response：
 - 排序：`GET /issues/{id}/activities` 仍按 `createdAt` **升序**返回（楼层组装依赖父评论先于子回复），**倒序展示由前端负责**——`utils/commentTree.ts` 把顶层（楼层根 + 状态动态）按时间倒序，楼层内子回复保持升序。
 - 头像字段：`actorAvatarUrl`（工作项动态/评论、项目动态）、`assigneeAvatarUrl` / `reporterAvatarUrl` / `verifierAvatarUrl`（工作项）、`avatarUrl`（`/users/login` 与 `/users/me`）统一返回 `/api/uploads/xxx` 形式；为空表示未上传，前端 `components/common/UserAvatar.vue` 回退首字彩色圆，图片加载失败同样回退。
 - 度量接口 `GET /projects/{projectId}/dashboard` 的 `assigneeDist[]` 每项为 `{ name, count, avatarUrl }`：`name` 取 `display_name`（兜底 `username`，再兜底「未分配」，与全站显示名口径一致），`avatarUrl` 为空（含「未分配」行）时前端回退首字/图标。前端另会过滤非图片形式的脏值（历史上曾把学号写进 `avatar_url`），不发起无意义请求。
+- 置空字段约定：`PUT /issues/{id}` 与 `PUT /projects/{projectId}/risks/{id}` 的请求体里 `null` 一律表示「不修改」，要把负责人、验证者、迭代、截止日等清空，必须把字段名放进 `clearFields`（如 `{"assigneeId":null,"clearFields":["assigneeId"]}`），后端用 UpdateWrapper 显式 `set null` 才会落库；只传 `null` 会被 MyBatis-Plus 的 `updateById` 跳过。
 
 ---
 
@@ -1347,6 +1383,36 @@ Response：
       "done": 56,
       "bugs": 12
     },
+
+    "typeSummaries": [
+      {
+        "typeCode": "REQUIREMENT",
+        "typeName": "需求",
+        "total": 26,
+        "todo": 8,
+        "inProgress": 9,
+        "done": 9,
+        "overdue": 1
+      },
+      {
+        "typeCode": "BUG",
+        "typeName": "缺陷",
+        "total": 12,
+        "todo": 3,
+        "inProgress": 4,
+        "done": 5,
+        "overdue": 0
+      },
+      {
+        "typeCode": "TASK",
+        "typeName": "任务",
+        "total": 90,
+        "todo": 19,
+        "inProgress": 29,
+        "done": 42,
+        "overdue": 3
+      }
+    ],
 
     "statusDistribution": [
       {
@@ -1409,6 +1475,24 @@ Priority
 ├── P2 82
 └── P3 26
 ```
+
+**字段口径**（度量页依赖这些语义，别混用）：
+
+- `summary.total` / `todo` / `inProgress` / `done` 分别对应 `COUNT(*)` 与 `issue_status.category = 'TODO' / 'IN_PROGRESS' / 'DONE'`。注意 `todo` 是真实统计值，**不是** `total - done`（历史实现曾这样算，把「待处理」算进了「处理中」，已修正）。
+- `summary.bugs` 口径仍是 `issue_type.code = 'BUG'` 的数量，在拆表后与 `typeSummaries[BUG].total` 相同。
+- `typeSummaries[]`：按工作项类型分组的统计，**顺序固定为 `REQUIREMENT` / `BUG` / `TASK`**，由服务端补零生成——某类工作项为 0 时该卡片仍然返回（`total=0`），前端不必自己兜底。`overdue` 含义与列表接口的 `overdue` 参数一致（`due_date < 今天` 且未完成）。
+- 前端**不按类型拆成三个接口**：一次 `dashboard` 请求拿全量，三类面板的数字点击后跳到对应列表页并带上 query：
+
+| 点击位置 | 跳转路径 | 携带 query |
+| --- | --- | --- |
+| 需求面板的数字 | `/projects/{id}/requirements` | `statusCategory=TODO / IN_PROGRESS / DONE`，或 `overdue=1`，或空（「全部」） |
+| 缺陷面板的数字 | `/projects/{id}/defects` | 同上 |
+| 任务面板的数字 | `/projects/{id}/tasks` | 同上 |
+
+- 度量页**不再有跨类型的「总工作项 / 待处理 / 处理中 / 已完成 / 逾期」概览卡片**：那排数字只能落到 `/table`（全部工作项）——它既不是某个类型页、也不在左侧导航里，看起来像「跳到了一个莫名其妙的页面」；且 `summary` 里的总数就是三张类型卡片之和，重复展示没有信息增量。现在顶部直接是 需求 / 缺陷 / 任务 三张面板（标题右侧「共 N」即该类总数），每个数字都落在用户当前所处的同类页面内。
+- `summary` 仍保留在接口里（概览页 `DashboardView` 的「总体完成率」等仍要用），只是度量页不再单独渲染那一排卡片。
+
+列表页读到 query 后展示一枚「筛选：待处理 / 逾期」chip，点「清除」时同时清内存状态与 URL（`router.replace`），避免刷新后筛选复活。
 
 ---
 

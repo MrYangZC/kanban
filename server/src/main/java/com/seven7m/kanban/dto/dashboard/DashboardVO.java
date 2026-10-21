@@ -11,8 +11,14 @@ import java.util.List;
 @Data
 public class DashboardVO {
 
-    /** 概览卡片：总数 / 进行中 / 已完成 / 逾期 */
+    /** 概览卡片：总数 / 待处理 / 处理中 / 已完成 / 逾期 */
     private Summary summary = new Summary();
+
+    /**
+     * 分类型概览（需求 / 缺陷 / 任务），供度量页按类型分组展示。
+     * 顺序固定为 需求、缺陷、任务，前端直接按顺序渲染。
+     */
+    private List<TypeSummary> typeSummaries = new ArrayList<>();
 
     /** 状态分布（按 issue_status 聚合） */
     private List<NameCount> statusDist = new ArrayList<>();
@@ -32,6 +38,24 @@ public class DashboardVO {
     @Data
     public static class Summary {
         private long total;
+        /** 未开始（issue_status.category = TODO） */
+        private long todo;
+        /** 进行中（category = IN_PROGRESS） */
+        private long inProgress;
+        /** 已完成（category = DONE，含已关闭/已取消等终态） */
+        private long done;
+        /** 逾期：有截止日、已过期且未完成 */
+        private long overdue;
+    }
+
+    /** 单类型概览：与 Summary 同口径，只是限定在 requirement / bug / task 一张表上 */
+    @Data
+    public static class TypeSummary {
+        /** REQUIREMENT / BUG / TASK，前端据此决定跳转到哪个列表页 */
+        private String typeCode;
+        private String typeName;
+        private long total;
+        private long todo;
         private long inProgress;
         private long done;
         private long overdue;

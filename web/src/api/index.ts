@@ -1,6 +1,6 @@
 import http, { req, type R } from './request'
 import { cached, invalidate, readMyPermissions, writeMyPermissions, clearMyPermissions } from '@/utils/cache'
-import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest, SprintVO, RiskVO, RbacRole, RbacMenu, PermissionDef, WorkItemCategory } from './types'
+import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, MemberCandidate, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest, SprintVO, RiskVO, RbacRole, RbacMenu, PermissionDef, WorkItemCategory } from './types'
 
 // 内存缓存 key（项目类数据按 projectId 隔离，会话内仅请求一次）
 // 状态字典按类别分开缓存：任务/需求/缺陷是三套节点，混用一个 key 会串数据
@@ -151,6 +151,12 @@ export function addProjectMember(projectId: string, userId: string, roles: strin
     return r
   })
 }
+/** 「添加成员」检索候选用户（未加入本项目），按账号/显示名模糊匹配；结果随关键字变化，不做缓存 */
+export function getMemberCandidates(projectId: string, keyword?: string) {
+  return req<MemberCandidate[]>(
+    http.get(`/v1/projects/${projectId}/members/candidates`, { params: keyword ? { keyword } : {} })
+  )
+}
 export function removeProjectMember(projectId: string, userId: string) {
   return req<void>(http.delete(`/v1/projects/${projectId}/members/${userId}`)).then((r) => {
     invalidate(C.members(projectId))
@@ -243,6 +249,10 @@ export function filterIssues(payload: {
   severity?: string
   labelId?: string
   keyword?: string
+  /** 状态类别过滤：TODO / IN_PROGRESS / DONE（度量页点统计数字跳转时用） */
+  statusCategory?: string
+  /** 只看逾期（未完成且已过截止日） */
+  overdue?: boolean
   issueTypeCodes?: string[]
   /** 迭代过滤：为空表示不过滤，后端会跨 task/requirement/bug 三表查询 */
   sprintId?: string
