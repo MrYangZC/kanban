@@ -1,8 +1,8 @@
 import { expect, type APIRequestContext } from '@playwright/test'
 
 /** 后端接口根（直连后端，绕过前端代理） */
-export const API = 'http://localhost:8080/api/v1'
-export const ORIGIN = 'http://localhost:8080'
+export const API = 'http://localhost:9085/api/v1'
+export const ORIGIN = 'http://localhost:9085'
 
 export const ADMIN = { username: 'admin', password: 'admin123' }
 

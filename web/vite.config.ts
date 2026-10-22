@@ -8,7 +8,7 @@ import path from 'path'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   // 后端地址可由 .env 覆盖（VITE_API_TARGET），避免联调时必须改源码
-  const apiTarget = env.VITE_API_TARGET || 'http://localhost:8080'
+  const apiTarget = env.VITE_API_TARGET || 'http://localhost:9085'
 
   return {
     plugins: [

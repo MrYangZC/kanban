@@ -1,6 +1,6 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test'
 
-const API = 'http://localhost:8080/api/v1'
+const API = 'http://localhost:9085/api/v1'
 
 async function loginViaApi(page: Page, username: string, password: string) {
   const resp = await page.request.post(`${API}/users/login`, {
