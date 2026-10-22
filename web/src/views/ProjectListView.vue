@@ -14,7 +14,7 @@ import EmptyState from '@/components/project/EmptyState.vue'
 import ErrorRetry from '@/components/project/ErrorRetry.vue'
 import Pagination from '@/components/project/Pagination.vue'
 import ProjectMemberDialog from '@/components/ProjectMemberDialog.vue'
-import { Plus, Menu, FolderKanban, Sparkles } from 'lucide-vue-next'
+import { Plus, Menu, Sparkles } from 'lucide-vue-next'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { reportError } from '@/utils/error'
 
@@ -40,14 +40,6 @@ const currentCategoryCount = computed(() => {
   const cat = categories.value.find((c) => c.key === selectedCategory.value)
   return cat?.count || 0
 })
-
-const totalMembers = computed(() =>
-  projects.value.reduce((sum, p) => sum + (p.stats?.memberCount || 0), 0)
-)
-
-const totalIssues = computed(() =>
-  projects.value.reduce((sum, p) => sum + (p.stats?.issueCount || 0), 0)
-)
 
 async function onNewProject() {
   try {
@@ -210,48 +202,6 @@ onMounted(async () => {
               <Plus :size="16" />
               <span>新建项目</span>
             </button>
-          </div>
-        </div>
-
-        <div
-          v-if="!loading && !error && projects.length"
-          class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4"
-        >
-          <div class="card flex items-center gap-3 p-4">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary-500">
-              <FolderKanban :size="20" />
-            </div>
-            <div>
-              <div class="text-xl font-semibold text-ink">{{ total }}</div>
-              <div class="text-xs text-ink-secondary">总项目数</div>
-            </div>
-          </div>
-          <div class="card flex items-center gap-3 p-4">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-success-light text-success">
-              <Sparkles :size="20" />
-            </div>
-            <div>
-              <div class="text-xl font-semibold text-ink">{{ totalIssues }}</div>
-              <div class="text-xs text-ink-secondary">本页任务</div>
-            </div>
-          </div>
-          <div class="card flex items-center gap-3 p-4">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-light text-warning">
-              <FolderKanban :size="20" />
-            </div>
-            <div>
-              <div class="text-xl font-semibold text-ink">{{ totalMembers }}</div>
-              <div class="text-xs text-ink-secondary">本页成员</div>
-            </div>
-          </div>
-          <div class="card flex items-center gap-3 p-4">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100 text-primary-600">
-              <Plus :size="20" />
-            </div>
-            <div>
-              <div class="text-xl font-semibold text-ink">{{ categories[0]?.count || 0 }}</div>
-              <div class="text-xs text-ink-secondary">全部项目</div>
-            </div>
           </div>
         </div>
 
