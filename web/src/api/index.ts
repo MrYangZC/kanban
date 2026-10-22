@@ -60,7 +60,11 @@ export function getMyProfile() {
   return req<ProfileVO>(http.get('/v1/users/me'))
 }
 export function updateMyProfile(payload: UpdateProfileRequest) {
-  return req<ProfileVO>(http.put('/v1/users/me', payload))
+  // 改头像/改名后人员下拉等缓存的简表要失效，否则别处仍显示旧头像
+  return req<ProfileVO>(http.put('/v1/users/me', payload)).then((r) => {
+    invalidate(C.users)
+    return r
+  })
 }
 export function changeMyPassword(payload: ChangePasswordRequest) {
   return req<void>(http.put('/v1/users/me/password', payload))

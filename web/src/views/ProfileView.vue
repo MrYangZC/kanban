@@ -5,7 +5,8 @@ import { useUserStore } from '@/stores/user'
 import type { ProfileVO } from '@/api/types'
 import { ElMessage } from 'element-plus'
 import { reportError } from '@/utils/error'
-import { User, Lock, Save, Camera, ShieldCheck, Clock } from 'lucide-vue-next'
+import { AVATAR_ACCEPT, validateAvatarFile } from '@/utils/avatar'
+import { User, Lock, Save, Camera, ShieldCheck, Clock, ImagePlus } from 'lucide-vue-next'
 
 const userStore = useUserStore()
 
@@ -20,7 +21,8 @@ const avatarInput = ref<HTMLInputElement | null>(null)
 const pwdForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const savingPwd = ref(false)
 
-const avatarDisplay = computed(() => profile.value?.avatarUrl || '')
+// 预览跟随表单：选好图先看到效果，点「保存」才写库
+const avatarDisplay = computed(() => form.value.avatarUrl || '')
 const initial = computed(() => profile.value?.displayName?.charAt(0) || 'U')
 
 function fmtTime(t?: string | null): string {
@@ -53,21 +55,28 @@ function triggerAvatarUpload() {
 async function onAvatarChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
+  // 立刻清空，否则重复选同一张图不会再触发 change
+  input.value = ''
   if (!file) return
+  const invalid = validateAvatarFile(file)
+  if (invalid) {
+    ElMessage.warning(invalid)
+    return
+  }
   uploadingAvatar.value = true
   try {
     const res = await uploadImage(file)
+    // 只回填表单：点「保存」才落库，避免误选一张就永久生效
     form.value.avatarUrl = res.url
-    const updated = await updateMyProfile({ avatarUrl: res.url })
-    profile.value = updated
-    syncLoginStore(updated)
-    ElMessage.success('头像已更新')
   } catch (e: unknown) {
     reportError(e, '头像上传失败')
   } finally {
     uploadingAvatar.value = false
-    input.value = ''
   }
+}
+
+function onClearAvatar() {
+  form.value.avatarUrl = ''
 }
 
 function syncLoginStore(p: ProfileVO) {
@@ -182,7 +191,7 @@ onMounted(loadProfile)
             <input
               ref="avatarInput"
               type="file"
-              accept="image/*"
+              :accept="AVATAR_ACCEPT"
               class="hidden"
               @change="onAvatarChange"
             />
@@ -238,9 +247,29 @@ onMounted(loadProfile)
               <input v-model="form.email" type="email" class="input-base" placeholder="name@example.com" />
             </div>
             <div>
-              <label class="label-base">头像 URL</label>
-              <input v-model="form.avatarUrl" class="input-base" placeholder="留空则使用首字母头像" />
-              <p class="mt-1.5 text-xs text-ink-secondary">点击左侧相机图标可直接上传图片</p>
+              <label class="label-base">头像</label>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="btn-ghost"
+                  :disabled="uploadingAvatar"
+                  @click="triggerAvatarUpload"
+                >
+                  <ImagePlus :size="14" />
+                  <span>{{ uploadingAvatar ? '上传中…' : '上传图片' }}</span>
+                </button>
+                <button
+                  v-if="avatarDisplay"
+                  type="button"
+                  class="rounded px-2.5 py-1.5 text-xs text-ink-secondary transition hover:bg-surface-hover"
+                  @click="onClearAvatar"
+                >
+                  清除
+                </button>
+              </div>
+              <p class="mt-1.5 text-xs text-ink-secondary">
+                支持 jpg / png / gif / webp，不超过 5MB；选好后点下方「保存」生效
+              </p>
             </div>
             <div class="flex justify-end">
               <button class="btn-primary" :disabled="savingProfile" @click="onSaveProfile">

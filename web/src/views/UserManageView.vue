@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, reactive, watch } from 'vue'
-import { listUsersPage, createUser, updateUser, deleteUser } from '@/api'
+import { listUsersPage, createUser, updateUser, deleteUser, uploadImage } from '@/api'
 import type { UserVO } from '@/api/types'
-import { Plus, Search, Trash2, Pencil, X } from 'lucide-vue-next'
+import { Plus, Search, Trash2, Pencil, X, ImagePlus } from 'lucide-vue-next'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import { AVATAR_ACCEPT, validateAvatarFile } from '@/utils/avatar'
 import { ElMessage } from 'element-plus'
 import { confirmDelete } from '@/utils/confirm'
 
@@ -70,6 +71,36 @@ function openCreate() {
   dialogOpen.value = true
 }
 
+const avatarInput = ref<HTMLInputElement | null>(null)
+const uploadingAvatar = ref(false)
+
+function triggerAvatarUpload() {
+  avatarInput.value?.click()
+}
+
+async function onAvatarChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  // 立刻清空，否则重复选同一张图不会再触发 change
+  input.value = ''
+  if (!file) return
+  const invalid = validateAvatarFile(file)
+  if (invalid) {
+    ElMessage.warning(invalid)
+    return
+  }
+  uploadingAvatar.value = true
+  try {
+    const res = await uploadImage(file)
+    // 只落到表单，点「保存」才写库：管理员可能先改了别的字段
+    form.avatarUrl = res.url
+  } catch {
+    /* 拦截器已提示错误 */
+  } finally {
+    uploadingAvatar.value = false
+  }
+}
+
 function openEdit(u: UserVO) {
   editing.value = u
   form.username = u.username
@@ -93,7 +124,7 @@ async function save() {
     await updateUser(editing.value.id, {
       displayName: form.displayName,
       email: form.email,
-      avatarUrl: form.avatarUrl,
+      avatarUrl: form.avatarUrl.trim(),
       enabled: editing.value.enabled,
       password: form.password || undefined
     })
@@ -220,8 +251,37 @@ onMounted(load)
             <input v-model="form.email" placeholder="如 zhangsan@kanban.dev" class="input-base" />
           </div>
           <div>
-            <label class="label-base">头像 URL</label>
-            <input v-model="form.avatarUrl" placeholder="可选" class="input-base" />
+            <label class="label-base">头像</label>
+            <div class="flex items-center gap-3">
+              <UserAvatar :name="form.displayName" :src="form.avatarUrl" :size="44" />
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="btn-ghost"
+                  :disabled="uploadingAvatar"
+                  @click="triggerAvatarUpload"
+                >
+                  <ImagePlus :size="14" />
+                  <span>{{ uploadingAvatar ? '上传中…' : '上传图片' }}</span>
+                </button>
+                <button
+                  v-if="form.avatarUrl"
+                  type="button"
+                  class="rounded px-2 py-1.5 text-xs text-ink-secondary transition hover:bg-surface-hover"
+                  @click="form.avatarUrl = ''"
+                >
+                  清除
+                </button>
+              </div>
+              <input
+                ref="avatarInput"
+                type="file"
+                :accept="AVATAR_ACCEPT"
+                class="hidden"
+                @change="onAvatarChange"
+              />
+            </div>
+            <p class="mt-1.5 text-xs text-ink-secondary">支持 jpg / png / gif / webp，不超过 5MB</p>
           </div>
           <div>
             <label class="label-base">{{ editing ? '重置密码（留空不改）' : '初始密码（必填，至少 6 位）' }}</label>
