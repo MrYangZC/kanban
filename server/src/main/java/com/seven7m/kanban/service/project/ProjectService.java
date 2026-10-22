@@ -145,14 +145,24 @@ public class ProjectService {
                 .eq(Project::getStatus, statusFilter)
                 .orderByDesc(Project::getCreatedAt);
 
+        // 超管不是任何项目的成员，若仍按成员过滤会永远看到空列表；对其展示全部项目
+        boolean superAdmin = isSuperAdmin(currentUser);
         switch (category) {
-            case MANAGED -> query.apply("id IN (SELECT ur.project_id FROM user_role ur " +
-                    "JOIN role r ON r.id = ur.role_id " +
-                    "WHERE ur.user_id = {0} " +
-                    "AND r.code IN ({1},{2},{3}))",
-                    currentUser, ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.PM);
+            case MANAGED -> {
+                if (!superAdmin) {
+                    query.apply("id IN (SELECT ur.project_id FROM user_role ur " +
+                            "JOIN role r ON r.id = ur.role_id " +
+                            "WHERE ur.user_id = {0} " +
+                            "AND r.code IN ({1},{2},{3}))",
+                            currentUser, ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.PM);
+                }
+            }
             case FAVORITED -> query.apply("id IN (SELECT project_id FROM project_favorite WHERE user_id = {0})", currentUser);
-            default -> query.apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser);
+            default -> {
+                if (!superAdmin) {
+                    query.apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser);
+                }
+            }
         }
 
         List<Project> projects = projectMapper.selectList(query);
@@ -191,14 +201,24 @@ public class ProjectService {
         var query = Wrappers.<Project>lambdaQuery()
                 .eq(Project::getStatus, statusFilter);
 
+        // 同 listAll：超管看全部项目
+        boolean superAdmin = isSuperAdmin(currentUser);
         switch (category) {
-            case MANAGED -> query.apply("id IN (SELECT ur.project_id FROM user_role ur " +
-                    "JOIN role r ON r.id = ur.role_id " +
-                    "WHERE ur.user_id = {0} " +
-                    "AND r.code IN ({1},{2},{3}))",
-                    currentUser, ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.PM);
+            case MANAGED -> {
+                if (!superAdmin) {
+                    query.apply("id IN (SELECT ur.project_id FROM user_role ur " +
+                            "JOIN role r ON r.id = ur.role_id " +
+                            "WHERE ur.user_id = {0} " +
+                            "AND r.code IN ({1},{2},{3}))",
+                            currentUser, ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.PM);
+                }
+            }
             case FAVORITED -> query.apply("id IN (SELECT project_id FROM project_favorite WHERE user_id = {0})", currentUser);
-            default -> query.apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser);
+            default -> {
+                if (!superAdmin) {
+                    query.apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser);
+                }
+            }
         }
 
         if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
@@ -262,17 +282,26 @@ public class ProjectService {
         UUID currentUser = UserContext.getUserId();
         ProjectCategoryCountsVO vo = new ProjectCategoryCountsVO();
 
-        vo.setAll(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
-                .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
-                .apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser)));
+        // 与列表口径保持一致：超管计入全部项目，否则项目列表有数据而计数为 0
+        boolean superAdmin = isSuperAdmin(currentUser);
+        long activeTotal = projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
+                .eq(Project::getStatus, ProjectStatus.ACTIVE.name()));
 
-        vo.setManaged(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
-                .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
-                .apply("id IN (SELECT ur.project_id FROM user_role ur " +
-                        "JOIN role r ON r.id = ur.role_id " +
-                        "WHERE ur.user_id = {0} " +
-                        "AND r.code IN ({1},{2},{3}))",
-                        currentUser, ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.PM)));
+        vo.setAll(superAdmin
+                ? activeTotal
+                : projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
+                        .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
+                        .apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser)));
+
+        vo.setManaged(superAdmin
+                ? activeTotal
+                : projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
+                        .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
+                        .apply("id IN (SELECT ur.project_id FROM user_role ur " +
+                                "JOIN role r ON r.id = ur.role_id " +
+                                "WHERE ur.user_id = {0} " +
+                                "AND r.code IN ({1},{2},{3}))",
+                                currentUser, ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.PM)));
 
         vo.setParticipated(vo.getAll());
 
@@ -280,10 +309,12 @@ public class ProjectService {
                 .eq(Project::getStatus, ProjectStatus.ACTIVE.name())
                 .apply("id IN (SELECT project_id FROM project_favorite WHERE user_id = {0})", currentUser)));
 
-        vo.setArchived(projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
-
-                .eq(Project::getStatus, ProjectStatus.ARCHIVED.name())
-                .apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser)));
+        vo.setArchived(superAdmin
+                ? projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
+                        .eq(Project::getStatus, ProjectStatus.ARCHIVED.name()))
+                : projectMapper.selectCount(Wrappers.<Project>lambdaQuery()
+                        .eq(Project::getStatus, ProjectStatus.ARCHIVED.name())
+                        .apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser)));
 
         return vo;
     }
@@ -384,17 +415,32 @@ public class ProjectService {
         projectMemberService.evictRoleCache(projectId, null);
     }
 
-    public boolean isMember(UUID projectId, UUID userId) {
-        if (userId != null && userId.equals(com.seven7m.kanban.common.security.UserContext.DEFAULT_ADMIN_ID)) {
-            return true;
-        }
+    /** 是否真正登记在项目成员名册中（不做超管豁免） */
+    public boolean hasMemberRecord(UUID projectId, UUID userId) {
         return projectMemberMapper.selectCount(Wrappers.<ProjectMember>lambdaQuery()
                 .eq(ProjectMember::getProjectId, projectId)
                 .eq(ProjectMember::getUserId, userId)) > 0;
     }
 
+    /**
+     * 是否有该项目访问权：超管对全部项目隐式具备成员身份，其余人须在成员名册中。
+     * 注意「重复添加成员/移除成员」这类需要真实成员行的判定请用 hasMemberRecord，
+     * 否则超管会被误判成“已是成员”而永远加不进项目。
+     */
+    public boolean isMember(UUID projectId, UUID userId) {
+        if (isSuperAdmin(userId)) {
+            return true;
+        }
+        return hasMemberRecord(projectId, userId);
+    }
+
+    /** 内置超管：对全部项目拥有隐式成员身份与管理权 */
+    private static boolean isSuperAdmin(UUID userId) {
+        return userId != null && userId.equals(UserContext.DEFAULT_ADMIN_ID);
+    }
+
     public boolean isOwner(UUID projectId, UUID userId) {
-        if (userId != null && userId.equals(com.seven7m.kanban.common.security.UserContext.DEFAULT_ADMIN_ID)) {
+        if (isSuperAdmin(userId)) {
             return true;
         }
         return projectMemberService.getRoles(projectId, userId).contains(ProjectRole.OWNER);
@@ -402,7 +448,7 @@ public class ProjectService {
 
     /** 判断当前用户是否为项目管理员（OWNER 或 ADMIN） */
     public boolean isAdmin(UUID projectId, UUID userId) {
-        if (userId != null && userId.equals(com.seven7m.kanban.common.security.UserContext.DEFAULT_ADMIN_ID)) {
+        if (isSuperAdmin(userId)) {
             return true;
         }
         Set<String> roles = projectMemberService.getRoles(projectId, userId);
@@ -416,7 +462,7 @@ public class ProjectService {
     }
 
     public boolean canWrite(UUID projectId, UUID userId) {
-        if (userId != null && userId.equals(com.seven7m.kanban.common.security.UserContext.DEFAULT_ADMIN_ID)) {
+        if (isSuperAdmin(userId)) {
             return true;
         }
         return projectMemberService.getRoles(projectId, userId).stream()
@@ -425,7 +471,7 @@ public class ProjectService {
 
     /** 判断当前用户是否为项目管理员（OWNER/ADMIN/PM，可管理成员与项目设置） */
     public boolean canManage(UUID projectId, UUID userId) {
-        if (userId != null && userId.equals(com.seven7m.kanban.common.security.UserContext.DEFAULT_ADMIN_ID)) {
+        if (isSuperAdmin(userId)) {
             return true;
         }
         Set<String> roles = projectMemberService.getRoles(projectId, userId);

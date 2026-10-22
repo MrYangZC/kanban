@@ -143,7 +143,8 @@ public class ProjectMemberService {
         if (userMapper.selectById(req.getUserId()) == null) {
             throw new ServiceException(404, "用户不存在");
         }
-        if (projectService.isMember(projectId, req.getUserId())) {
+        // 必须用真实成员行判定：isMember 对超管恒为 true，会导致超管永远加不进项目
+        if (projectService.hasMemberRecord(projectId, req.getUserId())) {
             throw new ServiceException(400, "该用户已是项目成员");
         }
         ProjectMember m = new ProjectMember();
@@ -161,7 +162,8 @@ public class ProjectMemberService {
     @Transactional
     public void remove(UUID projectId, UUID userId) {
         requireAdmin(projectId);
-        if (!projectService.isMember(projectId, userId)) {
+        // 同上：移除校验也要看真实成员行，否则移除未加入的用户会静默成功
+        if (!projectService.hasMemberRecord(projectId, userId)) {
             throw new ServiceException(404, "该用户不是项目成员");
         }
         // 不允许移除最后一个 OWNER，否则项目失去管理者
