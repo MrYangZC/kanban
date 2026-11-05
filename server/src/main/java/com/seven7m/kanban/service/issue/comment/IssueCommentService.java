@@ -66,13 +66,12 @@ public class IssueCommentService {
             result.setList(List.of());
             return result;
         }
-        // 行结果先转成类型化对象：列名与类型转换只在 TimelineRow 里写一次
-        List<TimelineRow> rows = timelineMapper.pageTimeline(issueId, category, s, (long) (p - 1) * s)
-                .stream().map(TimelineRow::from).toList();
+        // 结果已是 POJO（列到属性的映射在 mapper 的 @Results 上声明）
+        List<TimelineRow> rows = timelineMapper.pageTimeline(issueId, category, s, (long) (p - 1) * s);
 
         // 批量取用户展示名，避免逐条查库
         Set<UUID> userIds = rows.stream()
-                .map(TimelineRow::actorId)
+                .map(TimelineRow::getActorId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         Map<UUID, SysUser> userMap = userIds.isEmpty() ? Map.of()
@@ -80,12 +79,12 @@ public class IssueCommentService {
                         .collect(Collectors.toMap(SysUser::getId, u -> u));
 
         // 撤销可用性：最近一条交接动态 + 当前负责人，两者都满足才置 revocable（真正的校验在 revokeHandoff）。
-        HandoffMarker latestHandoff = HandoffMarker.from(timelineMapper.latestHandoff(issueId, category));
+        HandoffMarker latestHandoff = timelineMapper.latestHandoff(issueId, category);
         UUID currentAssignee = workItemRouter.assigneeIdOf(issueId);
         String revocableActivityId = null;
         if (latestHandoff != null && latestHandoff.isAssigneeChanged() && currentAssignee != null
-                && currentAssignee.equals(activityTextResolver.userIdOf(latestHandoff.newValue()))) {
-            revocableActivityId = String.valueOf(latestHandoff.id());
+                && currentAssignee.equals(activityTextResolver.userIdOf(latestHandoff.getNewValue()))) {
+            revocableActivityId = String.valueOf(latestHandoff.getId());
         }
 
         // 动态里存的是状态 code（{"status":"REQ_TODO"}），统一翻成中文名再返回
@@ -93,19 +92,19 @@ public class IssueCommentService {
         List<IssueActivityVO> voList = new ArrayList<>(rows.size());
         for (TimelineRow row : rows) {
             IssueActivityVO vo = new IssueActivityVO();
-            UUID actorId = row.actorId();
+            UUID actorId = row.getActorId();
             SysUser actor = actorId == null ? null : userMap.get(actorId);
-            vo.setId(row.id());
-            vo.setType(row.type());
+            vo.setId(row.getId());
+            vo.setType(row.getType());
             vo.setActorId(actorId);
             vo.setActorName(actor == null ? "未知" : actor.getDisplayName());
             vo.setActorAvatarUrl(actor == null ? null : actor.getAvatarUrl());
-            vo.setContent(row.content());
-            vo.setParentId(row.parentId());
-            vo.setOldValue(activityTextResolver.toText(row.oldValue(), statusNames));
-            vo.setNewValue(activityTextResolver.toText(row.newValue(), statusNames));
-            vo.setCreatedAt(row.createdAt());
-            if (row.id() != null && row.id().toString().equals(revocableActivityId)) {
+            vo.setContent(row.getContent());
+            vo.setParentId(row.getParentId());
+            vo.setOldValue(activityTextResolver.toText(row.getOldValue(), statusNames));
+            vo.setNewValue(activityTextResolver.toText(row.getNewValue(), statusNames));
+            vo.setCreatedAt(row.getCreatedAt());
+            if (row.getId() != null && row.getId().toString().equals(revocableActivityId)) {
                 vo.setRevocable(true);
             }
             voList.add(vo);

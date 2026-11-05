@@ -2,10 +2,11 @@ package com.seven7m.kanban.mapper.issue;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -15,11 +16,12 @@ import java.util.UUID;
  * 一个持续半年的工作项会一次拉几千条。这里用 UNION ALL 在数据库侧合并并分页，
  * 保证响应体与查询量都与数据量脱钩。
  *
- * <p>返回 Map 而不是实体：两张表字段不同构，用 {@code NULL} 占位比造一个中间实体更直观。
- * 调用方一律先经 {@link TimelineRow#from} / {@link HandoffMarker#from} 转成类型化对象，
- * 列名只在那两个类里写一次（此前是调用方按 {@code row.get("new_value")} 取值，
- * 列别名写错只会在线上表现为"新值总是空"）。
- * jsonb 列显式 {@code ::text}，避免 PGobject 直接落到调用方。
+ * <p>结果按 POJO 返回（{@link TimelineRow} / {@link HandoffMarker}），列到属性的映射用 {@code @Results}
+ * 显式声明：两张表字段不同构，UNION 里用 {@code NULL} 占位比造一个中间实体更直观，但**不允许**
+ * 再把 {@code Map} 交给业务层按字符串键取值。别名与属性的对应关系由
+ * {@code TimelineMapperMappingTest} 静态校验。
+ *
+ * <p>jsonb 列显式 {@code ::text}，避免 PGobject 直接落到调用方。
  */
 @Mapper
 public interface IssueTimelineMapper {
@@ -42,10 +44,20 @@ public interface IssueTimelineMapper {
             LIMIT #{size} OFFSET #{offset}
             </script>
             """)
-    List<Map<String, Object>> pageTimeline(@Param("issueId") UUID issueId,
-                                           @Param("category") String category,
-                                           @Param("size") int size,
-                                           @Param("offset") long offset);
+    @Results(id = "timelineRow", value = {
+            @Result(column = "id", property = "id", id = true),
+            @Result(column = "type", property = "type"),
+            @Result(column = "actor_id", property = "actorId"),
+            @Result(column = "content", property = "content"),
+            @Result(column = "parent_id", property = "parentId"),
+            @Result(column = "old_value", property = "oldValue"),
+            @Result(column = "new_value", property = "newValue"),
+            @Result(column = "created_at", property = "createdAt")
+    })
+    List<TimelineRow> pageTimeline(@Param("issueId") UUID issueId,
+                                   @Param("category") String category,
+                                   @Param("size") int size,
+                                   @Param("offset") long offset);
 
     /** 时间线总条数（评论数 + 动态数） */
     @Select("""
@@ -74,5 +86,10 @@ public interface IssueTimelineMapper {
             ORDER BY a.created_at DESC, a.id DESC
             LIMIT 1
             """)
-    Map<String, Object> latestHandoff(@Param("issueId") UUID issueId, @Param("category") String category);
+    @Results(id = "handoffMarker", value = {
+            @Result(column = "id", property = "id", id = true),
+            @Result(column = "action", property = "action"),
+            @Result(column = "new_value", property = "newValue")
+    })
+    HandoffMarker latestHandoff(@Param("issueId") UUID issueId, @Param("category") String category);
 }

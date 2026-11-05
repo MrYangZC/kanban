@@ -1,72 +1,49 @@
 package com.seven7m.kanban.mapper.issue;
 
-import com.seven7m.kanban.common.util.Uuids;
+import lombok.Data;
 
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.UUID;
 
 /**
- * 时间线（评论 + 动态 UNION ALL）的一行结果。
+ * 时间线（评论 + 动态 UNION ALL）的一行结果，作为查询投影的 POJO 由 MyBatis 直接映射。
  *
- * <p>此前 `IssueTimelineMapper` 直接返回 `Map<String, Object>`，取值靠字符串键：
- * 列别名改一个字、或者写错 `newvalue`/`new_value`，编译期毫无提示，线上表现是
- * "动态里的旧值/新值/负责人莫名其妙是空的"。这里把列名收成常量、把类型转换收进工厂，
- * 键写错至少能在同一个文件里被发现，转换逻辑也有单测覆盖。
+ * <p>为什么是实体类而不是 {@code Map<String, Object>}：
+ * 用 Map 承载数据库行时，字段名只是字符串键，列别名写错、类型不符都只能在运行时暴露，
+ * 而且业务代码里到处是 {@code row.get("new_value")} 这种魔法值。《阿里巴巴 Java 开发手册》
+ * 对此的要求是明确的——POJO 用来承载数据、映射关系显式声明（resultMap/@Results）、
+ * 避免魔法值与弱类型容器在业务层流转。
  *
- * <p>注意 `old_value`/`new_value` 是 JSON 文本（见 {@code ActivityValue}），这里只负责原样取出，
- * 翻译成中文由 {@code ActivityTextResolver} 负责。
+ * <p>列与属性的对应关系写在 {@code IssueTimelineMapper} 的 {@code @Results} 里，
+ * 并由 {@code TimelineMapperMappingTest} 静态校验"SQL 里的每个 AS 别名都被映射、
+ * 每个映射属性都在本类上存在"，因此别名漂移会在跑测试时暴露，而不是等线上看到空值。
+ *
+ * <p>类型说明：PG 的 {@code uuid} 列由 MyBatis 的 {@code UUIDTypeHandler} 处理（UUID/字符串都能吃下），
+ * {@code timestamptz} 由 {@code LocalDateTimeTypeHandler} 处理，无需在本类里手写转换。
  */
-public record TimelineRow(
-        UUID id,
-        String type,
-        UUID actorId,
-        String content,
-        UUID parentId,
-        String oldValue,
-        String newValue,
-        LocalDateTime createdAt) {
+@Data
+public class TimelineRow {
 
-    /** 与 {@code IssueTimelineMapper} 里 SELECT 的列别名一一对应 */
-    public static final String COL_ID = "id";
-    public static final String COL_TYPE = "type";
-    public static final String COL_ACTOR_ID = "actor_id";
-    public static final String COL_CONTENT = "content";
-    public static final String COL_PARENT_ID = "parent_id";
-    public static final String COL_OLD_VALUE = "old_value";
-    public static final String COL_NEW_VALUE = "new_value";
-    public static final String COL_CREATED_AT = "created_at";
+    /** 评论或动态的 id */
+    private UUID id;
 
-    /** 把 JDBC 行转成类型化对象；任何列缺失都退化为 null，不抛异常（历史数据/驱动差异） */
-    public static TimelineRow from(Map<String, Object> row) {
-        if (row == null) {
-            return null;
-        }
-        return new TimelineRow(
-                Uuids.parseOrNull(text(row, COL_ID)),
-                text(row, COL_TYPE),
-                Uuids.parseOrNull(text(row, COL_ACTOR_ID)),
-                text(row, COL_CONTENT),
-                Uuids.parseOrNull(text(row, COL_PARENT_ID)),
-                text(row, COL_OLD_VALUE),
-                text(row, COL_NEW_VALUE),
-                dateTime(row, COL_CREATED_AT));
-    }
+    /** 行类型：评论固定为 COMMENT，动态取 activity.action（STATUS_CHANGED / ASSIGNEE_CHANGED …） */
+    private String type;
 
-    private static String text(Map<String, Object> row, String column) {
-        Object value = row.get(column);
-        return value == null ? null : value.toString();
-    }
+    /** 操作人（评论作者 / 动态触发者） */
+    private UUID actorId;
 
-    private static LocalDateTime dateTime(Map<String, Object> row, String column) {
-        Object value = row.get(column);
-        if (value instanceof LocalDateTime dt) {
-            return dt;
-        }
-        if (value instanceof Timestamp ts) {
-            return ts.toLocalDateTime();
-        }
-        return null;
-    }
+    /** 评论正文；动态行为 null */
+    private String content;
+
+    /** 父评论 id（嵌套回复），动态行为 null */
+    private UUID parentId;
+
+    /** 动态旧值，JSON 文本（见 {@code ActivityValue}）；评论行为 null */
+    private String oldValue;
+
+    /** 动态新值，JSON 文本；评论行为 null */
+    private String newValue;
+
+    private LocalDateTime createdAt;
 }
