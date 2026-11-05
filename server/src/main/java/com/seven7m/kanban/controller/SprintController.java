@@ -48,7 +48,8 @@ public class SprintController {
 
     @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
     @PutMapping("/{id}")
-    public R<SprintVO> update(@PathVariable UUID projectId, @PathVariable UUID id, @Valid @RequestBody UpdateSprintRequest req) {
+    public R<SprintVO> update(@PathVariable UUID projectId, @PathVariable UUID id,
+                              @Valid @RequestBody UpdateSprintRequest req) {
         return R.ok(sprintService.update(projectId, id, req));
     }
 

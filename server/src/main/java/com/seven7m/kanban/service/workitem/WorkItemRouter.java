@@ -1,5 +1,6 @@
 package com.seven7m.kanban.service.workitem;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.common.exception.ServiceException;
@@ -11,6 +12,9 @@ import com.seven7m.kanban.dto.issue.MoveIssueRequest;
 import com.seven7m.kanban.dto.issue.UpdateIssueRequest;
 import com.seven7m.kanban.entity.issue.IssueType;
 import com.seven7m.kanban.entity.workitem.AbstractWorkItem;
+import com.seven7m.kanban.entity.workitem.Bug;
+import com.seven7m.kanban.entity.workitem.Requirement;
+import com.seven7m.kanban.entity.workitem.Task;
 import com.seven7m.kanban.mapper.issue.IssueTypeMapper;
 import com.seven7m.kanban.mapper.workitem.BugMapper;
 import com.seven7m.kanban.mapper.workitem.RequirementMapper;
@@ -163,11 +167,11 @@ public class WorkItemRouter implements IssueLocationPort {
     /** 统计项目下工作项总数（含已归档），供删除项目前拦截 */
     public long countByProject(UUID projectId) {
         long total = 0;
-        total += taskMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.seven7m.kanban.entity.workitem.Task>()
+        total += taskMapper.selectCount(new QueryWrapper<Task>()
                 .eq("project_id", projectId));
-        total += requirementMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.seven7m.kanban.entity.workitem.Requirement>()
+        total += requirementMapper.selectCount(new QueryWrapper<Requirement>()
                 .eq("project_id", projectId));
-        total += bugMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.seven7m.kanban.entity.workitem.Bug>()
+        total += bugMapper.selectCount(new QueryWrapper<Bug>()
                 .eq("project_id", projectId));
         return total;
     }

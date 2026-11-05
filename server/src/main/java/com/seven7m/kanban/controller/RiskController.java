@@ -48,7 +48,8 @@ public class RiskController {
 
     @ProjectRoleAnnotation(Permission.RISK_MANAGE)
     @PutMapping("/{id}")
-    public R<RiskVO> update(@PathVariable UUID projectId, @PathVariable UUID id, @Valid @RequestBody UpdateRiskRequest req) {
+    public R<RiskVO> update(@PathVariable UUID projectId, @PathVariable UUID id,
+                            @Valid @RequestBody UpdateRiskRequest req) {
         return R.ok(riskService.update(projectId, id, req));
     }
 

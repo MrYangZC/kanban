@@ -2,6 +2,7 @@ package com.seven7m.kanban.service.project;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.Permission;
@@ -209,11 +210,20 @@ public class ProjectService {
         // 只有显式 asc 才升序；缺省（null）沿用"最新在前"的降序语义，避免删掉 DTO 默认值后行为反转
         boolean asc = "asc".equalsIgnoreCase(sortOrder);
         switch (sortField) {
-            case "createdAt" -> { if (asc) q.orderByAsc(Project::getCreatedAt); else q.orderByDesc(Project::getCreatedAt); }
-            case "updatedAt" -> { if (asc) q.orderByAsc(Project::getUpdatedAt); else q.orderByDesc(Project::getUpdatedAt); }
-            case "name" -> { if (asc) q.orderByAsc(Project::getName); else q.orderByDesc(Project::getName); }
-            case "projectKey" -> { if (asc) q.orderByAsc(Project::getProjectKey); else q.orderByDesc(Project::getProjectKey); }
+            case "createdAt" -> orderProjects(q, Project::getCreatedAt, asc);
+            case "updatedAt" -> orderProjects(q, Project::getUpdatedAt, asc);
+            case "name" -> orderProjects(q, Project::getName, asc);
+            case "projectKey" -> orderProjects(q, Project::getProjectKey, asc);
             default -> q.orderByDesc(Project::getCreatedAt);
+        }
+    }
+
+    /** 单个排序项的升/降序落库（把 if/else 收成一处，避免每种字段重复一遍） */
+    private static void orderProjects(LambdaQueryWrapper<Project> q, SFunction<Project, ?> column, boolean asc) {
+        if (asc) {
+            q.orderByAsc(column);
+        } else {
+            q.orderByDesc(column);
         }
     }
 

@@ -60,7 +60,8 @@ public interface IssueTagMapper extends BaseMapper<IssueTag> {
             </foreach>
             </script>
             """)
-    void deleteIssueLabelByIssueIdsAndCategory(@Param("issueIds") Collection<UUID> issueIds, @Param("category") String category);
+    void deleteIssueLabelByIssueIdsAndCategory(@Param("issueIds") Collection<UUID> issueIds,
+                                               @Param("category") String category);
 
     @Select("""
             SELECT l.* FROM label l
@@ -71,14 +72,17 @@ public interface IssueTagMapper extends BaseMapper<IssueTag> {
     List<IssueTag> selectByProject(@Param("projectId") UUID projectId);
 
     @Insert("INSERT INTO issue_label (issue_id, label_id, category) VALUES (#{issueId}, #{labelId}, #{category})")
-    void insertIssueLabel(@Param("issueId") UUID issueId, @Param("labelId") UUID labelId, @Param("category") String category);
+    void insertIssueLabel(@Param("issueId") UUID issueId, @Param("labelId") UUID labelId,
+                          @Param("category") String category);
 
     @Delete("DELETE FROM issue_label WHERE issue_id = #{issueId} AND label_id = #{labelId} AND category = #{category}")
-    void deleteIssueLabel(@Param("issueId") UUID issueId, @Param("labelId") UUID labelId, @Param("category") String category);
+    void deleteIssueLabel(@Param("issueId") UUID issueId, @Param("labelId") UUID labelId,
+                          @Param("category") String category);
 
     @Select("""
             SELECT COUNT(*) FROM issue_label
             WHERE issue_id = #{issueId} AND label_id = #{labelId} AND category = #{category}
             """)
-    Integer countIssueLabel(@Param("issueId") UUID issueId, @Param("labelId") UUID labelId, @Param("category") String category);
+    Integer countIssueLabel(@Param("issueId") UUID issueId, @Param("labelId") UUID labelId,
+                            @Param("category") String category);
 }

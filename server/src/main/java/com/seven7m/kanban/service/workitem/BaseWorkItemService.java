@@ -181,14 +181,16 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
         else if ("REPORTED".equals(scope)) q.eq("reporter_id", me);
         else if ("VERIFIED".equals(scope)) q.eq("verifier_id", me);
         else if ("SHARED".equals(scope))
-            q.apply("id IN (SELECT issue_id FROM issue_participant WHERE user_id = {0} AND category = {1})", me, categoryName());
+            q.apply("id IN (SELECT issue_id FROM issue_participant WHERE user_id = {0}"
+                    + " AND category = {1})", me, categoryName());
         else if ("ARCHIVED".equals(scope)) q.eq("archived", true);
         // ACTIVE、未指定以及无法识别的 scope（拼写错误等）一律只查未归档：
         // 原实现只对 null 过滤，传入未知取值时会把归档工作项一并返回
         else q.eq("archived", false);
 
         if (req.getLabelId() != null) {
-            q.apply("id IN (SELECT issue_id FROM issue_label WHERE label_id = {0} AND category = {1})", req.getLabelId(), categoryName());
+            q.apply("id IN (SELECT issue_id FROM issue_label WHERE label_id = {0}"
+                    + " AND category = {1})", req.getLabelId(), categoryName());
         }
 
         // 工作项类型编码过滤（需求/任务/缺陷分类，避免列表互相混入）
@@ -371,7 +373,8 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
     }
 
     /** 状态变更的结果：用于事后写活动记录与交接落点，避免各段重复解析 */
-    private record StatusOutcome(String fromCode, String toCode, WorkItemHandoffService.Decision handoff, boolean sprintApplied) {
+    private record StatusOutcome(String fromCode, String toCode,
+                                 WorkItemHandoffService.Decision handoff, boolean sprintApplied) {
         static final StatusOutcome NONE = new StatusOutcome(null, null, null, false);
     }
 
@@ -476,12 +479,14 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
         if (!isStatusChanging(issue, req)) {
             return StatusOutcome.NONE;
         }
-        IssueStatus fromStatus = issue.getStatusId() == null ? null : issueStatusMapper().selectById(issue.getStatusId());
+        IssueStatus fromStatus = issue.getStatusId() == null
+                ? null : issueStatusMapper().selectById(issue.getStatusId());
         IssueStatus target = issueStatusMapper().selectById(req.getStatusId());
         if (target == null) {
             throw new ServiceException(400, "状态不存在");
         }
-        if (!workflowService().canTransition(issue.getProjectId(), category(), issue.getStatusId(), req.getStatusId())) {
+        if (!workflowService().canTransition(issue.getProjectId(), category(),
+                issue.getStatusId(), req.getStatusId())) {
             String fromName = fromStatus == null ? "未知状态" : fromStatus.getName();
             throw new ServiceException(400, "不允许从「" + fromName + "」流转到「" + target.getName() + "」");
         }

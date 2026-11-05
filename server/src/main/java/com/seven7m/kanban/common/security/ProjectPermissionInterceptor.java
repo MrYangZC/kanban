@@ -46,7 +46,8 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
 
         UUID userId = UserContext.getUserId();
         @SuppressWarnings("unchecked")
-        Map<String, String> pathVars = (Map<String, String>) request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+        Map<String, String> pathVars =
+                (Map<String, String>) request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
         UUID projectId = resolveProjectId(pathVars);
         if (projectId == null) {
             // 路径变量无 projectId 时，尝试从缓存的请求体(projectId 字段)解析，兼容 /issues/filter 等

@@ -32,7 +32,8 @@ public class UserContext {
     public static UUID getUserId() {
         UUID id = USER_ID.get();
         if (id == null) {
-            throw new IllegalStateException("UserContext not set — interceptor missing or called outside request context");
+            throw new IllegalStateException(
+                    "UserContext not set — interceptor missing or called outside request context");
         }
         return id;
     }
@@ -43,7 +44,8 @@ public class UserContext {
     public static String getUsername() {
         String name = USER_NAME.get();
         if (name == null) {
-            throw new IllegalStateException("UserContext not set — interceptor missing or called outside request context");
+            throw new IllegalStateException(
+                    "UserContext not set — interceptor missing or called outside request context");
         }
         return name;
     }

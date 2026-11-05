@@ -38,7 +38,8 @@ public final class ProjectRole {
 
     /** 是否至少是成员（可参与协作：创建/编辑/分配/拖拽） */
     public static boolean isMember(String role) {
-        return role != null && (isAdmin(role) || PM.equals(role) || DEV.equals(role) || QA.equals(role) || MEMBER.equals(role));
+        return role != null && (isAdmin(role) || PM.equals(role) || DEV.equals(role)
+                || QA.equals(role) || MEMBER.equals(role));
     }
 
     /** 是否至少有只读权限 */

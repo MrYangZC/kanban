@@ -86,7 +86,8 @@ public class IssueExportService {
 
         Project project = projectMapper.selectById(projectId);
         String key = project == null ? "issues" : project.getProjectKey();
-        String filename = key + "-issues-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmm")) + ".csv";
+        String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmm"));
+        String filename = key + "-issues-" + stamp + ".csv";
 
         // 超过单次上限时明确告知：此前是静默截断，用户会误以为导出了全量
         long total = page.getTotal();

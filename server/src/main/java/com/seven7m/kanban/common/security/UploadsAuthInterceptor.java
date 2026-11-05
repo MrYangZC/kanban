@@ -45,7 +45,8 @@ public class UploadsAuthInterceptor implements HandlerInterceptor {
             UploadFile upload = uploadFileMapper.selectOne(Wrappers.<UploadFile>lambdaQuery()
                     .eq(UploadFile::getFilename, filename).last("LIMIT 1"));
             if (upload != null && upload.getProjectId() != null
-                    && !permissionService.hasPermission(UserContext.getUserId(), upload.getProjectId(), Permission.ISSUE_VIEW)) {
+                    && !permissionService.hasPermission(UserContext.getUserId(), upload.getProjectId(),
+                    Permission.ISSUE_VIEW)) {
                 return reject(response, HttpServletResponse.SC_FORBIDDEN, "无权限访问该文件");
             }
             return true;

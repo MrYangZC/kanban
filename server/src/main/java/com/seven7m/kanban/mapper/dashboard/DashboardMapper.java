@@ -122,7 +122,9 @@ public interface DashboardMapper extends BaseMapper<Object> {
                 COUNT(*) FILTER (WHERE s.category = 'TODO') AS todo,
                 COUNT(*) FILTER (WHERE s.category = 'IN_PROGRESS') AS in_progress,
                 COUNT(*) FILTER (WHERE s.category = 'DONE') AS done,
-                COUNT(*) FILTER (WHERE w.due_date IS NOT NULL AND w.due_date < now() AND s.category <> 'DONE') AS overdue
+                COUNT(*) FILTER (
+                    WHERE w.due_date IS NOT NULL AND w.due_date < now() AND s.category <> 'DONE'
+                ) AS overdue
             FROM w
             JOIN issue_status s ON s.id = w.status_id
             """)
@@ -141,11 +143,14 @@ public interface DashboardMapper extends BaseMapper<Object> {
      */
     @Select("""
             WITH w AS (
-                SELECT 'TASK' AS type_code, status_id, due_date FROM task WHERE project_id = #{projectId} AND archived = false
+                SELECT 'TASK' AS type_code, status_id, due_date
+                FROM task WHERE project_id = #{projectId} AND archived = false
                 UNION ALL
-                SELECT 'REQUIREMENT' AS type_code, status_id, due_date FROM requirement WHERE project_id = #{projectId} AND archived = false
+                SELECT 'REQUIREMENT' AS type_code, status_id, due_date
+                FROM requirement WHERE project_id = #{projectId} AND archived = false
                 UNION ALL
-                SELECT 'BUG' AS type_code, status_id, due_date FROM bug WHERE project_id = #{projectId} AND archived = false
+                SELECT 'BUG' AS type_code, status_id, due_date
+                FROM bug WHERE project_id = #{projectId} AND archived = false
             )
             SELECT
                 w.type_code AS type_code,
@@ -153,7 +158,9 @@ public interface DashboardMapper extends BaseMapper<Object> {
                 COUNT(*) FILTER (WHERE s.category = 'TODO') AS todo,
                 COUNT(*) FILTER (WHERE s.category = 'IN_PROGRESS') AS in_progress,
                 COUNT(*) FILTER (WHERE s.category = 'DONE') AS done,
-                COUNT(*) FILTER (WHERE w.due_date IS NOT NULL AND w.due_date < now() AND s.category <> 'DONE') AS overdue
+                COUNT(*) FILTER (
+                    WHERE w.due_date IS NOT NULL AND w.due_date < now() AND s.category <> 'DONE'
+                ) AS overdue
             FROM w
             JOIN issue_status s ON s.id = w.status_id
             GROUP BY w.type_code

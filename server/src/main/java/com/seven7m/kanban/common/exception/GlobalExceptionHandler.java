@@ -49,7 +49,8 @@ public class GlobalExceptionHandler {
                 String lower = raw.toLowerCase();
                 if (lower.startsWith("size must be between")) yield field + " 长度超出允许范围";
                 if (lower.startsWith("must be less than") || lower.startsWith("must be greater than")
-                        || lower.startsWith("must be less than or equal to") || lower.startsWith("must be greater than or equal to")) {
+                        || lower.startsWith("must be less than or equal to")
+                        || lower.startsWith("must be greater than or equal to")) {
                     yield field + " 数值超出允许范围";
                 }
                 if (lower.startsWith("must ")) yield field + " 参数不合法";

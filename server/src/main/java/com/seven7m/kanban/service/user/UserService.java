@@ -172,7 +172,9 @@ public class UserService {
         if (keyword != null && !keyword.isBlank()) {
             // 转义 LIKE 通配符，避免关键字 _ / % 命中全部用户
             String pattern = LikeEscaper.contains(keyword);
-            q.and(w -> w.apply("(username LIKE {0} ESCAPE '\\' OR display_name LIKE {1} ESCAPE '\\' OR email LIKE {2} ESCAPE '\\')",
+            q.and(w -> w.apply(
+                    "(username LIKE {0} ESCAPE '\\' OR display_name LIKE {1} ESCAPE '\\'"
+                            + " OR email LIKE {2} ESCAPE '\\')",
                     pattern, pattern, pattern));
         }
         long total = userMapper.selectCount(q);
