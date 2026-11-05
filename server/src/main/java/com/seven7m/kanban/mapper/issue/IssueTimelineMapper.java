@@ -16,6 +16,9 @@ import java.util.UUID;
  * 保证响应体与查询量都与数据量脱钩。
  *
  * <p>返回 Map 而不是实体：两张表字段不同构，用 {@code NULL} 占位比造一个中间实体更直观。
+ * 调用方一律先经 {@link TimelineRow#from} / {@link HandoffMarker#from} 转成类型化对象，
+ * 列名只在那两个类里写一次（此前是调用方按 {@code row.get("new_value")} 取值，
+ * 列别名写错只会在线上表现为"新值总是空"）。
  * jsonb 列显式 {@code ::text}，避免 PGobject 直接落到调用方。
  */
 @Mapper

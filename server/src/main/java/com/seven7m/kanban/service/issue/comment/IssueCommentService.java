@@ -4,12 +4,13 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.PermissionService;
 import com.seven7m.kanban.common.security.UserContext;
-import com.seven7m.kanban.common.util.Uuids;
 import com.seven7m.kanban.dto.issue.IssueActivityVO;
 import com.seven7m.kanban.dto.issue.IssueTimelineVO;
 import com.seven7m.kanban.entity.issue.comment.IssueComment;
 import com.seven7m.kanban.entity.user.SysUser;
+import com.seven7m.kanban.mapper.issue.HandoffMarker;
 import com.seven7m.kanban.mapper.issue.IssueTimelineMapper;
+import com.seven7m.kanban.mapper.issue.TimelineRow;
 import com.seven7m.kanban.mapper.issue.comment.IssueCommentMapper;
 import com.seven7m.kanban.mapper.user.SysUserMapper;
 import com.seven7m.kanban.service.support.ProjectWriteGuard;
@@ -20,9 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -65,83 +66,52 @@ public class IssueCommentService {
             result.setList(List.of());
             return result;
         }
-        List<Map<String, Object>> rows = timelineMapper.pageTimeline(issueId, category, s, (long) (p - 1) * s);
+        // 行结果先转成类型化对象：列名与类型转换只在 TimelineRow 里写一次
+        List<TimelineRow> rows = timelineMapper.pageTimeline(issueId, category, s, (long) (p - 1) * s)
+                .stream().map(TimelineRow::from).toList();
 
         // 批量取用户展示名，避免逐条查库
-        Set<UUID> userIds = new HashSet<>();
-        for (Map<String, Object> row : rows) {
-            UUID actorId = asUuid(row.get("actor_id"));
-            if (actorId != null) {
-                userIds.add(actorId);
-            }
-        }
+        Set<UUID> userIds = rows.stream()
+                .map(TimelineRow::actorId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
         Map<UUID, SysUser> userMap = userIds.isEmpty() ? Map.of()
                 : userMapper.selectBatchIds(userIds).stream()
                         .collect(Collectors.toMap(SysUser::getId, u -> u));
 
         // 撤销可用性：最近一条交接动态 + 当前负责人，两者都满足才置 revocable（真正的校验在 revokeHandoff）。
-        Map<String, Object> latestHandoff = timelineMapper.latestHandoff(issueId, category);
+        HandoffMarker latestHandoff = HandoffMarker.from(timelineMapper.latestHandoff(issueId, category));
         UUID currentAssignee = workItemRouter.assigneeIdOf(issueId);
         String revocableActivityId = null;
-        if (latestHandoff != null
-                && "ASSIGNEE_CHANGED".equals(latestHandoff.get("action"))
-                && currentAssignee != null) {
-            String newValue = latestHandoff.get("new_value") == null ? null : latestHandoff.get("new_value").toString();
-            if (currentAssignee.equals(activityTextResolver.userIdOf(newValue))) {
-                revocableActivityId = String.valueOf(latestHandoff.get("id"));
-            }
+        if (latestHandoff != null && latestHandoff.isAssigneeChanged() && currentAssignee != null
+                && currentAssignee.equals(activityTextResolver.userIdOf(latestHandoff.newValue()))) {
+            revocableActivityId = String.valueOf(latestHandoff.id());
         }
 
         // 动态里存的是状态 code（{"status":"REQ_TODO"}），统一翻成中文名再返回
         Map<String, String> statusNames = activityTextResolver.loadStatusNames();
         List<IssueActivityVO> voList = new ArrayList<>(rows.size());
-        for (Map<String, Object> row : rows) {
+        for (TimelineRow row : rows) {
             IssueActivityVO vo = new IssueActivityVO();
-            String id = row.get("id") == null ? null : row.get("id").toString();
-            UUID actorId = asUuid(row.get("actor_id"));
+            UUID actorId = row.actorId();
             SysUser actor = actorId == null ? null : userMap.get(actorId);
-            vo.setId(id == null ? null : UUID.fromString(id));
-            vo.setType(str(row.get("type")));
+            vo.setId(row.id());
+            vo.setType(row.type());
             vo.setActorId(actorId);
             vo.setActorName(actor == null ? "未知" : actor.getDisplayName());
             vo.setActorAvatarUrl(actor == null ? null : actor.getAvatarUrl());
-            vo.setContent(str(row.get("content")));
-            vo.setParentId(asUuid(row.get("parent_id")));
-            vo.setOldValue(activityTextResolver.toText(str(row.get("old_value")), statusNames));
-            vo.setNewValue(activityTextResolver.toText(str(row.get("new_value")), statusNames));
-            vo.setCreatedAt(asDateTime(row.get("created_at")));
-            if (id != null && id.equals(revocableActivityId)) {
+            vo.setContent(row.content());
+            vo.setParentId(row.parentId());
+            vo.setOldValue(activityTextResolver.toText(row.oldValue(), statusNames));
+            vo.setNewValue(activityTextResolver.toText(row.newValue(), statusNames));
+            vo.setCreatedAt(row.createdAt());
+            if (row.id() != null && row.id().toString().equals(revocableActivityId)) {
                 vo.setRevocable(true);
             }
             voList.add(vo);
         }
         result.setList(voList);
         return result;
-    }
-
-    private static String str(Object value) {
-        return value == null ? null : value.toString();
-    }
-
-    private static UUID asUuid(Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof UUID uuid) {
-            return uuid;
-        }
-        // 复用 Uuids 的统一解析（失败返回 null），避免再写一份 try/catch
-        return Uuids.parseOrNull(value.toString());
-    }
-
-    private static LocalDateTime asDateTime(Object value) {
-        if (value instanceof LocalDateTime dt) {
-            return dt;
-        }
-        if (value instanceof java.sql.Timestamp ts) {
-            return ts.toLocalDateTime();
-        }
-        return null;
     }
 
     @Transactional
