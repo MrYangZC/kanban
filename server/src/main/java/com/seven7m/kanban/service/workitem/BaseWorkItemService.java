@@ -21,7 +21,6 @@ import com.seven7m.kanban.dto.issue.IssueFilterRequest;
 import com.seven7m.kanban.dto.issue.IssueVO;
 import com.seven7m.kanban.dto.issue.MoveIssueRequest;
 import com.seven7m.kanban.dto.issue.UpdateIssueRequest;
-import com.seven7m.kanban.dto.workflow.HandoffTarget;
 import com.seven7m.kanban.entity.issue.IssueActivity;
 import com.seven7m.kanban.entity.issue.IssueCc;
 import com.seven7m.kanban.entity.issue.IssueParticipant;
@@ -31,7 +30,6 @@ import com.seven7m.kanban.entity.issue.comment.IssueComment;
 import com.seven7m.kanban.entity.issue.link.IssueLink;
 import com.seven7m.kanban.entity.issuestatus.IssueStatus;
 import com.seven7m.kanban.entity.project.Project;
-import com.seven7m.kanban.entity.user.SysUser;
 import com.seven7m.kanban.entity.workitem.AbstractWorkItem;
 import com.seven7m.kanban.entity.workitem.Bug;
 import com.seven7m.kanban.entity.workitem.Requirement;
@@ -121,6 +119,10 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
     /** 排序键计算与列内重排（算法与业务字段无关，单独成类便于测试） */
     @Autowired
     protected WorkItemSortKeyService sortKeyService;
+
+    /** 交接解析与副作用（与具体表无关，见 {@link WorkItemHandoffService}） */
+    @Autowired
+    protected WorkItemHandoffService handoffService;
 
     /** 工作项 VO 装配（批量预取 + 字段映射，与权限/事务无关） */
     @Autowired
@@ -369,7 +371,7 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
     }
 
     /** 状态变更的结果：用于事后写活动记录与交接落点，避免各段重复解析 */
-    private record StatusOutcome(String fromCode, String toCode, HandoffDecision handoff, boolean sprintApplied) {
+    private record StatusOutcome(String fromCode, String toCode, WorkItemHandoffService.Decision handoff, boolean sprintApplied) {
         static final StatusOutcome NONE = new StatusOutcome(null, null, null, false);
     }
 
@@ -492,7 +494,8 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
             uw.setSql("done_at = NULL");
         }
 
-        HandoffDecision handoff = resolveHandoff(issue, req.getStatusId(), target.getName(), req.getAssigneeId());
+        WorkItemHandoffService.Decision handoff = handoffService.resolve(
+                handoffContext(issue), req.getStatusId(), target.getName(), req.getAssigneeId());
         boolean sprintApplied = false;
         if (handoff != null) {
             uw.set("assignee_id", handoff.toUserId());
@@ -518,7 +521,8 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
     private void recordHandoffIfAny(T issue, StatusOutcome status, UpdateIssueRequest req) {
         if (status.handoff() != null) {
             // labelIds 非空时下方会全量替换标签，交接再插一条等于白做，故只在未显式指定时补标签
-            recordHandoff(issue, status.handoff(), status.sprintApplied(), req.getLabelIds() == null);
+            handoffService.record(handoffContext(issue), status.handoff(),
+                    status.sprintApplied(), req.getLabelIds() == null);
         }
     }
 
@@ -594,7 +598,7 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
         boolean wasDone = isDoneCategory(fromStatusEntity);
         String statusFromCode = null;
         String statusToCode = null;
-        HandoffDecision handoff = null;
+        WorkItemHandoffService.Decision handoff = null;
         IssueStatus target = null;
         if (statusChanging) {
             // 跨列拖拽属于「状态变更」，对应 issue:status；同列排序仍只需要 issue:edit（注解已拦）
@@ -607,7 +611,7 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
             }
             statusFromCode = fromStatusEntity == null ? null : fromStatusEntity.getCode();
             statusToCode = target.getCode();
-            handoff = resolveHandoff(issue, toStatus, target.getName(), null);
+            handoff = handoffService.resolve(handoffContext(issue), toStatus, target.getName(), null);
         }
         issue.setStatusId(toStatus);
         boolean clearDoneAt = false;
@@ -641,7 +645,7 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
         }
         if (handoff != null) {
             // 拖拽（move）请求不带迭代与标签，落点一律由列配置写入
-            recordHandoff(issue, handoff, handoff.sprintId() != null, true);
+            handoffService.record(handoffContext(issue), handoff, handoff.sprintId() != null, true);
         }
         Project project = projectMapper().selectById(issue.getProjectId());
         return toVO(issue, project == null ? "" : project.getProjectKey());
@@ -815,117 +819,10 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
 
     // ========================= 交接（handoff） =========================
 
-    /** 交接动态：负责人由 A 变为 B */
-    private static final String ACTION_ASSIGNEE_CHANGED = "ASSIGNEE_CHANGED";
-    /** 撤销交接：负责人由 B 退回 A（与上面区分，避免撤销本身又成为可撤销项） */
-    private static final String ACTION_HANDOFF_REVOKED = "HANDOFF_REVOKED";
-    /** 交接落点：工作项被放进某个迭代（单列「迭代」是工作项的强属性，换掉要留痕） */
-    private static final String ACTION_SPRINT_CHANGED = "SPRINT_CHANGED";
-    /** 交接落点：工作项被补上某个标签（只在真正新增时记一条，已经有就静默） */
-    private static final String ACTION_LABEL_ADDED = "LABEL_ADDED";
-
-
-    /**
-     * 一次流转的交接计划；仅在确实解析出「换人」时才有值。
-     *
-     * @param fromSprintId 交接前的迭代，撤销时据此把迭代退回去；null 表示本来没有迭代
-     * @param sprintId     落点迭代，null 表示本列不规定落点
-     * @param labelId      落点标签，null 表示本列不规定落点
-     */
-    private record HandoffDecision(UUID fromUserId, UUID toUserId, String toUserName,
-                                   String statusName, String note,
-                                   UUID sprintId, String sprintName,
-                                   UUID labelId, String labelName,
-                                   UUID fromSprintId) {
-    }
-
-    /**
-     * 解析目标列的交接。用户主动改了负责人时跳过——刚选的人不该被列配置覆盖。
-     *
-     * <p>注意「显式指定」的判定要排除「等于当前负责人」的情形：详情页保存时会把未变的
-     * 负责人一并提交，若把这种请求当作显式指派，从详情页改状态就永远不触发交接。
-     *
-     * @return null 表示本次流转不交接：无配置、类型 NONE、解析不出人、或与当前负责人相同
-     */
-    private HandoffDecision resolveHandoff(T issue, UUID toStatusId, String toStatusName, UUID explicitAssigneeId) {
-        if (toStatusId == null) {
-            return null;
-        }
-        if (explicitAssigneeId != null && !explicitAssigneeId.equals(issue.getAssigneeId())) {
-            return null;
-        }
-        // 只在真正流转时查项目，静态更新（改标题/优先级）不付这次查询
-        Project project = projectMapper().selectById(issue.getProjectId());
-        HandoffTarget target = workflowService().resolveHandoffTarget(
-                issue.getProjectId(), category(), toStatusId, project);
-        if (target == null || target.userId().equals(issue.getAssigneeId())) {
-            return null;
-        }
-        return new HandoffDecision(issue.getAssigneeId(), target.userId(), target.userName(),
-                toStatusName, target.note(),
-                target.sprintId(), target.sprintName(), target.labelId(), target.labelName(),
-                issue.getSprintId());
-    }
-
-    /**
-     * 交接副作用：动态 + 落点 + 站内通知。与负责人改写同处一个事务，
-     * 任一失败整体回滚，不会留下「人转了但没通知」的中间态。
-     *
-     * @param applySprint 迭代落点是否由本次交接写入（用户在请求里显式指定了迭代时为 false，
-     *                    与「显式指定负责人不覆盖」同一原则）
-     * @param applyLabel  标签落点是否由本次交接写入（请求里带了 labelIds 时为 false：
-     *                    那是全量替换，交接再插一次会被下一行代码删掉，属于白做工）
-     */
-    private void recordHandoff(T issue, HandoffDecision decision, boolean applySprint, boolean applyLabel) {
-        String fromName = userNameOf(decision.fromUserId());
-        // 首尾两条都带上「当时的迭代」：撤销要靠它们判断交接到底动没动迭代，
-        // 以及这一刻迭代是否还停在交接写入的那个值（被别人改过就不能退回去覆盖）
-        UUID toSprintId = applySprint && decision.sprintId() != null
-                ? decision.sprintId()
-                : decision.fromSprintId();
-        recordActivity(issue.getId(), ACTION_ASSIGNEE_CHANGED,
-                jsonUserWithSprint(fromName, decision.fromUserId(), decision.fromSprintId()),
-                jsonUserWithSprint(decision.toUserName(), decision.toUserId(), toSprintId));
-
-        boolean sprintApplied = applySprint && decision.sprintId() != null;
-        if (sprintApplied) {
-            String fromSprintName = decision.fromSprintId() == null
-                    ? null
-                    : workflowService().sprintNameOf(decision.fromSprintId());
-            recordActivity(issue.getId(), ACTION_SPRINT_CHANGED,
-                    jsonField("sprint", fromSprintName), jsonField("sprint", decision.sprintName()));
-        }
-        boolean labelApplied = false;
-        if (applyLabel && decision.labelId() != null) {
-            Integer existing = issueTagMapper().countIssueLabel(
-                    issue.getId(), decision.labelId(), categoryName());
-            // 已经有这个标签就不写：重复 insert 违反唯一约束，白写一条「打上标签」的动态也没意义
-            if (existing == null || existing == 0) {
-                issueTagMapper().insertIssueLabel(issue.getId(), decision.labelId(), categoryName());
-                recordActivity(issue.getId(), ACTION_LABEL_ADDED, null,
-                        jsonField("label", decision.labelName()));
-                labelApplied = true;
-            }
-        }
-
-        // 通知里的落点按「实际发生了什么」写：标签本来就有的那种情况不该骗接手人说打上了
-        notificationService().notifyHandoff(decision.toUserId(), issue.getProjectId(), issue.getId(),
-                category().name(), issue.getIssueNumber(), issue.getTitle(), decision.statusName(),
-                decision.note(),
-                landingText(sprintApplied ? decision.sprintName() : null,
-                        labelApplied ? decision.labelName() : null));
-    }
-
-    /** 交接通知里的一句落点说明；两项都没配返回 null，通知正文与之前完全一致 */
-    private String landingText(String sprintName, String labelName) {
-        List<String> parts = new ArrayList<>(2);
-        if (sprintName != null) {
-            parts.add("已放进迭代「" + sprintName + "」");
-        }
-        if (labelName != null) {
-            parts.add("已打上标签「" + labelName + "」");
-        }
-        return parts.isEmpty() ? null : String.join("，", parts);
+    /** 交接的解析、动态、落点与撤销副作用都委托给 {@link WorkItemHandoffService}（只依赖值对象，与具体表无关） */
+    private WorkItemHandoffService.Context handoffContext(T issue) {
+        return new WorkItemHandoffService.Context(issue.getId(), issue.getProjectId(), category(),
+                issue.getIssueNumber(), issue.getTitle(), issue.getAssigneeId(), issue.getSprintId());
     }
 
     /**
@@ -934,8 +831,8 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
      * <p>Multica 里误交接靠「取消这条 run」兜底；我们没有 run 可取消，
      * 等价能力就是把负责人退回去，并给退回的人补一条通知（否则任务悄悄回到他名下没人知道）。
      *
-     * <p>只认最后一条交接动态，且它的接手人必须仍是当前负责人 —— 中间若有人手工改过负责人，
-     * 撤销就会覆盖别人的编辑，这里直接拒绝而不是猜。
+     * <p>可撤销性与迭代回退的判断在 {@link WorkItemHandoffService#planRevoke}，
+     * 本方法只负责落库与回填实体，保证「改库」与「写动态/发通知」在同一事务里。
      *
      * <p>撤销记成 {@code HANDOFF_REVOKED} 而不是再写一条 ASSIGNEE_CHANGED：否则撤销本身
      * 又变成一条「可以撤销的交接」，按钮会永远挂着（撤销的撤销语义上是重新转交，不是撤销）。
@@ -943,135 +840,44 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
     @Transactional
     public IssueVO revokeHandoff(UUID id) {
         T issue = requireIssue(id);
-        IssueActivity last = issueActivityMapper().selectOne(Wrappers.<IssueActivity>lambdaQuery()
-                .eq(IssueActivity::getIssueId, id)
-                .eq(IssueActivity::getCategory, categoryName())
-                .in(IssueActivity::getAction, ACTION_ASSIGNEE_CHANGED, ACTION_HANDOFF_REVOKED)
-                .orderByDesc(IssueActivity::getCreatedAt)
-                .last("LIMIT 1"));
-        if (last == null || !ACTION_ASSIGNEE_CHANGED.equals(last.getAction())) {
-            throw new ServiceException(400, "没有可撤销的交接");
-        }
-        UUID handedTo = userIdOf(last.getNewValue());
-        UUID handedFrom = userIdOf(last.getOldValue());
-        if (handedTo == null || !handedTo.equals(issue.getAssigneeId())) {
-            throw new ServiceException(400, "负责人已被再次变更，无法撤销这次交接");
-        }
+        WorkItemHandoffService.Context ctx = handoffContext(issue);
+        WorkItemHandoffService.RevokePlan plan = handoffService.planRevoke(ctx);
 
         UpdateWrapper<T> uw = Wrappers.update();
         uw.eq("id", id);
-        if (handedFrom == null) {
+        if (plan.fromUserId() == null) {
             // set(column, null) 在 PG 上可能推断不出参数类型，置空直接写 SQL
             uw.setSql("assignee_id = NULL");
         } else {
-            uw.set("assignee_id", handedFrom);
+            uw.set("assignee_id", plan.fromUserId());
         }
-        // 迭代落点一起退回。标签不退：标签是可累加的，撤销这一刻它可能已经被别人手工加过，
-        // 删掉等于覆盖别人的编辑（ProjectHandoff 上有同样口径的说明）。
-        //
-        // 迭代则必须先确认「还停在交接写入的那个值」：负责人被改过就拒绝撤销，迭代被改过同理
-        // 不能闷头退回去，否则撤销会悄悄抹掉别人的调整。这里的处理是跳过迭代回退、只退负责人，
-        // 而不是整体拒绝 —— 用户的诉求是「把人退回去」，不该被一个已经无关的迭代卡住。
-        boolean sprintRestored = false;
-        UUID restoredSprintId = null;
-        String oldSprintId = fieldOf(last.getOldValue(), "sprintId");
-        String newSprintId = fieldOf(last.getNewValue(), "sprintId");
-        if (oldSprintId != null && newSprintId != null
-                && Objects.equals(parseUuidOrNull(newSprintId), issue.getSprintId())) {
-            if (oldSprintId.isBlank()) {
+        // 迭代落点一起退回；标签不退（标签可累加，删掉等于覆盖别人的编辑）
+        if (plan.sprintRestored()) {
+            if (plan.restoredSprintId() == null) {
                 uw.setSql("sprint_id = NULL");
             } else {
-                restoredSprintId = parseUuidOrNull(oldSprintId);
-                if (restoredSprintId != null) {
-                    uw.set("sprint_id", restoredSprintId);
-                }
+                uw.set("sprint_id", plan.restoredSprintId());
             }
-            // 旧值损坏（解析不出 id）时不写这一项，避免把迭代误清空
-            sprintRestored = restoredSprintId != null || oldSprintId.isBlank();
         }
         LocalDateTime now = LocalDateTime.now();
         uw.set("updated_at", now);
         mapper().update(null, uw);
 
-        recordActivity(id, ACTION_HANDOFF_REVOKED,
-                jsonUser(userNameOf(handedTo), handedTo), jsonUser(userNameOf(handedFrom), handedFrom));
-        if (sprintRestored) {
-            // 时间线要能看到迭代也退回去了，否则用户只看到「负责人被退回」而迭代悄悄变了
-            recordActivity(id, ACTION_SPRINT_CHANGED,
-                    jsonField("sprint", workflowService().sprintNameOf(issue.getSprintId())),
-                    jsonField("sprint", restoredSprintId == null ? null : workflowService().sprintNameOf(restoredSprintId)));
-        }
-        if (handedFrom != null) {
-            notificationService().notifyHandoffRevoked(handedFrom, issue.getProjectId(), issue.getId(),
-                    category().name(), issue.getIssueNumber(), issue.getTitle(), userNameOf(UserContext.getUserId()));
-        }
+        // 传撤销前的迭代：动态的「旧值」要写它，而下面马上就把实体改掉了
+        handoffService.recordRevoke(ctx, plan, issue.getSprintId(), UserContext.getUserId());
 
-        issue.setAssigneeId(handedFrom);
-        if (sprintRestored) {
-            issue.setSprintId(restoredSprintId);
+        issue.setAssigneeId(plan.fromUserId());
+        if (plan.sprintRestored()) {
+            issue.setSprintId(plan.restoredSprintId());
         }
         issue.setUpdatedAt(now);
         return toVO(issue, resolveProjectKey(issue.getProjectId()));
-    }
-
-    private String userNameOf(UUID userId) {
-        if (userId == null) {
-            return null;
-        }
-        SysUser user = sysUserMapper().selectById(userId);
-        if (user == null) {
-            return null;
-        }
-        String display = user.getDisplayName();
-        return display == null || display.isBlank() ? user.getUsername() : display;
-    }
-
-    /**
-     * 动态中的用户值：{@code {"user":"张三","userId":"..."}}。
-     *
-     * <p>userId 是给「撤销交接」定位原负责人用的；展示侧（ActivityTextResolver）只读 user 字段，
-     * 所以这是对旧数据和旧前端都无感的字段扩展。历史记录没有 userId，
-     * 解析不出来时按「不可撤销」处理，不做猜人。
-     */
-    private String jsonUser(String name, UUID userId) {
-        return ActivityValue.user(name, userId);
-    }
-
-    /**
-     * 交接动态里的「原负责人」值，额外带上交接前的迭代 id：
-     * {@code {"user":"张三","userId":"...","sprintId":"..."}}。
-     *
-     * <p>sprintId 无论有没有都会写（没有就是空串）：撤销时要能区分「本来没有迭代」和
-     * 「历史记录没记这个字段」，前者要把 sprint_id 置空，后者应保持原样什么都不做。
-     */
-    private String jsonUserWithSprint(String name, UUID userId, UUID sprintId) {
-        return ActivityValue.userWithSprint(name, userId, sprintId);
-    }
-
-    /** 动态中的通用单字段值：{@code {"sprint":"S1"}} / {@code {"label":"bug"}} */
-    private String jsonField(String field, String value) {
-        return ActivityValue.field(field, value);
-    }
-
-    /** 解析动态里的 UUID；空串或格式不对一律 null（历史脏数据不该让撤销/流转整体失败） */
-    private UUID parseUuidOrNull(String raw) {
-        return Uuids.parseOrNull(raw);
-    }
-
-    /** 取动态值里某个字符串字段；字段不存在返回 null（注意空串与 null 语义不同） */
-    private String fieldOf(String raw, String field) {
-        return ActivityValue.text(raw, field);
     }
 
     /** clearFields 里是否点名要清空该字段 */
     private boolean clearsField(UpdateIssueRequest req, String field) {
         Set<String> clearFields = req.getClearFields();
         return clearFields != null && clearFields.contains(field);
-    }
-
-    /** 从动态的 user 值里取 userId；缺字段或格式不对返回 null */
-    private UUID userIdOf(String raw) {
-        return ActivityValue.userId(raw);
     }
 
     private String resolveProjectKey(UUID projectId) {
