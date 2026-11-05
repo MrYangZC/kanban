@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.seven7m.kanban.dto.dashboard.DashboardVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDateTime;
@@ -23,6 +26,10 @@ import java.util.UUID;
  *       ——后者任何编辑都会变，周期时间会被"改个标题"凭空拉长；</li>
  *   <li>完成度判定统一按 {@code issue_status.category = 'DONE'}。</li>
  * </ul>
+ *
+ * <p>结果映射一律显式声明（手册 ORM 规约）：投影类见 {@link DashboardSummaryRow}、
+ * {@link TypeSummaryRow}、{@link CycleTimeRow}、{@link DailyCompletedRow}、{@link DailyCreatedRow}；
+ * 别名与属性的对应关系由 {@code DashboardMapperMappingTest} 静态校验。
  */
 @Mapper
 public interface DashboardMapper extends BaseMapper<Object> {
@@ -45,6 +52,10 @@ public interface DashboardMapper extends BaseMapper<Object> {
             GROUP BY s.name, s.sort_order
             ORDER BY s.sort_order
             """)
+    @Results(id = "nameCount", value = {
+            @Result(column = "name", property = "name"),
+            @Result(column = "count", property = "count")
+    })
     List<DashboardVO.NameCount> statusDist(@Param("projectId") UUID projectId);
 
     /** 优先级分布：P0~P3 */
@@ -64,6 +75,7 @@ public interface DashboardMapper extends BaseMapper<Object> {
             GROUP BY w.priority
             ORDER BY w.priority
             """)
+    @ResultMap("nameCount")
     List<DashboardVO.NameCount> priorityDist(@Param("projectId") UUID projectId);
 
     /** 按负责人分布的工作量（带 display_name 与头像，供度量页按人展示） */
@@ -86,6 +98,11 @@ public interface DashboardMapper extends BaseMapper<Object> {
             GROUP BY u.display_name, u.username, u.avatar_url
             ORDER BY count DESC
             """)
+    @Results(id = "assigneeCount", value = {
+            @Result(column = "name", property = "name"),
+            @Result(column = "avatar_url", property = "avatarUrl"),
+            @Result(column = "count", property = "count")
+    })
     List<DashboardVO.AssigneeCount> assigneeDist(@Param("projectId") UUID projectId);
 
     /** 概览：总数 / 待处理(TODO) / 处理中(IN_PROGRESS) / 已完成(DONE) / 逾期(due_date < now 且未完成) */
@@ -109,7 +126,14 @@ public interface DashboardMapper extends BaseMapper<Object> {
             FROM w
             JOIN issue_status s ON s.id = w.status_id
             """)
-    DashboardSummaryView summary(@Param("projectId") UUID projectId);
+    @Results(id = "dashboardSummary", value = {
+            @Result(column = "total", property = "total"),
+            @Result(column = "todo", property = "todo"),
+            @Result(column = "in_progress", property = "inProgress"),
+            @Result(column = "done", property = "done"),
+            @Result(column = "overdue", property = "overdue")
+    })
+    DashboardSummaryRow summary(@Param("projectId") UUID projectId);
 
     /**
      * 分类型概览：需求 / 缺陷 / 任务各一张表，用 UNION ALL 带出类型标签后按类型聚合，
@@ -134,7 +158,15 @@ public interface DashboardMapper extends BaseMapper<Object> {
             JOIN issue_status s ON s.id = w.status_id
             GROUP BY w.type_code
             """)
-    List<TypeSummaryView> typeSummaries(@Param("projectId") UUID projectId);
+    @Results(id = "typeSummary", value = {
+            @Result(column = "type_code", property = "typeCode"),
+            @Result(column = "total", property = "total"),
+            @Result(column = "todo", property = "todo"),
+            @Result(column = "in_progress", property = "inProgress"),
+            @Result(column = "done", property = "done"),
+            @Result(column = "overdue", property = "overdue")
+    })
+    List<TypeSummaryRow> typeSummaries(@Param("projectId") UUID projectId);
 
     /**
      * 已解决工作项的周期时间（小时）：完成时间 {@code done_at} - 创建时间。
@@ -154,7 +186,11 @@ public interface DashboardMapper extends BaseMapper<Object> {
             FROM w
             WHERE w.done_at IS NOT NULL
             """)
-    CycleTimeView cycleTime(@Param("projectId") UUID projectId);
+    @Results(id = "cycleTime", value = {
+            @Result(column = "avg_hours", property = "avgHours"),
+            @Result(column = "max_hours", property = "maxHours")
+    })
+    CycleTimeRow cycleTime(@Param("projectId") UUID projectId);
 
     /** 每日完成数（按 done_at 日期，仅已完成项） */
     @Select("""
@@ -172,8 +208,12 @@ public interface DashboardMapper extends BaseMapper<Object> {
             GROUP BY TO_CHAR(w.done_at, 'YYYY-MM-DD')
             ORDER BY date
             """)
-    List<DateCountView> dailyCompleted(@Param("projectId") UUID projectId,
-                                       @Param("start") LocalDateTime start);
+    @Results(id = "dailyCompleted", value = {
+            @Result(column = "date", property = "date"),
+            @Result(column = "completed", property = "completed")
+    })
+    List<DailyCompletedRow> dailyCompleted(@Param("projectId") UUID projectId,
+                                           @Param("start") LocalDateTime start);
 
     /** 每日新建数（燃尽图的"总工作量"曲线来源，按 created_at 累计） */
     @Select("""
@@ -190,8 +230,12 @@ public interface DashboardMapper extends BaseMapper<Object> {
             GROUP BY TO_CHAR(w.created_at, 'YYYY-MM-DD')
             ORDER BY date
             """)
-    List<DateCountView> dailyCreated(@Param("projectId") UUID projectId,
-                                     @Param("start") LocalDateTime start);
+    @Results(id = "dailyCreated", value = {
+            @Result(column = "date", property = "date"),
+            @Result(column = "created", property = "created")
+    })
+    List<DailyCreatedRow> dailyCreated(@Param("projectId") UUID projectId,
+                                       @Param("start") LocalDateTime start);
 
     /** 窗口开始前已创建的总数（燃尽图起点基线） */
     @Select("""
@@ -218,32 +262,4 @@ public interface DashboardMapper extends BaseMapper<Object> {
             SELECT COUNT(*) AS count FROM w WHERE w.done_at IS NOT NULL AND w.done_at < #{start}
             """)
     long countDoneBefore(@Param("projectId") UUID projectId, @Param("start") LocalDateTime start);
-
-    class DashboardSummaryView {
-        public long total;
-        public long todo;
-        public long inProgress;
-        public long done;
-        public long overdue;
-    }
-
-    class TypeSummaryView {
-        public String typeCode;
-        public long total;
-        public long todo;
-        public long inProgress;
-        public long done;
-        public long overdue;
-    }
-
-    class CycleTimeView {
-        public double avgHours;
-        public double maxHours;
-    }
-
-    class DateCountView {
-        public String date;
-        public long completed;
-        public long created;
-    }
 }
