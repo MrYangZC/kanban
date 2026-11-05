@@ -15,6 +15,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
+/**
+ * 看板查询：按状态列聚合，或按指定维度（负责人/优先级/迭代）分组。
+ *
+ * <p>要求 board:view；工作项已拆成 task/requirement/bug 三张物理表，
+ * 这里按类别路由到对应表，不做跨表 UNION。
+ */
 @RestController
 @RequestMapping("/projects")
 @RequiredArgsConstructor

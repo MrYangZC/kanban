@@ -14,6 +14,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 工作项附件：登记元信息、真实文件上传、删除、下载鉴权。
+ *
+ * <p>写要求 issue:edit，读要求 issue:view。文件名与落盘路径经校验，
+ * 避免用 ../../ 之类的方式越出上传目录；下载走 /api/uploads/**，由 UploadsAuthInterceptor 二次鉴权。
+ */
 @RestController
 @RequestMapping("/issues")
 @RequiredArgsConstructor

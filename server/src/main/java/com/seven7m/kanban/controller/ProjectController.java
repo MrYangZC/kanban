@@ -22,6 +22,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * 项目 CRUD 与列表：创建、详情、筛选分页、收藏、归档/取消归档、删除。
+ *
+ * <p>权限模型：设置改 project:setting，归档 project:archive，删除 project:delete（仅 OWNER/ADMIN）；
+ * 列表与详情只返回当前用户可见的项目，可见性判定统一走 ProjectQueryScope，不在控制器里散落。
+ */
 @RestController
 @RequestMapping("/projects")
 @RequiredArgsConstructor

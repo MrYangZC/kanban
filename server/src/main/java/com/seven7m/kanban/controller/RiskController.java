@@ -21,6 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 风险清单：列表、详情、创建、修改、删除。
+ *
+ * <p>读要求 risk:view，增删改统一要求 risk:manage —— 更细的 risk:create/edit/delete
+ * 从未被接口引用，已随迁移删除，避免出现「勾了也不生效」的假权限。
+ */
 @RestController
 @RequestMapping("/projects/{projectId}/risks")
 @RequiredArgsConstructor

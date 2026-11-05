@@ -23,6 +23,12 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 工作流查询与配置：状态节点、流转规则、看板列（含每列交接配置）、保存交接。
+ *
+ * <p>读要求 issue:view，写（保存交接）要求 project:workflow。
+ * 状态节点与流转规则按工作项类别区分，调用方必须显式传 category。
+ */
 @RestController
 @RequestMapping("/projects")
 @RequiredArgsConstructor

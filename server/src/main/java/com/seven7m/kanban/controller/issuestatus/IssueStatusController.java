@@ -17,6 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 项目状态节点查询（按工作项类别返回该类别工作流的全部节点）。
+ *
+ * <p>只读，要求 issue:view。任务/需求/缺陷各有自己的节点，不能混用一套。
+ */
 @RestController
 @RequestMapping("/projects")
 @RequiredArgsConstructor

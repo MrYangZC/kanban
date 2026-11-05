@@ -13,6 +13,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+/**
+ * 工作项评论：分页查询、新增、删除。
+ *
+ * <p>新增要求 issue:comment；删除的「只有作者或管理员可删」在服务层判定（控制器只做权限码拦截）。
+ */
 @RestController
 @RequestMapping("/issues")
 @RequiredArgsConstructor

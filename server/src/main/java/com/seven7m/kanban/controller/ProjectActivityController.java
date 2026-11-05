@@ -15,6 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 项目动态：最近 N 条工作项变更，用于项目首页时间线。
+ *
+ * <p>只读，要求 issue:view；limit 有上限，避免一次拉全量历史。
+ */
 @RestController
 @RequestMapping("/projects/{projectId}/activities")
 @RequiredArgsConstructor

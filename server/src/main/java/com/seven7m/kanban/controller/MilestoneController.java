@@ -14,6 +14,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 里程碑：列表、创建、修改、删除（路线图页的数据源）。
+ *
+ * <p>读要求 milestone:view，写要求 milestone:manage。
+ */
 @RestController
 @RequestMapping("/projects/{projectId}/milestones")
 @RequiredArgsConstructor

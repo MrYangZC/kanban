@@ -21,6 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 迭代：列表、详情、创建、修改、删除，以及开始/完成两个状态动作。
+ *
+ * <p>读要求 sprint:view，写要求 sprint:manage。开始/完成会改迭代状态与日期，
+ * 因此走独立的 POST 子路径而不是 PATCH 字段。
+ */
 @RestController
 @RequestMapping("/projects/{projectId}/sprints")
 @RequiredArgsConstructor

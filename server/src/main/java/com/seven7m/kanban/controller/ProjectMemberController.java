@@ -16,6 +16,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 项目成员管理：花名册、候选用户检索、增删成员、改角色。
+ *
+ * <p>读写门槛不同：读只要 issue:view（成员都能看花名册），写要 project:member。
+ * 成员角色变化会改变权限判定结果，因此服务层同时清掉该项目的权限码缓存。
+ */
 @Validated
 @RestController
 @RequestMapping("/projects/{projectId}/members")

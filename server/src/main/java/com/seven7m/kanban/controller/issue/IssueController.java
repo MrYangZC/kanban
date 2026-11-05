@@ -17,6 +17,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 工作项主入口：创建、更新、拖拽/流转、详情、列表筛选、删除。
+ *
+ * <p>工作项已从单表拆分为 task/requirement/bug，本控制器不直接碰表，
+ * 统一转给 WorkItemRouter 按类别路由；写操作按动作分别要求
+ * issue:create / issue:edit / issue:status / issue:assign / issue:delete，
+ * 状态与负责人变更不再笼统算作「编辑」。
+ */
 @RestController
 @RequestMapping("/issues")
 @RequiredArgsConstructor

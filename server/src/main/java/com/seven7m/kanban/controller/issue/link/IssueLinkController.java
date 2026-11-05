@@ -13,6 +13,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 工作项双向关联（blocks / relates / duplicates 等关系类型）。
+ *
+ * <p>写要求 issue:edit；关联是双向的，服务层会同时维护正反两条记录。
+ */
 @RestController
 @RequestMapping("/issues")
 @RequiredArgsConstructor

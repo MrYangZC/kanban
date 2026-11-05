@@ -14,6 +14,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 项目公告：列表、发布、修改、删除（含置顶）。
+ *
+ * <p>读要求 issue:view，写要求 announcement:manage。
+ */
 @RestController
 @RequestMapping("/projects/{projectId}/announcements")
 @RequiredArgsConstructor

@@ -13,6 +13,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
+/**
+ * 度量页只读聚合：概览卡片、分类型概览、状态/优先级/负责人分布、周期时间、燃尽图。
+ *
+ * <p>要求 issue:view。口径统一在 DashboardMapper 里（排除归档、完成度按 issue_status.category、
+ * 周期时间用 done_at），控制器只做转发。
+ */
 @RestController
 @RequestMapping("/projects/{projectId}/dashboard")
 @RequiredArgsConstructor

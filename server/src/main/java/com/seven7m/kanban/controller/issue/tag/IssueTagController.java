@@ -13,6 +13,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 标签相关接口：工作项打/取消标签、全局标签库、项目选用标签。
+ *
+ * <p>两类权限：改工作项标签要 issue:edit，管理标签库与项目选用要 project:label。
+ * 路由前缀为空是因为同一控制器下同时挂 /issues/{id}/tags、/labels、/projects/{id}/labels 三组路径。
+ */
 @RestController
 @RequiredArgsConstructor
 public class IssueTagController {

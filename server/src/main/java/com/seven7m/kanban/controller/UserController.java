@@ -24,6 +24,13 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 用户与账号：登录、登出、人员下拉、用户管理（分页/增删改）、个人中心、我的权限码。
+ *
+ * <p>鉴权分层要注意：登录与 /users/me 只要求登录态；用户管理与 RBAC 由
+ * AdminAuthInterceptor 的 @RequireAdmin（sys_user.is_admin）把关，**不是**项目级权限码；
+ * 只有 /projects/{id}/my-permissions 走项目成员身份。
+ */
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
