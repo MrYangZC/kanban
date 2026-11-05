@@ -35,7 +35,16 @@ spring:
     # v1.0.0 为固化基线：现有库清空 flyway_schema_history 后，Flyway 会基线到 1.0.0，
     # 跳过 V1.0.0__baseline.sql（避免重复建表）；全新空库则正常执行该脚本初始化。
     baseline-version: 1.0.0
-    validate-on-migrate: false
+    # 允许"乱序"迁移：历史库的 flyway_schema_history 已推进到 V24~V37（取自 .ai-tmp/old-migrations），
+    # 而 V1.0.1/V1.0.2 的版本号数值小于 37。若不开 outOfOrder，新迁移会被判定为"已过去"而不执行，
+    # 导致 project_handoff / notification 两张表在既有库上永久缺失（表现为进看板列头 500）。
+    out-of-order: true
+    # 历史 V24~V37 已从仓库移除（收敛为 v1.0.0 基线），但老库历史表里仍有记录：
+    # 只忽略"本地缺失/未来版本"这两类，校验和与新增迁移照常校验，避免把真实错误一并吞掉。
+    validate-on-migrate: true
+    ignore-migration-patterns:
+      - "*:future"
+      - "*:missing"
   servlet:
     multipart:
       max-file-size: 5MB

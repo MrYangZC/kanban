@@ -1,7 +1,6 @@
 package com.seven7m.kanban.service.issue.comment;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.seven7m.kanban.common.activity.ActivityValue;
 import com.seven7m.kanban.entity.issuestatus.IssueStatus;
 import com.seven7m.kanban.mapper.issuestatus.IssueStatusMapper;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +9,7 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 把 `issue_activity` 里存的机器值翻译成中文展示文本。
@@ -20,12 +20,11 @@ import java.util.Map;
  * 因此在接口装配层统一翻成状态名（「待处理」「已取消」…），前端不必再维护一份字典。
  *
  * <p>只做展示翻译：库里仍保留 code，历史数据无需迁移；遇到非 status 结构的旧值原样返回。
+ * 交接（ASSIGNEE_CHANGED）存的是 `{"user": "张三"}`，值本身已是显示名，直接透出。
  */
 @Component
 @RequiredArgsConstructor
 public class ActivityTextResolver {
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     /**
      * 字典里已不存在、但历史动态里仍可能出现的 code → 中文名。
@@ -58,7 +57,8 @@ public class ActivityTextResolver {
     }
 
     /**
-     * 单值翻译：`{"status": "REQ_TODO"}` → `待处理`；其他结构原样返回。
+     * 单值翻译：`{"status": "REQ_TODO"}` → `待处理`，`{"user": "张三"}` → `张三`；
+     * 其他结构原样返回。
      *
      * @param raw         库里存的原值（可能为 null）
      * @param statusNames {@link #loadStatusNames()} 的结果
@@ -67,7 +67,25 @@ public class ActivityTextResolver {
         if (raw == null || raw.isBlank()) {
             return null;
         }
-        String code = statusCode(raw);
+        // 结构解析统一走 ActivityValue（与写入方同一份协议实现）
+        if (ActivityValue.parse(raw) == null) {
+            return raw;
+        }
+        // 交接动态（ASSIGNEE_CHANGED）落库时已是显示名，不需要再查字典
+        String user = ActivityValue.text(raw, "user");
+        if (user != null) {
+            return user;
+        }
+        // 交接落点（SPRINT_CHANGED / LABEL_ADDED）同理，存的就是迭代名/标签名
+        String sprint = ActivityValue.text(raw, "sprint");
+        if (sprint != null) {
+            return sprint;
+        }
+        String label = ActivityValue.text(raw, "label");
+        if (label != null) {
+            return label;
+        }
+        String code = ActivityValue.text(raw, "status");
         if (code == null) {
             return raw;
         }
@@ -78,22 +96,12 @@ public class ActivityTextResolver {
         return name == null || name.isBlank() ? code : name;
     }
 
-    /** 从 `{"status": "CODE"}` 中取出 code；结构不符返回 null */
-    private String statusCode(String raw) {
-        String text = raw.trim();
-        if (!text.startsWith("{")) {
-            return null;
-        }
-        try {
-            JsonNode node = OBJECT_MAPPER.readTree(text);
-            JsonNode status = node.get("status");
-            if (status == null || status.isNull()) {
-                return null;
-            }
-            String code = status.asText();
-            return code == null || code.isBlank() ? null : code;
-        } catch (Exception e) {
-            return null;
-        }
+    /**
+     * 取动态值里携带的 userId（只有交接动态 {@code {"user":..,"userId":..}} 才有）。
+     * 交接功能上线前的历史记录只存了显示名，取不到返回 null，调用方按「不可撤销」处理，
+     * 不要退回姓名去反查用户 —— 显示名可重复。
+     */
+    public UUID userIdOf(String raw) {
+        return ActivityValue.userId(raw);
     }
 }

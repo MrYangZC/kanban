@@ -7,6 +7,7 @@ import com.seven7m.kanban.dto.board.BoardGroupView;
 import com.seven7m.kanban.dto.board.BoardView;
 import com.seven7m.kanban.dto.board.GroupColumnView;
 import com.seven7m.kanban.dto.issue.IssueVO;
+import com.seven7m.kanban.dto.workflow.WorkflowColumnVO;
 import com.seven7m.kanban.entity.board.Board;
 import com.seven7m.kanban.entity.board.BoardColumn;
 import com.seven7m.kanban.entity.issuestatus.IssueStatus;
@@ -73,16 +74,24 @@ public class BoardService {
         return boardNameOf(board);
     }
 
-    private List<GroupColumnView> toColumns(List<IssueStatus> statuses, List<IssueVO> issues) {
-        return statuses.stream().map(st -> {
+    private List<GroupColumnView> toColumns(List<WorkflowColumnVO> columns, List<IssueVO> issues) {
+        return columns.stream().map(col -> {
             GroupColumnView gc = new GroupColumnView();
-            gc.setStatusId(st.getId());
-            gc.setName(st.getName());
-            gc.setCategory(st.getCategory());
-            gc.setColor(st.getColor());
-            gc.setSortOrder(st.getSortOrder());
+            gc.setStatusId(col.statusId());
+            gc.setName(col.name());
+            gc.setCategory(col.category());
+            gc.setColor(col.color());
+            gc.setSortOrder(col.sortOrder());
+            if (col.handoffType() != null) gc.setHandoffType(col.handoffType());
+            gc.setHandoffUserId(col.handoffUserId());
+            gc.setHandoffUserName(col.handoffUserName());
+            gc.setHandoffNote(col.handoffNote());
+            gc.setTargetSprintId(col.targetSprintId());
+            gc.setTargetSprintName(col.targetSprintName());
+            gc.setTargetLabelId(col.targetLabelId());
+            gc.setTargetLabelName(col.targetLabelName());
             gc.setIssues(issues.stream()
-                    .filter(i -> i.getStatusId() != null && i.getStatusId().equals(st.getId()))
+                    .filter(i -> i.getStatusId() != null && i.getStatusId().equals(col.statusId()))
                     .sorted(Comparator.comparing(i -> i.getSortKey() == null ? "" : i.getSortKey()))
                     .collect(Collectors.toList()));
             return gc;
@@ -145,7 +154,9 @@ public class BoardService {
 
     public BoardGroupView getBoard(UUID projectId, String groupBy, ItemCategory category) {
         List<IssueVO> issues = selectForBoard(projectId, category);
-        List<IssueStatus> statuses = statusesOf(projectId, category);
+        // 列与交接配置一次取齐：workflow_status 节点 + project_handoff + 相关用户各一次查询，
+        // 不随列数增长
+        List<WorkflowColumnVO> columns = workflowService.columnsOf(projectId, category);
 
         BoardGroupView view = new BoardGroupView();
         view.setName(boardName(projectId));
@@ -156,7 +167,7 @@ public class BoardService {
             all.setGroupKey("ALL");
             all.setGroupName("全部");
             all.setIssueCount(issues.size());
-            all.setColumns(toColumns(statuses, issues));
+            all.setColumns(toColumns(columns, issues));
             view.getGroups().add(all);
             return view;
         }
@@ -168,7 +179,7 @@ public class BoardService {
             item.setGroupKey(e.getKey());
             item.setGroupName(e.getKey());
             item.setIssueCount(e.getValue().size());
-            item.setColumns(toColumns(statuses, e.getValue()));
+            item.setColumns(toColumns(columns, e.getValue()));
             view.getGroups().add(item);
         }
         return view;

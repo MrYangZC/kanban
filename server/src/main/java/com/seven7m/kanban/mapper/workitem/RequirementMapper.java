@@ -25,6 +25,10 @@ public interface RequirementMapper extends BaseMapper<Requirement> {
     @Select("SELECT project_id FROM requirement WHERE id = #{id}")
     UUID selectProjectId(@Param("id") UUID id);
 
+    /** 撤销交接的可用性判定用：返回当前负责人，无负责人/不存在返回 null */
+    @Select("SELECT assignee_id FROM requirement WHERE id = #{id}")
+    UUID selectAssigneeId(@Param("id") UUID id);
+
     @Select("SELECT id FROM requirement WHERE project_id = #{projectId}")
     List<UUID> selectIdsByProject(@Param("projectId") UUID projectId);
 }

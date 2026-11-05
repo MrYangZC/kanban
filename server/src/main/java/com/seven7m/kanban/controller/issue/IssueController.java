@@ -49,6 +49,16 @@ public class IssueController {
         return R.ok(workItemRouter.move(id, req));
     }
 
+    /**
+     * 撤销最近一次交接：负责人退回交接前的人。
+     * 与改负责人同一权限（能改负责人的人才能撤销交接，撤销不比改负责人更危险）。
+     */
+    @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
+    @PostMapping("/{id}/handoff/revoke")
+    public R<IssueVO> revokeHandoff(@PathVariable UUID id) {
+        return R.ok(workItemRouter.revokeHandoff(id));
+    }
+
     @ProjectRoleAnnotation(Permission.ISSUE_DELETE)
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable UUID id) {

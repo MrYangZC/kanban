@@ -1,7 +1,6 @@
 package com.seven7m.kanban.service.issue.link;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.dto.issue.IssueVO;
 import com.seven7m.kanban.dto.issue.LinkVO;
@@ -29,11 +28,9 @@ public class IssueLinkService {
     /** 关联类型枚举（与前端下拉选项一致） */
     private static final Set<String> VALID_RELATION_TYPES = Set.of("关联", "阻塞", "重复", "修复");
 
-    /** 根据工作项 id 判定所属类别（TASK/REQUIREMENT/BUG），不存在抛 404 */
+    /** 类别名（TASK/REQUIREMENT/BUG）；工作项不存在时由 router 统一抛 404 */
     private String categoryOf(UUID issueId) {
-        ItemCategory c = workItemRouter.categoryOf(issueId);
-        if (c == null) throw new ServiceException(404, "工作项不存在");
-        return c.name();
+        return workItemRouter.categoryNameOrThrow(issueId);
     }
 
     public List<LinkVO> list(UUID issueId) {

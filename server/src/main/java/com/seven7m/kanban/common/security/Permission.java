@@ -23,6 +23,7 @@ public final class Permission {
     public static final String ISSUE_STATUS  = "issue:status";
     public static final String ISSUE_ASSIGN  = "issue:assign";
     public static final String ISSUE_EXPORT  = "issue:export";
+    public static final String ISSUE_ARCHIVE = "issue:archive";
 
     // ---- 迭代 ----
     public static final String SPRINT_VIEW   = "sprint:view";
@@ -33,19 +34,23 @@ public final class Permission {
     public static final String MILESTONE_MANAGE = "milestone:manage";
 
     // ---- 看板 ----
+    // 说明：看板列的配置能力尚未落地，原来的 board:manage 从未被任何接口引用，
+    // 已随数据库迁移删除；board:view 现在真正用于看板查询接口。
     public static final String BOARD_VIEW   = "board:view";
-    public static final String BOARD_MANAGE = "board:manage";
 
     // ---- 风险 ----
+    // 说明：风险的增删改统一用 risk:manage（种子数据里 DEV/QA/MEMBER 只持有它），
+    // 更细的 risk:create/edit/delete 从未被接口引用，已随迁移删除。
     public static final String RISK_VIEW   = "risk:view";
     public static final String RISK_MANAGE = "risk:manage";
 
     // ---- 项目设置 ----
     public static final String PROJECT_SETTING  = "project:setting";
     public static final String PROJECT_MEMBER   = "project:member";
-    public static final String PROJECT_ROLE     = "project:role";
     public static final String PROJECT_LABEL    = "project:label";
     public static final String PROJECT_WORKFLOW = "project:workflow";
+    public static final String PROJECT_ARCHIVE  = "project:archive";
+    public static final String PROJECT_DELETE   = "project:delete";
 
     // ---- 公告 ----
     public static final String ANNOUNCEMENT_MANAGE = "announcement:manage";

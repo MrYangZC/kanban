@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -97,6 +98,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public R<Void> handleNotReadable(HttpMessageNotReadableException e) {
         return R.fail(HttpStatus.BAD_REQUEST.value(), "请求体格式错误");
+    }
+
+    /**
+     * 不存在的接口路径：404。
+     * 不加这条时，Spring 6.1 抛出的 NoResourceFoundException 会落到下面的兜底 Exception 分支，
+     * 把「路径写错」报成 HTTP 500「系统异常」——污染监控告警，也让调用方误判为服务故障。
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public R<Void> handleNoResource(NoResourceFoundException e) {
+        return R.fail(HttpStatus.NOT_FOUND.value(), "接口不存在");
     }
 
     /**

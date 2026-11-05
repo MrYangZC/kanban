@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -80,47 +81,58 @@ public class DashboardService {
         vo.getCycleTime().setAvgHours(round2(ct.avgHours));
         vo.getCycleTime().setMaxHours(round2(ct.maxHours));
 
-        // 燃尽图：最近 14 天，remaining = 总创建累计 - 累计完成
-        buildBurndown(vo, projectId, s.total, s.done);
+        // 燃尽图：最近 14 天。剩余 = 累计创建 - 累计完成（同口径、均排除归档）
+        buildBurndown(vo, projectId);
 
         return vo;
     }
 
-    private void buildBurndown(DashboardVO vo, UUID projectId, long totalCount, long totalDone) {
-        List<DashboardMapper.DateCountView> completed = dashboardMapper.dailyCompleted(projectId);
-
-        Map<String, Long> completedByDate = new LinkedHashMap<>();
-        for (DashboardMapper.DateCountView c : completed) {
-            completedByDate.merge(c.date, c.completed, Long::sum);
-        }
-
+    /**
+     * 14 天燃尽图。
+     *
+     * <p>此前用"当前总数"反推历史：14 天窗口内新建的工作项被当成"一开始就存在"，
+     * 曲线左端整体偏低。现在按 created_at / done_at 逐日累计：
+     * 剩余(t) = 窗口前已创建 + 窗口内累计新建 - 窗口前已完成 - 窗口内累计完成。
+     */
+    private void buildBurndown(DashboardVO vo, UUID projectId) {
         LocalDate end = LocalDate.now();
-        LocalDate start = end.minusDays(13);
-        // 注：此前这里有一段计算 cumCreated 的嵌套循环，但其结果从未被读取（燃尽图
-        // 只消费 cumDone），属死代码，且连带一次无用的 dailyCreated 查询，已移除。
-        long cumDone = totalDone - sumRecent(completed, start); // 起点前已完成的基线
+        LocalDate startDate = end.minusDays(13);
+        LocalDateTime windowStart = startDate.atStartOfDay();
+
+        long cumCreated = dashboardMapper.countCreatedBefore(projectId, windowStart);
+        long cumDone = dashboardMapper.countDoneBefore(projectId, windowStart);
+
+        Map<String, Long> createdByDate = createdByDate(dashboardMapper.dailyCreated(projectId, windowStart));
+        Map<String, Long> completedByDate = completedByDate(dashboardMapper.dailyCompleted(projectId, windowStart));
+
         List<DashboardVO.BurndownPoint> points = new ArrayList<>();
         for (int d = 0; d < 14; d++) {
-            LocalDate day = start.plusDays(d);
-            String key = day.toString();
-            long doneToday = completedByDate.getOrDefault(key, 0L);
-            cumDone += doneToday;
-            long remaining = Math.max(0, totalCount - cumDone);
+            String key = startDate.plusDays(d).toString();
+            cumCreated += createdByDate.getOrDefault(key, 0L);
+            cumDone += completedByDate.getOrDefault(key, 0L);
             DashboardVO.BurndownPoint p = new DashboardVO.BurndownPoint();
             p.setDate(key);
-            p.setRemaining(remaining);
+            p.setRemaining(Math.max(0, cumCreated - cumDone));
             p.setCompleted(cumDone);
             points.add(p);
         }
         vo.setBurndown(points);
     }
 
-    private long sumRecent(List<DashboardMapper.DateCountView> completed, LocalDate start) {
-        long sum = 0;
-        for (DashboardMapper.DateCountView c : completed) {
-            if (LocalDate.parse(c.date).isBefore(start)) sum += c.completed;
+    private Map<String, Long> createdByDate(List<DashboardMapper.DateCountView> rows) {
+        Map<String, Long> map = new LinkedHashMap<>();
+        for (DashboardMapper.DateCountView row : rows) {
+            map.merge(row.date, row.created, Long::sum);
         }
-        return sum;
+        return map;
+    }
+
+    private Map<String, Long> completedByDate(List<DashboardMapper.DateCountView> rows) {
+        Map<String, Long> map = new LinkedHashMap<>();
+        for (DashboardMapper.DateCountView row : rows) {
+            map.merge(row.date, row.completed, Long::sum);
+        }
+        return map;
     }
 
     private double round2(double v) {

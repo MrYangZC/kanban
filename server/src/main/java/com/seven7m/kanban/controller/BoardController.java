@@ -1,6 +1,5 @@
 package com.seven7m.kanban.controller;
 
-import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.dto.board.BoardGroupView;
 import com.seven7m.kanban.dto.board.BoardView;
 import com.seven7m.kanban.service.board.BoardService;
@@ -23,7 +22,11 @@ public class BoardController {
 
     private final BoardService boardService;
 
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    /**
+     * 看板视图：用 board:view（此前借用了 issue:view，导致 board:view 定义了却从未生效）。
+     * 种子里所有能看工作项的角色都持有 board:view，因此不会收窄可见范围。
+     */
+    @ProjectRoleAnnotation(Permission.BOARD_VIEW)
     @GetMapping("/{projectId}/board")
     public R<BoardView> getBoard(@PathVariable UUID projectId,
                                 @RequestParam(required = false) String category) {
@@ -31,7 +34,7 @@ public class BoardController {
     }
 
     /** 分组看板：groupBy=STATUS/ASSIGNEE/PRIORITY/SPRINT（缺省 STATUS） */
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @ProjectRoleAnnotation(Permission.BOARD_VIEW)
     @GetMapping("/{projectId}/board/grouped")
     public R<BoardGroupView> getBoardGrouped(@PathVariable UUID projectId,
                                              @RequestParam(required = false) String groupBy,

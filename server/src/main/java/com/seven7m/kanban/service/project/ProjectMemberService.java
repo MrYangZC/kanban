@@ -2,6 +2,7 @@ package com.seven7m.kanban.service.project;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.exception.ServiceException;
+import com.seven7m.kanban.common.security.MemberRolePort;
 import com.seven7m.kanban.common.security.PermissionService;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.entity.project.ProjectRole;
@@ -32,9 +33,12 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
-public class ProjectMemberService {
+public class ProjectMemberService implements MemberRolePort {
 
     private final ProjectMemberMapper projectMemberMapper;
     @Autowired
@@ -156,6 +160,8 @@ public class ProjectMemberService {
         grantRoles(projectId, req.getUserId(), req.getRoles());
         evictRoleCache(projectId, req.getUserId());
         permissionService.evictUserPermissions(req.getUserId(), projectId);
+        log.info("project.member.add projectId={} member={} roles={} operator={}",
+                projectId, req.getUserId(), req.getRoles(), UserContext.getUserId());
         return toVO(m);
     }
 
@@ -178,6 +184,8 @@ public class ProjectMemberService {
                 .eq(UserRole::getUserId, userId));
         evictRoleCache(projectId, userId);
         permissionService.evictUserPermissions(userId, projectId);
+        log.info("project.member.remove projectId={} member={} operator={}",
+                projectId, userId, UserContext.getUserId());
     }
 
     @Transactional
@@ -201,6 +209,8 @@ public class ProjectMemberService {
         grantRoles(projectId, userId, roles);
         evictRoleCache(projectId, userId);
         permissionService.evictUserPermissions(userId, projectId);
+        log.info("project.member.roles projectId={} member={} from={} to={} operator={}",
+                projectId, userId, oldRoles, roles, UserContext.getUserId());
         return toVO(m);
     }
 
@@ -239,6 +249,12 @@ public class ProjectMemberService {
             return Set.of();
         }
         return new LinkedHashSet<>(userRoleMapper.selectRoleIdsByProjectAndUser(projectId, userId));
+    }
+
+    /** {@link MemberRolePort} 实现：给公共安全层用，避免它直接依赖业务 Service */
+    @Override
+    public Set<UUID> roleIdsOf(UUID projectId, UUID userId) {
+        return getRoleIds(projectId, userId);
     }
 
     /**

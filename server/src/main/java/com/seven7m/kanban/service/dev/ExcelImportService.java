@@ -32,7 +32,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.FileInputStream;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -48,6 +47,8 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
+// 仅 dev profile 注册：否则生产环境会白白加载 POI 依赖与这个只服务于一次性数据导入的 Bean
+@org.springframework.context.annotation.Profile("dev")
 public class ExcelImportService {
 
     /** 汇总统计 sheet（非任务列表），需跳过 */

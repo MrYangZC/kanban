@@ -96,8 +96,11 @@ public class ProjectController {
 
     /**
      * 归档项目（仅 OWNER/ADMIN 可操作）。
+     * 权限码用 project:archive（种子数据里只有 OWNER/ADMIN 持有），
+     * 与"改项目基本信息"的 project:setting 区分开。
      */
     @PutMapping("/{id}/archive")
+    @ProjectRoleAnnotation(Permission.PROJECT_ARCHIVE)
     public R<Void> archive(@PathVariable UUID id) {
         projectService.archive(id, UserContext.getUserId());
         return R.ok();
@@ -107,6 +110,7 @@ public class ProjectController {
      * 取消归档项目（仅 OWNER/ADMIN 可操作）。
      */
     @PutMapping("/{id}/unarchive")
+    @ProjectRoleAnnotation(Permission.PROJECT_ARCHIVE)
     public R<Void> unarchive(@PathVariable UUID id) {
         projectService.unarchive(id, UserContext.getUserId());
         return R.ok();
@@ -116,7 +120,7 @@ public class ProjectController {
      * 删除项目（仅 OWNER/ADMIN 可操作）。
      */
     @DeleteMapping("/{id}")
-    @ProjectRoleAnnotation(Permission.PROJECT_SETTING)
+    @ProjectRoleAnnotation(Permission.PROJECT_DELETE)
     public R<Void> delete(@PathVariable UUID id) {
         projectService.delete(id, UserContext.getUserId());
         return R.ok();

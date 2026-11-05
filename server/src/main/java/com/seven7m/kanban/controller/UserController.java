@@ -5,6 +5,8 @@ import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.RequireAdmin;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.common.security.UserContextInterceptor;
+import com.seven7m.kanban.common.security.UserSessionRegistry;
+import com.seven7m.kanban.dto.project.MemberCandidateVO;
 import com.seven7m.kanban.dto.user.ChangePasswordRequest;
 import com.seven7m.kanban.dto.user.CreateUserRequest;
 import com.seven7m.kanban.dto.user.LoginRequest;
@@ -28,6 +30,8 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    /** 会话登记表：登录时登记，登出/被踢时移除，供"禁用即下线"使用 */
+    private final UserSessionRegistry sessionRegistry;
 
     @PostMapping("/login")
     public R<LoginVO> login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
@@ -38,6 +42,8 @@ public class UserController {
         request.changeSessionId();
         session.setAttribute(UserContextInterceptor.SESSION_UID, vo.getId());
         session.setAttribute(UserContextInterceptor.SESSION_UNAME, vo.getUsername());
+        // 登记会话，便于账号被禁用/删除后立即踢下线
+        sessionRegistry.register(session, vo.getId());
         return R.ok(vo);
     }
 
@@ -49,12 +55,13 @@ public class UserController {
     public R<Void> logout(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session != null) {
+            sessionRegistry.unregister(session.getId());
             session.invalidate();
         }
         return R.ok();
     }
 
-    /** 用户管理列表（含 username/email/enabled）：分页 + 关键字检索 */
+    /** 用户管理列表（含 username/email/enabled/isAdmin）：分页 + 关键字检索 */
     @RequireAdmin
     @GetMapping
     public R<PageResult<UserVO>> list(@RequestParam(defaultValue = "1") int page,
@@ -63,11 +70,16 @@ public class UserController {
         return R.ok(userService.pageForAdmin(page, size, keyword));
     }
 
-    /** 全量用户简表：仅供「添加项目成员」等人员下拉使用 */
-    @RequireAdmin
+    /**
+     * 人员下拉（负责人/验证人/按人筛选），返回 id/账号/显示名/头像，不含 email。
+     *
+     * <p>此接口**不能**加 @RequireAdmin：项目成员在详情抽屉里改负责人时会用到它，
+     * 加管理员限制会让普通成员每次打开详情都吃到 403 且选不到人（本次修复的 P1 问题）。
+     * 用户管理列表继续由 {@link #list} 承担，那个才需要管理员。
+     */
     @GetMapping("/options")
-    public R<List<UserVO>> options() {
-        return R.ok(userService.list());
+    public R<List<MemberCandidateVO>> options() {
+        return R.ok(userService.listOptions());
     }
 
     @RequireAdmin
@@ -103,8 +115,10 @@ public class UserController {
 
     /** 当前用户修改密码 */
     @PutMapping("/me/password")
-    public R<Void> changePassword(@Valid @RequestBody ChangePasswordRequest req) {
-        userService.changePassword(UserContext.getUserId(), req);
+    public R<Void> changePassword(@Valid @RequestBody ChangePasswordRequest req, HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        userService.changePassword(UserContext.getUserId(), req,
+                session == null ? null : session.getId());
         return R.ok();
     }
 }

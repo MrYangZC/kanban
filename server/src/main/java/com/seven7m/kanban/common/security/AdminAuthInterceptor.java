@@ -5,6 +5,7 @@ import com.seven7m.kanban.mapper.user.SysUserMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -16,6 +17,7 @@ import java.util.UUID;
  * 判定：sys_user.is_admin = true（系统级管理员标识，与项目级角色无关）。
  * 依赖 UserContextInterceptor 先行填充操作人。
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AdminAuthInterceptor implements HandlerInterceptor {
@@ -41,6 +43,9 @@ public class AdminAuthInterceptor implements HandlerInterceptor {
         }
         SysUser user = userMapper.selectById(userId);
         if (user == null || !Boolean.TRUE.equals(user.getIsAdmin())) {
+            // 审计线索：非管理员访问后台接口需要留痕
+            log.warn("管理员权限校验失败 userId={} {} {}", userId,
+                    request.getMethod(), request.getRequestURI());
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("application/json;charset=UTF-8");
             try {

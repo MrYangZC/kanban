@@ -18,4 +18,9 @@ public class IssueActivityVO {
     private String oldValue;
     private String newValue;
     private LocalDateTime createdAt;
+    /**
+     * 仅交接动态会出现：这条交接当前是否可以撤销。
+     * 判定口径在后端（最后一条交接 + 接手人仍是当前负责人），前端只按标记显示按钮。
+     */
+    private Boolean revocable;
 }

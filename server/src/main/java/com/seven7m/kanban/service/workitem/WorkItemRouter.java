@@ -1,6 +1,9 @@
 package com.seven7m.kanban.service.workitem;
 
 import com.seven7m.kanban.common.domain.PageResult;
+import com.seven7m.kanban.common.enums.ItemCategory;
+import com.seven7m.kanban.common.exception.ServiceException;
+import com.seven7m.kanban.common.security.IssueLocationPort;
 import com.seven7m.kanban.dto.issue.CreateIssueRequest;
 import com.seven7m.kanban.dto.issue.IssueFilterRequest;
 import com.seven7m.kanban.dto.issue.IssueVO;
@@ -31,7 +34,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class WorkItemRouter {
+public class WorkItemRouter implements IssueLocationPort {
 
     private final TaskService taskService;
     private final RequirementService requirementService;
@@ -85,6 +88,11 @@ public class WorkItemRouter {
         return locate(id).move(id, req);
     }
 
+    /** 撤销最近一次工作流交接（负责人退回交接前的人） */
+    public IssueVO revokeHandoff(UUID id) {
+        return locate(id).revokeHandoff(id);
+    }
+
     public void delete(UUID id) {
         locate(id).delete(id);
     }
@@ -110,12 +118,46 @@ public class WorkItemRouter {
         return null;
     }
 
+    /** {@link IssueLocationPort} 实现：供公共安全层的权限解析使用 */
+    @Override
+    public UUID projectIdOf(UUID issueId) {
+        return getProjectId(issueId);
+    }
+
     /** 返回某工作项所属类别（TASK/REQUIREMENT/BUG），不存在返回 null */
-    public com.seven7m.kanban.common.enums.ItemCategory categoryOf(UUID id) {
-        if (taskMapper.selectById(id) != null) return com.seven7m.kanban.common.enums.ItemCategory.TASK;
-        if (requirementMapper.selectById(id) != null) return com.seven7m.kanban.common.enums.ItemCategory.REQUIREMENT;
-        if (bugMapper.selectById(id) != null) return com.seven7m.kanban.common.enums.ItemCategory.BUG;
+    public ItemCategory categoryOf(UUID id) {
+        if (taskMapper.selectById(id) != null) return ItemCategory.TASK;
+        if (requirementMapper.selectById(id) != null) return ItemCategory.REQUIREMENT;
+        if (bugMapper.selectById(id) != null) return ItemCategory.BUG;
         return null;
+    }
+
+    /**
+     * 工作项类别名（TASK/REQUIREMENT/BUG），不存在抛 404。
+     *
+     * <p>评论、附件、关联、标签四个子域此前各写一份完全相同的 {@code categoryOf} 私有方法，
+     * 且各自的错误文案还不一致；统一收口到这里，子域只表达"我需要类别名"。
+     */
+    public String categoryNameOrThrow(UUID issueId) {
+        ItemCategory category = categoryOf(issueId);
+        if (category == null) {
+            throw new ServiceException(404, "工作项不存在");
+        }
+        return category.name();
+    }
+
+    /**
+     * 当前负责人 id，供「撤销交接是否可用」判定。
+     * 先定位类别再查单列，避免 X 表有该行但负责人为空时串到下一张表去取值。
+     */
+    public UUID assigneeIdOf(UUID id) {
+        com.seven7m.kanban.common.enums.ItemCategory c = categoryOf(id);
+        if (c == null) return null;
+        return switch (c) {
+            case TASK -> taskMapper.selectAssigneeId(id);
+            case REQUIREMENT -> requirementMapper.selectAssigneeId(id);
+            case BUG -> bugMapper.selectAssigneeId(id);
+        };
     }
 
     /** 统计项目下工作项总数（含已归档），供删除项目前拦截 */
@@ -261,36 +303,9 @@ public class WorkItemRouter {
         return c;
     }
 
-    /** 内存排序规则需与 BaseWorkItemService#applySort 的 SQL 排序保持一致 */
+    /** 内存排序与单表 SQL 排序共用 {@link WorkItemSort}，不再各维护一份规则 */
     private Comparator<IssueVO> comparatorFor(String sortField) {
-        if (sortField == null || sortField.isBlank()) {
-            return Comparator.comparing(IssueVO::getStatusId, Comparator.nullsLast(Comparator.naturalOrder()))
-                    .thenComparing(IssueVO::getSortKey, Comparator.nullsLast(Comparator.naturalOrder()));
-        }
-        return switch (sortField) {
-            case "issueKey" -> Comparator.comparing(IssueVO::getIssueNumber,
-                    Comparator.nullsLast(WorkItemRouter::compareIssueNumber));
-            case "updatedAt" -> Comparator.comparing(IssueVO::getUpdatedAt,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            case "createdAt" -> Comparator.comparing(IssueVO::getCreatedAt,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            case "priority" -> Comparator.comparing(IssueVO::getPriority,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            case "severity" -> Comparator.comparing(IssueVO::getSeverity,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            case "statusId" -> Comparator.comparing(IssueVO::getStatusId,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            case "sortKey" -> Comparator.comparing(IssueVO::getSortKey,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            default -> Comparator.comparing(IssueVO::getStatusId, Comparator.nullsLast(Comparator.naturalOrder()))
-                    .thenComparing(IssueVO::getSortKey, Comparator.nullsLast(Comparator.naturalOrder()));
-        };
-    }
-
-    /** issue_number 为数字串：按长度+字典序比较，与 SQL 的 LENGTH(issue_number), issue_number 排序一致 */
-    private static int compareIssueNumber(String a, String b) {
-        if (a == null || b == null) return 0;
-        return a.length() != b.length() ? Integer.compare(a.length(), b.length()) : a.compareTo(b);
+        return WorkItemSort.comparator(sortField);
     }
 
     /** 单表场景由前端直接传页码；多表合并时每张表最多取这么多条候选 */

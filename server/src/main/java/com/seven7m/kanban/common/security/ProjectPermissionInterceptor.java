@@ -1,9 +1,6 @@
 package com.seven7m.kanban.common.security;
 
-import com.seven7m.kanban.common.domain.R;
-import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
-import com.seven7m.kanban.common.security.RequireAdmin;
 import com.seven7m.kanban.common.util.Uuids;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -71,6 +68,10 @@ public class ProjectPermissionInterceptor implements HandlerInterceptor {
         boolean ok = java.util.Arrays.stream(required)
                 .allMatch(p -> permissionService.hasPermission(userId, resolvedProjectId, p));
         if (!ok) {
+            // 审计线索：线上"某人越权访问"必须能查到，而不是只有一句 403
+            log.warn("权限不足 userId={} projectId={} 需要={} {} {}",
+                    userId, resolvedProjectId, java.util.Arrays.toString(required),
+                    request.getMethod(), request.getRequestURI());
             writeError(response, HttpServletResponse.SC_FORBIDDEN, "无权限执行该操作");
             return false;
         }

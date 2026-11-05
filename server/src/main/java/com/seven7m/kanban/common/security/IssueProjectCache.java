@@ -1,6 +1,5 @@
 package com.seven7m.kanban.common.security;
 
-import com.seven7m.kanban.service.workitem.WorkItemRouter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -27,7 +26,8 @@ public class IssueProjectCache {
 
     private static final Map<UUID, Entry> CACHE = new ConcurrentHashMap<>();
 
-    private final WorkItemRouter workItemRouter;
+    /** 只依赖端口，不直接依赖 service.workitem（公共层不反向引用业务层） */
+    private final IssueLocationPort issueLocationPort;
 
     private record Entry(UUID projectId, long expireAt) {
         boolean alive() {
@@ -40,7 +40,7 @@ public class IssueProjectCache {
         if (entry != null && entry.alive()) {
             return entry.projectId();
         }
-        UUID projectId = workItemRouter.getProjectId(issueId);
+        UUID projectId = issueLocationPort.projectIdOf(issueId);
         if (CACHE.size() >= MAX_SIZE) {
             CACHE.clear();
         }

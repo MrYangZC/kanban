@@ -115,4 +115,69 @@ public final class SortKeyUtils {
         // b[i] 已是最小字符，a 与 b 相邻，无中间值可取
         return after(a);
     }
+
+    // ======================== 列内重平衡 ========================
+
+    /**
+     * 为 count 条记录选择重排后的键宽（等宽，保证字典序 == 数值序）。
+     *
+     * <p>为什么需要重平衡：{@link #after} 是"在原键后追加一个字符"，反复拖到列尾会让键
+     * 每次长 1 个字符——既能撑破 varchar(255)，也会在列首反复插入时把 a、b 挤成相邻键，
+     * 此时 {@link #between} 只能退化，出现"拖到 A 左边却落到 A 右边"的错序。
+     * 定期把整列改写成等宽键即可恢复大量可用间隔。
+     */
+    public static int widthForCount(int count) {
+        int width = 1;
+        long capacity = capacityOf(width);
+        while (count > capacity) {
+            width++;
+            capacity = capacityOf(width);
+        }
+        return width;
+    }
+
+    /** 宽度为 width 时可容纳的键数量：首字符从 '1' 开始，为"插到最前"预留 '0' 前缀 */
+    private static long capacityOf(int width) {
+        long total = pow(BASE, width);
+        return total - pow(BASE, width - 1);
+    }
+
+    private static long pow(int base, int exp) {
+        long result = 1;
+        for (int i = 0; i < exp; i++) {
+            result *= base;
+        }
+        return result;
+    }
+
+    /** 第 index 个等宽键（0 起）；同一 width 下字典序严格递增 */
+    public static String keyForIndex(int index, int width) {
+        if (index < 0) {
+            throw new IllegalArgumentException("index must be >= 0");
+        }
+        if (width < 1) {
+            throw new IllegalArgumentException("width must be >= 1");
+        }
+        // 偏移一个"首位"的量级，使所有键的首字符 >= '1'，从而 before(first) 仍有空间
+        long value = pow(BASE, width - 1) + index;
+        char[] buf = new char[width];
+        for (int i = width - 1; i >= 0; i--) {
+            buf[i] = CHARS.charAt((int) (value % BASE));
+            value /= BASE;
+        }
+        if (value > 0) {
+            throw new IllegalArgumentException("index out of range for width " + width);
+        }
+        return new String(buf);
+    }
+
+    /** 重排整列用的等宽键序列（count 个，字典序递增） */
+    public static java.util.List<String> rebalancedKeys(int count) {
+        int width = widthForCount(count);
+        java.util.List<String> keys = new java.util.ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            keys.add(keyForIndex(i, width));
+        }
+        return keys;
+    }
 }

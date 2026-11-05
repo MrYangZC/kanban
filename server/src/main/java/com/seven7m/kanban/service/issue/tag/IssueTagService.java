@@ -1,9 +1,7 @@
 package com.seven7m.kanban.service.issue.tag;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.common.exception.ServiceException;
-import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.dto.issue.LabelVO;
 import com.seven7m.kanban.entity.issue.tag.IssueTag;
 import com.seven7m.kanban.entity.issue.tag.ProjectLabel;
@@ -27,11 +25,9 @@ public class IssueTagService {
     private final ProjectLabelMapper projectLabelMapper;
     private final WorkItemRouter workItemRouter;
 
-    /** 根据工作项 id 判定所属类别（TASK/REQUIREMENT/BUG），不存在抛 404 */
+    /** 类别名（TASK/REQUIREMENT/BUG）；工作项不存在时由 router 统一抛 404 */
     private String categoryOf(UUID issueId) {
-        ItemCategory c = workItemRouter.categoryOf(issueId);
-        if (c == null) throw new ServiceException(404, "工作项不存在");
-        return c.name();
+        return workItemRouter.categoryNameOrThrow(issueId);
     }
 
     /** 项目下所有标签（用于给 issue 打标时选择） */
@@ -59,13 +55,26 @@ public class IssueTagService {
     @Transactional
     public void addToIssue(UUID projectId, UUID issueId, String name, String color) {
         String category = categoryOf(issueId);
+        // 请求体里的 projectId 不能直接信：它决定往哪个项目的标签库写选用关系。
+        // 之前不校验会让 A 项目的成员把标签塞进 B 项目（跨项目污染），这里强制工作项属于该项目。
+        UUID actualProjectId = workItemRouter.getProjectId(issueId);
+        if (projectId == null || !projectId.equals(actualProjectId)) {
+            throw new ServiceException(400, "工作项不属于该项目");
+        }
+        String labelName = name == null ? "" : name.trim();
+        if (labelName.isEmpty()) {
+            throw new ServiceException(400, "标签名称不能为空");
+        }
+        if (labelName.length() > 50) {
+            throw new ServiceException(400, "标签名称不能超过 50 个字符");
+        }
         // 标签全局化：按 name 查全局标签库，不存在则创建
         IssueTag tag = tagMapper.selectOne(Wrappers.<IssueTag>lambdaQuery()
-                .eq(IssueTag::getName, name));
+                .eq(IssueTag::getName, labelName));
         if (tag == null) {
             tag = new IssueTag();
             tag.setId(UUID.randomUUID());
-            tag.setName(name);
+            tag.setName(labelName);
             tag.setColor(color == null ? "#1677FF" : color);
             tag.setCreatedAt(LocalDateTime.now());
             tagMapper.insert(tag);

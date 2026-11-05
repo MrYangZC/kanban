@@ -23,6 +23,9 @@ public class UpdateUserRequest {
 
     private Boolean enabled;
 
+    /** 是否系统管理员；为 null 表示不修改。内置种子管理员不允许取消 */
+    private Boolean isAdmin;
+
     /** 仅填写时修改密码（bcrypt 加密） */
     private String password;
 }

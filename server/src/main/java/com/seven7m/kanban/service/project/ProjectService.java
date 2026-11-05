@@ -4,8 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
+import com.seven7m.kanban.common.security.Permission;
+import com.seven7m.kanban.common.security.PermissionService;
 import com.seven7m.kanban.common.security.UserContext;
-import com.seven7m.kanban.common.util.LikeEscaper;
 import com.seven7m.kanban.entity.project.ProjectCategoryKey;
 import com.seven7m.kanban.entity.project.ProjectRole;
 import com.seven7m.kanban.entity.project.ProjectStatus;
@@ -17,19 +18,23 @@ import com.seven7m.kanban.dto.project.ProjectVO;
 import com.seven7m.kanban.dto.project.UpdateProjectRequest;
 import com.seven7m.kanban.entity.announcement.Announcement;
 import com.seven7m.kanban.entity.board.Board;
+import com.seven7m.kanban.entity.handoff.ProjectHandoff;
 import com.seven7m.kanban.entity.milestone.Milestone;
 import com.seven7m.kanban.entity.project.Project;
 import com.seven7m.kanban.entity.project.ProjectFavorite;
 import com.seven7m.kanban.entity.project.ProjectMember;
 import com.seven7m.kanban.mapper.announcement.AnnouncementMapper;
 import com.seven7m.kanban.mapper.board.BoardMapper;
+import com.seven7m.kanban.mapper.handoff.ProjectHandoffMapper;
 import com.seven7m.kanban.mapper.milestone.MilestoneMapper;
 import com.seven7m.kanban.mapper.project.ProjectFavoriteMapper;
 import com.seven7m.kanban.mapper.project.ProjectMapper;
 import com.seven7m.kanban.mapper.project.ProjectMemberMapper;
 import com.seven7m.kanban.service.workitem.WorkItemRouter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +46,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProjectService {
@@ -54,6 +62,18 @@ public class ProjectService {
     private final BoardMapper boardMapper;
     private final AnnouncementMapper announcementMapper;
     private final MilestoneMapper milestoneMapper;
+    private final ProjectHandoffMapper projectHandoffMapper;
+
+    /**
+     * 超级管理员判定统一入口。
+     * 此前本类自己实现了一套「只认种子 UUID」的判定，而 PermissionService / AdminAuthInterceptor
+     * 还认 sys_user.is_admin=true，导致被标记为管理员的账号「权限码全亮、打不开项目」（403）。
+     * 这里改为完全委托，保证列表可见性、成员豁免、权限码三处口径一致。
+     * 循环依赖：PermissionService -> ProjectMemberService -> ProjectService，故用 @Lazy 打破。
+     */
+    @Lazy
+    @Autowired
+    private PermissionService permissionService;
 
     @Transactional
     public ProjectVO create(CreateProjectRequest req) {
@@ -125,66 +145,14 @@ public class ProjectService {
     }
 
     /**
-     * 按分类查询当前用户的项目列表。
-     * - ALL/PARTICIPATED：项目成员且 status=ACTIVE
-     * - MANAGED：角色含 OWNER/ADMIN/PM 且 status=ACTIVE
-     * - FAVORITED：project_favorite 含当前用户且 status=ACTIVE
-     * - ARCHIVED：项目成员且 status=ARCHIVED
-     * 查询后填充 favorited 与 canEdit 字段。
+     * 按分类查询当前用户的项目列表（非分页）。
+     * 可见性规则见 {@link ProjectQueryScope#visibleQuery}，与分页查询共用同一套条件。
      */
     public List<ProjectVO> listAll(ProjectCategoryKey category) {
-        if (category == null) {
-            category = ProjectCategoryKey.ALL;
-        }
         UUID currentUser = UserContext.getUserId();
-        String statusFilter = ProjectCategoryKey.ARCHIVED == category
-                ? ProjectStatus.ARCHIVED.name()
-                : ProjectStatus.ACTIVE.name();
-
-        var query = Wrappers.<Project>lambdaQuery()
-                .eq(Project::getStatus, statusFilter)
+        var query = ProjectQueryScope.visibleQuery(category, currentUser, isSuperAdmin(currentUser))
                 .orderByDesc(Project::getCreatedAt);
-
-        // 超管不是任何项目的成员，若仍按成员过滤会永远看到空列表；对其展示全部项目
-        boolean superAdmin = isSuperAdmin(currentUser);
-        switch (category) {
-            case MANAGED -> {
-                if (!superAdmin) {
-                    query.apply("id IN (SELECT ur.project_id FROM user_role ur " +
-                            "JOIN role r ON r.id = ur.role_id " +
-                            "WHERE ur.user_id = {0} " +
-                            "AND r.code IN ({1},{2},{3}))",
-                            currentUser, ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.PM);
-                }
-            }
-            case FAVORITED -> query.apply("id IN (SELECT project_id FROM project_favorite WHERE user_id = {0})", currentUser);
-            default -> {
-                if (!superAdmin) {
-                    query.apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser);
-                }
-            }
-        }
-
-        List<Project> projects = projectMapper.selectList(query);
-        if (projects.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<UUID> projectIds = projects.stream().map(Project::getId).collect(Collectors.toList());
-        List<ProjectStats> stats = projectMapper.selectStatsByProjectIds(projectIds);
-        Map<UUID, ProjectStats> statsMap = stats.stream()
-                .collect(Collectors.toMap(ProjectStats::getProjectId, s -> s));
-
-        Set<UUID> favoritedIds = listFavoritedProjectIds(currentUser, projectIds);
-
-        return projects.stream().map(p -> {
-            ProjectVO vo = toVO(p);
-            vo.setStats(statsMap.getOrDefault(p.getId(), new ProjectStats()));
-            vo.setFavorited(favoritedIds.contains(p.getId()));
-            vo.setCanEdit(canManage(p.getId(), currentUser));
-            vo.setCanManage(canManage(p.getId(), currentUser));
-            return vo;
-        }).collect(Collectors.toList());
+        return assembleBatch(projectMapper.selectList(query), currentUser);
     }
 
     /**
@@ -194,39 +162,9 @@ public class ProjectService {
     public PageResult<ProjectVO> listByFilter(ProjectFilterRequest req) {
         ProjectCategoryKey category = ProjectCategoryKey.of(req.getCategory());
         UUID currentUser = UserContext.getUserId();
-        String statusFilter = ProjectCategoryKey.ARCHIVED == category
-                ? ProjectStatus.ARCHIVED.name()
-                : ProjectStatus.ACTIVE.name();
 
-        var query = Wrappers.<Project>lambdaQuery()
-                .eq(Project::getStatus, statusFilter);
-
-        // 同 listAll：超管看全部项目
-        boolean superAdmin = isSuperAdmin(currentUser);
-        switch (category) {
-            case MANAGED -> {
-                if (!superAdmin) {
-                    query.apply("id IN (SELECT ur.project_id FROM user_role ur " +
-                            "JOIN role r ON r.id = ur.role_id " +
-                            "WHERE ur.user_id = {0} " +
-                            "AND r.code IN ({1},{2},{3}))",
-                            currentUser, ProjectRole.OWNER, ProjectRole.ADMIN, ProjectRole.PM);
-                }
-            }
-            case FAVORITED -> query.apply("id IN (SELECT project_id FROM project_favorite WHERE user_id = {0})", currentUser);
-            default -> {
-                if (!superAdmin) {
-                    query.apply("id IN (SELECT project_id FROM project_member WHERE user_id = {0})", currentUser);
-                }
-            }
-        }
-
-        if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
-            // 必须转义 LIKE 通配符，否则 keyword=_ 或 % 会命中全部项目
-            String pattern = LikeEscaper.contains(req.getKeyword());
-            query.and(w -> w.apply("(name LIKE {0} ESCAPE '\\' OR project_key LIKE {1} ESCAPE '\\')",
-                    pattern, pattern));
-        }
+        var query = ProjectQueryScope.visibleQuery(category, currentUser, isSuperAdmin(currentUser));
+        ProjectQueryScope.applyKeyword(query, req.getKeyword());
 
         int page = req.getPage() == null || req.getPage() < 1 ? 1 : req.getPage();
         int size = req.getSize() == null || req.getSize() < 1 ? 10 : Math.min(req.getSize(), 100);
@@ -237,26 +175,29 @@ public class ProjectService {
         query.last("LIMIT " + size + " OFFSET " + ((long) (page - 1) * size));
 
         List<Project> projects = projectMapper.selectList(query);
-        if (projects.isEmpty()) {
-            return new PageResult<>(total, page, size, Collections.emptyList());
-        }
+        return new PageResult<>(total, page, size, assembleBatch(projects, currentUser));
+    }
 
-        List<UUID> projectIds = projects.stream().map(Project::getId).collect(Collectors.toList());
-        List<ProjectStats> stats = projectMapper.selectStatsByProjectIds(projectIds);
-        Map<UUID, ProjectStats> statsMap = stats.stream()
+    /**
+     * 批量装配项目 VO：一次查统计与收藏，再逐项按权限码填充能力标记。
+     * 列表（分页/非分页）共用；单项目 {@link #get(UUID)} 走自己的轻量路径。
+     */
+    private List<ProjectVO> assembleBatch(List<Project> projects, UUID currentUser) {
+        if (projects == null || projects.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<UUID> projectIds = projects.stream().map(Project::getId).toList();
+        Map<UUID, ProjectStats> statsMap = projectMapper.selectStatsByProjectIds(projectIds).stream()
                 .collect(Collectors.toMap(ProjectStats::getProjectId, s -> s));
         Set<UUID> favoritedIds = listFavoritedProjectIds(currentUser, projectIds);
 
-        List<ProjectVO> voList = projects.stream().map(p -> {
+        return projects.stream().map(p -> {
             ProjectVO vo = toVO(p);
             vo.setStats(statsMap.getOrDefault(p.getId(), new ProjectStats()));
             vo.setFavorited(favoritedIds.contains(p.getId()));
-            vo.setCanEdit(canManage(p.getId(), currentUser));
-            vo.setCanManage(canManage(p.getId(), currentUser));
+            applyCapabilities(vo, p.getId(), currentUser);
             return vo;
         }).collect(Collectors.toList());
-
-        return new PageResult<>(total, page, size, voList);
     }
 
     /** 排序字段白名单，防止 SQL 注入 */
@@ -334,9 +275,24 @@ public class ProjectService {
         vo.setFavorited(projectFavoriteMapper.selectCount(Wrappers.<ProjectFavorite>lambdaQuery()
                 .eq(ProjectFavorite::getProjectId, id)
                 .eq(ProjectFavorite::getUserId, currentUser)) > 0);
-        vo.setCanEdit(canManage(id, currentUser));
-        vo.setCanManage(canManage(id, currentUser));
+        applyCapabilities(vo, id, currentUser);
         return vo;
+    }
+
+    /**
+     * 按权限码填充"当前用户能对项目做什么"，作为前端按钮显隐的唯一来源。
+     *
+     * <p>此前这里用角色硬编码（canManage 同时充当 canEdit），导致两处问题：
+     * ①PM 的"删除项目"按钮可点，但后端要求 project:delete（仅 OWNER/ADMIN），点下去必然 403；
+     * ②同一项目每行要算两次角色，一页 10 条就是 20 次查询。
+     * 现在一次取权限码集合（带缓存），四个能力全部由它派生，与接口注解完全同源。
+     */
+    private void applyCapabilities(ProjectVO vo, UUID projectId, UUID userId) {
+        Set<String> permissions = permissionService.getPermissions(userId, projectId);
+        vo.setCanEdit(permissions.contains(Permission.PROJECT_SETTING));
+        vo.setCanManage(permissions.contains(Permission.PROJECT_MEMBER));
+        vo.setCanArchive(permissions.contains(Permission.PROJECT_ARCHIVE));
+        vo.setCanDelete(permissions.contains(Permission.PROJECT_DELETE));
     }
 
     /**
@@ -355,6 +311,7 @@ public class ProjectService {
         p.setUpdatedAt(LocalDateTime.now());
         projectMapper.updateById(p);
         projectMemberService.evictRoleCache(projectId, null);
+        log.info("project.archive projectId={} operator={}", projectId, userId);
     }
 
     /**
@@ -373,6 +330,7 @@ public class ProjectService {
         p.setUpdatedAt(LocalDateTime.now());
         projectMapper.updateById(p);
         projectMemberService.evictRoleCache(projectId, null);
+        log.info("project.unarchive projectId={} operator={}", projectId, userId);
     }
 
     public boolean existsByKey(String projectKey) {
@@ -410,9 +368,15 @@ public class ProjectService {
         workItemRouter.deleteByProject(projectId);
         boardMapper.delete(Wrappers.<Board>lambdaQuery()
                 .eq(Board::getProjectId, projectId));
+        // 交接配置是「项目 × 类别 × 状态」的附属数据且无外键，项目删除后必须手动清理，
+        // 否则会留下指向已删项目的孤儿配置（通知是用户级历史，刻意保留）
+        projectHandoffMapper.delete(Wrappers.<ProjectHandoff>lambdaQuery()
+                .eq(ProjectHandoff::getProjectId, projectId));
         projectMapper.deleteById(projectId);
 
         projectMemberService.evictRoleCache(projectId, null);
+        // 删除是不可逆操作，必须留下"谁删了哪个项目"的审计线索
+        log.info("project.delete projectId={} projectKey={} operator={}", projectId, p.getProjectKey(), userId);
     }
 
     /** 是否真正登记在项目成员名册中（不做超管豁免） */
@@ -434,9 +398,13 @@ public class ProjectService {
         return hasMemberRecord(projectId, userId);
     }
 
-    /** 内置超管：对全部项目拥有隐式成员身份与管理权 */
-    private static boolean isSuperAdmin(UUID userId) {
-        return userId != null && userId.equals(UserContext.DEFAULT_ADMIN_ID);
+    /**
+     * 内置超管：对全部项目拥有隐式成员身份与管理权。
+     * 判定统一委托给 {@link PermissionService#isSuperAdmin}（种子 UUID 或 sys_user.is_admin），
+     * 不要再在这里写第二套规则——两套口径必然漂移。
+     */
+    private boolean isSuperAdmin(UUID userId) {
+        return userId != null && permissionService.isSuperAdmin(userId);
     }
 
     public boolean isOwner(UUID projectId, UUID userId) {

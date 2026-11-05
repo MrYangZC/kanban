@@ -4,8 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
+import com.seven7m.kanban.common.security.PermissionService;
 import com.seven7m.kanban.common.security.UserContext;
+import com.seven7m.kanban.common.security.UserSessionRegistry;
 import com.seven7m.kanban.common.util.LikeEscaper;
+import com.seven7m.kanban.dto.project.MemberCandidateVO;
 import com.seven7m.kanban.dto.user.ChangePasswordRequest;
 import com.seven7m.kanban.dto.user.CreateUserRequest;
 import com.seven7m.kanban.dto.user.LoginRequest;
@@ -52,6 +55,10 @@ public class UserService {
     private final UserRoleMapper userRoleMapper;
     private final IssueCommentMapper commentMapper;
     private final IssueActivityMapper activityMapper;
+    /** 账号被禁用/删除/改密后立即踢掉旧会话，避免"禁用不生效" */
+    private final UserSessionRegistry sessionRegistry;
+    /** is_admin 变更后需要失效权限缓存（superAdminFlag / projectPermissions） */
+    private final PermissionService permissionService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     /** 用户名不存在时也跑一次等成本哈希比对，让响应时间与「密码错误」一致，避免用户名枚举 */
@@ -135,11 +142,23 @@ public class UserService {
         return userMapper.selectById(id);
     }
 
-    /** 全量用户简表，供缺陷负责人/验证人下拉选人 */
-    public List<UserVO> list() {
-        return userMapper.selectList(Wrappers.<SysUser>lambdaQuery().orderByAsc(SysUser::getDisplayName))
-                .stream().map(this::toVO)
-                .collect(Collectors.toList());
+    /**
+     * 人员下拉用的精简列表（id/账号/显示名/头像）。
+     * 与用户管理列表 {@link #pageForAdmin} 刻意区分：后者含 email/enabled、只对系统管理员开放；
+     * 本方法供项目内"选负责人/验证人/按人筛选"使用，任何登录用户可用，且不下发 email。
+     */
+    public List<MemberCandidateVO> listOptions() {
+        return userMapper.selectList(Wrappers.<SysUser>lambdaQuery()
+                        .select(SysUser::getId, SysUser::getUsername, SysUser::getDisplayName, SysUser::getAvatarUrl)
+                        .orderByAsc(SysUser::getDisplayName))
+                .stream().map(u -> {
+                    MemberCandidateVO vo = new MemberCandidateVO();
+                    vo.setId(u.getId());
+                    vo.setUsername(u.getUsername());
+                    vo.setDisplayName(u.getDisplayName());
+                    vo.setAvatarUrl(u.getAvatarUrl());
+                    return vo;
+                }).collect(Collectors.toList());
     }
 
     /** 用户管理视图：分页 + 关键字（username / displayName / email），与工作项列表一致的 PageResult 结构 */
@@ -176,8 +195,15 @@ public class UserService {
         u.setAvatarUrl(req.getAvatarUrl());
         u.setPasswordHash(passwordEncoder.encode(req.getPassword()));
         u.setEnabled(true);
+        // 系统管理员标识以前只能改库：DTO 里没有字段、Service 也不设置，
+        // 文档承诺的"是否管理员"实际不可用，而权限判定又依赖这个字段
+        u.setIsAdmin(Boolean.TRUE.equals(req.getIsAdmin()));
 
         userMapper.insert(u);
+        if (Boolean.TRUE.equals(u.getIsAdmin())) {
+            // 新增管理员会影响 isSuperAdmin 缓存（未命中会查库，命中旧值会误判）
+            permissionService.evictAllPermissions();
+        }
         return toVO(u);
     }
 
@@ -191,10 +217,29 @@ public class UserService {
         if (req.getEmail() != null) u.setEmail(req.getEmail());
         if (req.getAvatarUrl() != null) u.setAvatarUrl(req.getAvatarUrl());
         if (req.getEnabled() != null) u.setEnabled(req.getEnabled());
-        if (req.getPassword() != null && !req.getPassword().isBlank()) {
+        boolean adminChanged = false;
+        if (req.getIsAdmin() != null && !req.getIsAdmin().equals(Boolean.TRUE.equals(u.getIsAdmin()))) {
+            // 内置种子管理员是保底的管理入口，不允许被降级（否则可能把系统锁死在一个没有管理员的库上）
+            if (id.equals(UserContext.DEFAULT_ADMIN_ID) && !req.getIsAdmin()) {
+                throw new ServiceException(400, "内置管理员账号不允许取消管理员身份");
+            }
+            u.setIsAdmin(req.getIsAdmin());
+            adminChanged = true;
+        }
+        boolean passwordChanged = req.getPassword() != null && !req.getPassword().isBlank();
+        if (passwordChanged) {
             u.setPasswordHash(passwordEncoder.encode(req.getPassword()));
         }
         userMapper.updateById(u);
+
+        if (adminChanged) {
+            // 缓存里可能还留着旧的 superAdminFlag / 权限码集合
+            permissionService.evictAllPermissions();
+        }
+        // 禁用账号或重置密码后，旧会话必须立刻失效：否则"已禁用"的账号还能继续操作到会话超时
+        if (passwordChanged || Boolean.FALSE.equals(req.getEnabled())) {
+            sessionRegistry.invalidateAll(id);
+        }
         return toVO(u);
     }
 
@@ -224,6 +269,8 @@ public class UserService {
                 .eq(IssueActivity::getActorId, id)) > 0) {
             throw new ServiceException(400, "该用户存在评论或动态记录，不允许删除，可改为禁用账号");
         }
+        // 删号前先踢掉会话：否则被删用户仍能凭旧 Session 继续调用接口（直到超时）
+        sessionRegistry.invalidateAll(id);
         userMapper.deleteById(id);
     }
 
@@ -235,6 +282,7 @@ public class UserService {
         vo.setEmail(u.getEmail());
         vo.setAvatarUrl(u.getAvatarUrl());
         vo.setEnabled(u.getEnabled());
+        vo.setIsAdmin(u.getIsAdmin());
         return vo;
     }
 
@@ -279,9 +327,9 @@ public class UserService {
         return toProfileVO(u);
     }
 
-    /** 当前用户修改密码：需校验旧密码 */
+    /** 当前用户修改密码：需校验旧密码；成功后踢掉该用户其它会话（含被盗会话） */
     @Transactional
-    public void changePassword(UUID id, ChangePasswordRequest req) {
+    public void changePassword(UUID id, ChangePasswordRequest req, String currentSessionId) {
         SysUser u = userMapper.selectById(id);
         if (u == null) {
             throw new ServiceException(404, "用户不存在");
@@ -295,5 +343,7 @@ public class UserService {
         }
         u.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
         userMapper.updateById(u);
+        // 保留当前会话（本人刚改完密码不该被自己踢下线），其余会话一律失效
+        sessionRegistry.invalidateOthers(id, currentSessionId);
     }
 }

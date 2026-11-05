@@ -1,6 +1,5 @@
 package com.seven7m.kanban.dto.issue;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 

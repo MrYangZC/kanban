@@ -39,6 +39,12 @@ public abstract class AbstractWorkItem extends BaseEntity {
     private LocalDate dueDate;
     private String sortKey;
     private Boolean archived;
+    /**
+     * 首次进入"已完成"类别状态的时间。
+     * 用 updated_at 代替会把"任何一次编辑"都算进解决周期（改个标题就变长），
+     * 因此单独记录；离开已完成类别时清空。
+     */
+    private java.time.LocalDateTime doneAt;
 
     /** 子类返回所属物理表对应的类别，用于路由与子表隔离。 */
     public abstract ItemCategory category();

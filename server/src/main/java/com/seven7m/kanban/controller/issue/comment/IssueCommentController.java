@@ -5,11 +5,11 @@ import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
 import com.seven7m.kanban.dto.issue.AddCommentRequest;
 import com.seven7m.kanban.dto.issue.IssueActivityVO;
+import com.seven7m.kanban.dto.issue.IssueTimelineVO;
 import com.seven7m.kanban.service.issue.comment.IssueCommentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -21,8 +21,10 @@ public class IssueCommentController {
 
     @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
     @GetMapping("/{issueId}/activities")
-    public R<List<IssueActivityVO>> list(@PathVariable UUID issueId) {
-        return R.ok(commentService.listActivities(issueId));
+    public R<IssueTimelineVO> list(@PathVariable UUID issueId,
+                                   @RequestParam(defaultValue = "1") int page,
+                                   @RequestParam(defaultValue = "50") int size) {
+        return R.ok(commentService.listActivities(issueId, page, size));
     }
 
     @ProjectRoleAnnotation(Permission.ISSUE_COMMENT)

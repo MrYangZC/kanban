@@ -6,7 +6,6 @@ import com.seven7m.kanban.entity.rbac.RolePermission;
 import com.seven7m.kanban.entity.user.SysUser;
 import com.seven7m.kanban.mapper.rbac.RolePermissionMapper;
 import com.seven7m.kanban.mapper.user.SysUserMapper;
-import com.seven7m.kanban.service.project.ProjectMemberService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +31,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PermissionService {
 
-    private final ProjectMemberService projectMemberService;
+    private final MemberRolePort memberRolePort;
     private final RolePermissionMapper rolePermissionMapper;
     private final SysUserMapper sysUserMapper;
 
@@ -56,7 +55,7 @@ public class PermissionService {
         if (self.isSuperAdmin(userId)) {
             return new HashSet<>(Permission.allCodes());
         }
-        Set<UUID> roleIds = projectMemberService.getRoleIds(projectId, userId);
+        Set<UUID> roleIds = memberRolePort.roleIdsOf(projectId, userId);
         if (roleIds == null || roleIds.isEmpty()) {
             return Set.of();
         }
