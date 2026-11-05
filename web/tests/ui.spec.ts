@@ -188,7 +188,10 @@ test.describe('项目内工作项 UI', () => {
 
   test.beforeAll(async ({ request }) => {
     await loginRequestOnly(request)
-    projId = await createProject(request, 'TUIW', 'TEST_UI_WORKITEM_PROJ')
+    // project_key 全局唯一：固定 key 一旦某轮清理失败，后续每轮都建不出来（POST 直接 400）。
+    // 加随机后缀让本组自给自足（key 不参与任何断言）。
+    const stamp = Date.now().toString(36).slice(-4).toUpperCase()
+    projId = await createProject(request, `TUIW${stamp}`, 'TEST_UI_WORKITEM_PROJ')
   })
 
   test.afterAll(async ({ request }) => {

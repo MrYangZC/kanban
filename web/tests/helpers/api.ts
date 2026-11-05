@@ -12,6 +12,9 @@ export interface Envelope<T> {
   data: T
 }
 
+/** 工作项类别：三套工作流各有一组状态列 */
+export type WorkItemCategory = 'TASK' | 'REQUIREMENT' | 'BUG'
+
 export interface IssueStatusVO { id: string; name: string; code: string; category: string }
 export interface IssueVO { id: string; issueKey: string; title: string; issueTypeCode: string; statusId: string }
 /** 工作流流转规则（from → to） */
@@ -26,6 +29,8 @@ export interface IssueActivityVO {
   oldValue: string | null
   newValue: string | null
   createdAt: string
+  /** 仅最后一条交接动态会带：后端判定的「这条交接现在还能不能撤销」 */
+  revocable?: boolean | null
 }
 export interface AttachmentVO {
   id: string
@@ -71,7 +76,7 @@ async function ensureLogin(request: APIRequestContext) {
   await loginApi(request)
 }
 
-type Method = 'get' | 'post' | 'put' | 'delete'
+type Method = 'get' | 'post' | 'put' | 'patch' | 'delete'
 
 interface CallOptions {
   label: string
@@ -86,6 +91,7 @@ function send(request: APIRequestContext, method: Method, url: string, opts: Cal
     case 'get': return request.get(url, { params: opts.params })
     case 'post': return request.post(url, init)
     case 'put': return request.put(url, init)
+    case 'patch': return request.patch(url, init)
     case 'delete': return request.delete(url, init)
   }
 }
@@ -119,6 +125,13 @@ export const apiPut = <T>(request: APIRequestContext, url: string, label: string
   call<T>(request, 'put', url, { label, data })
 export const apiDelete = <T>(request: APIRequestContext, url: string, label: string) =>
   call<T>(request, 'delete', url, { label })
+export const apiPatch = <T>(request: APIRequestContext, url: string, label: string, data?: unknown) =>
+  call<T>(request, 'patch', url, { label, data })
+
+/** 拖拽落列（看板主入口）：状态 + 位置一次提交，与前端拖拽走同一个接口 */
+export const moveIssue = (
+  request: APIRequestContext, issueId: string, payload: { statusId: string; beforeId?: string | null; afterId?: string | null }
+) => apiPatch<{ id: string; statusId: string }>(request, `${API}/issues/${issueId}/position`, '拖拽移动工作项', payload)
 
 // ---------------------------------------------------------------------------
 // 基础数据
@@ -130,7 +143,10 @@ export const apiDelete = <T>(request: APIRequestContext, url: string, label: str
  * 「用户名已存在」，用例被迫 skip，看起来像环境问题，实际是数据残留。
  */
 export async function deleteUsersByName(request: APIRequestContext, username: string) {
-  const list = await apiGet<{ id: string; username: string }[]>(request, `${API}/users`, '查询用户列表')
+  // 走 /users/options（全量简表）而不是分页的 GET /users：
+  // 后者默认一页 20 条，残留账号排在后面时找不到人，POST /users 会直接 400「用户名已存在」，
+  // 用例看起来像环境故障，实际是分页导致的漏查。
+  const list = await apiGet<{ id: string; username: string }[]>(request, `${API}/users/options`, '查询用户列表')
   const rows = Array.isArray(list)
     ? list
     : ((list as unknown as { records?: { id: string; username: string }[] })?.records ?? [])
@@ -149,8 +165,37 @@ export async function createProject(request: APIRequestContext, key: string, nam
   } catch {
     const list = await apiGet<{ id: string; projectKey: string }[]>(request, `${API}/projects`, '查询项目列表')
     const stale = (list || []).find((p) => p.projectKey === key)
-    if (stale) await apiDelete<void>(request, `${API}/projects/${stale.id}`, `清理旧项目 ${key}`)
+    if (stale) await deleteProject(request, stale.id)
     return (await apiPost<{ id: string }>(request, `${API}/projects`, `重建项目 ${name}`, payload)).id
+  }
+}
+
+/**
+ * 清空项目下的工作项。
+ *
+ * 后端 ProjectService.delete 在项目还有工作项时返回 400（防止误删），
+ * 于是「删测试项目」必须先删工作项。子工作项会随父项级联删除，
+ * 但父项在子项还在时会拒绝删除，所以按轮次重试直到清空。
+ */
+export async function purgeProjectIssues(request: APIRequestContext, projectId: string) {
+  for (let round = 0; round < 5; round++) {
+    let items: { id: string }[] = []
+    try {
+      const page = await apiPost<{ total?: number; list?: { id: string }[] }>(
+        request, `${API}/issues/filter`, '查询项目工作项', { projectId, page: 1, size: 500 }
+      )
+      items = page?.list ?? []
+    } catch {
+      return
+    }
+    if (!items.length) return
+    for (const item of items) {
+      try {
+        await apiDelete<void>(request, `${API}/issues/${item.id}`, `清理工作项 ${item.id}`)
+      } catch {
+        // 仍有子项时本轮删不掉，交给下一轮
+      }
+    }
   }
 }
 
@@ -161,12 +206,20 @@ export async function createProject(request: APIRequestContext, key: string, nam
  * `test.afterAll` 里拿到的是新实例、没有登录 cookie，裸删除会被 401 静默吞掉，
  * 项目及其工作项就长期堆在库里（历史上 TCOL / TPLN / TBDG / TUIW 都是这么残留的）。
  */
-export const deleteProject = (request: APIRequestContext, projectId: string) =>
-  apiDelete<void>(request, `${API}/projects/${projectId}`, '删除测试项目')
+export async function deleteProject(request: APIRequestContext, projectId: string) {
+  // 项目还有工作项时后端拒绝删除（400），先清空再删，保证 afterAll 不会留下残留项目
+  await purgeProjectIssues(request, projectId)
+  return apiDelete<void>(request, `${API}/projects/${projectId}`, '删除测试项目')
+}
 
-export async function listProjectStatuses(request: APIRequestContext, projectId: string) {
+export async function listProjectStatuses(
+  request: APIRequestContext, projectId: string, category?: WorkItemCategory
+) {
+  // 不传 category 时后端只返回一套工作流（历史上是缺陷），
+  // 用它去建需求工作项会被后端以「状态不属于该类别」拒绝，所以调用方应显式传类别
+  const query = category ? `?category=${category}` : ''
   const statuses = await apiGet<IssueStatusVO[]>(
-    request, `${API}/projects/${projectId}/statuses`, '查询项目状态'
+    request, `${API}/projects/${projectId}/statuses${query}`, '查询项目状态'
   )
   expect(statuses.length, '项目应至少有一个工作流状态').toBeGreaterThan(0)
   return statuses
@@ -177,8 +230,129 @@ export async function firstStatusId(request: APIRequestContext, projectId: strin
 }
 
 /** 项目默认工作流的流转规则（后端 WorkflowController：/projects/{id}/transitions） */
-export const listTransitions = (request: APIRequestContext, projectId: string) =>
-  apiGet<TransitionVO[]>(request, `${API}/projects/${projectId}/transitions`, '查询工作流流转规则')
+export const listTransitions = (
+  request: APIRequestContext, projectId: string, category?: WorkItemCategory
+) => {
+  const query = category ? `?category=${category}` : ''
+  return apiGet<TransitionVO[]>(
+    request, `${API}/projects/${projectId}/transitions${query}`, '查询工作流流转规则'
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 工作流列交接（handoff）：配置落在 project_handoff，按「项目 × 类别 × 状态」维度
+// ---------------------------------------------------------------------------
+
+export interface WorkflowColumnVO {
+  statusId: string
+  name: string
+  category: string
+  color: string
+  sortOrder: number
+  handoffType: 'NONE' | 'MEMBER' | 'PROJECT_LEAD'
+  handoffUserId?: string
+  handoffUserName?: string
+  handoffNote?: string
+  /** 落点迭代：交接时把工作项放进这个迭代 */
+  targetSprintId?: string
+  targetSprintName?: string
+  /** 落点标签：交接时给工作项补上这个标签 */
+  targetLabelId?: string
+  targetLabelName?: string
+}
+
+export const listWorkflowColumns = (
+  request: APIRequestContext, projectId: string, category: WorkItemCategory
+) =>
+  apiGet<WorkflowColumnVO[]>(
+    request, `${API}/projects/${projectId}/workflow-columns?category=${category}`, '查询工作流列交接配置'
+  )
+
+export const saveWorkflowHandoff = (
+  request: APIRequestContext,
+  projectId: string,
+  statusId: string,
+  category: WorkItemCategory,
+  payload: {
+    handoffType: 'NONE' | 'MEMBER' | 'PROJECT_LEAD'
+    handoffUserId?: string | null
+    handoffNote?: string | null
+    targetSprintId?: string | null
+    targetLabelId?: string | null
+  }
+) =>
+  apiPut<WorkflowColumnVO>(
+    request,
+    `${API}/projects/${projectId}/workflow-columns/${statusId}/handoff?category=${category}`,
+    '保存列交接配置',
+    payload
+  )
+
+/** 新建迭代（落点用例需要一个真实迭代 id，不能拿别的项目/别的用例的凑） */
+export async function createSprint(request: APIRequestContext, projectId: string, name: string) {
+  const sprint = await apiPost<{ id: string; name: string }>(
+    request, `${API}/projects/${projectId}/sprints`, '创建迭代', { name }
+  )
+  return sprint
+}
+
+/** 删除迭代：落点配了它之后再删掉，验证交接退化成「只换人」 */
+export const deleteSprint = (request: APIRequestContext, projectId: string, sprintId: string) =>
+  apiDelete<void>(request, `${API}/projects/${projectId}/sprints/${sprintId}`, '删除迭代')
+
+/**
+ * 保证项目标签库里存在名为 name 的标签，并返回它的 id。
+ *
+ * 没有「直接建项目标签」的接口（只有「从全局库里选一个」），标签只在给工作项打标时创建。
+ * 所以借 seedIssueId 这个工作项先把标签建出来（同时建立项目选用关系），随即把它从该工作项上摘掉：
+ * 标签本身是全局表 + project_label 引用，摘除关联不会删掉标签，正好留给调用方使用。
+ */
+export async function ensureProjectTag(
+  request: APIRequestContext, projectId: string, name: string, seedIssueId: string
+) {
+  const list = () => apiGet<{ id: string; name: string }[]>(
+    request, `${API}/projects/${projectId}/tags`, '查询项目标签'
+  )
+  const hit = (await list()).find((t) => t.name === name)
+  if (hit) return hit.id
+
+  await apiPost<void>(request, `${API}/issues/${seedIssueId}/tags`, '给工作项打标签', {
+    projectId, name, color: '#1677FF'
+  })
+  await apiDelete<void>(request, `${API}/issues/${seedIssueId}/tags/${
+    (await list()).find((t) => t.name === name)?.id ?? ''
+  }`, '摘除打标用的关联')
+
+  const created = (await list()).find((t) => t.name === name)
+  if (!created) throw new Error(`打标后仍未查到标签 ${name}`)
+  return created.id
+}
+
+export interface NotificationVO {
+  id: string
+  type: string
+  title: string
+  body?: string
+  projectId?: string
+  issueId?: string
+  category?: string
+  readAt?: string
+  createdAt: string
+}
+
+export const listNotifications = (request: APIRequestContext, page = 1, size = 20) =>
+  apiGet<{ total: number; list: NotificationVO[] }>(
+    request, `${API}/users/notifications?page=${page}&size=${size}`, '查询我的通知'
+  )
+
+export const unreadNotificationCount = (request: APIRequestContext) =>
+  apiGet<number>(request, `${API}/users/notifications/unread-count`, '查询未读通知数')
+
+export const markNotificationRead = (request: APIRequestContext, id: string) =>
+  apiPut<void>(request, `${API}/users/notifications/${id}/read`, '标记通知已读', {})
+
+export const markAllNotificationsRead = (request: APIRequestContext) =>
+  apiPut<number>(request, `${API}/users/notifications/read-all`, '全部通知已读', {})
 
 // ---------------------------------------------------------------------------
 // 项目成员（RBAC：一人可多角色）
@@ -259,6 +433,10 @@ export async function updateIssue(request: APIRequestContext, issueId: string, p
 
 export const listActivities = (request: APIRequestContext, issueId: string) =>
   apiGet<IssueActivityVO[]>(request, `${API}/issues/${issueId}/activities`, '查询动态流')
+
+/** 撤销最近一次交接（负责人退回交接前的人）；重复撤销会被后端拒绝，故此处直接返回原始响应 */
+export const revokeHandoffViaApi = (request: APIRequestContext, issueId: string) =>
+  request.post(`${API}/issues/${issueId}/handoff/revoke`)
 
 export const addCommentViaApi = (request: APIRequestContext, issueId: string, content: string) =>
   apiPost<IssueActivityVO>(request, `${API}/issues/${issueId}/comments`, '接口发评论', { content })

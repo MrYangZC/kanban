@@ -28,6 +28,13 @@ import { gotoAsAdmin } from './helpers/session'
 
 const PREFIX = 'TEST_DRAG_'
 
+/**
+ * 需求工作流有 6 列，默认 1440 宽视口只能看到前 4 列。
+ * 拖到视口外的列不会产生 dragover（浏览器不会为窗口外坐标派发拖拽事件），
+ * 于是「被拒绝」「同列排序」这类用例会假失败 —— 这里放大视口让所有列同屏。
+ */
+test.use({ viewport: { width: 2200, height: 1000 } })
+
 interface BoardGrouped {
   groups: Array<{
     columns: Array<{ statusId: string; name: string; issues: Array<{ id: string; title: string }> }>
@@ -68,7 +75,14 @@ async function dragCardTo(page: Page, card: Locator, target: { x: number; y: num
   // 先越过 fallback-tolerance(8px) 才会进入拖拽态
   await page.mouse.move(sx + 12, sy + 12, { steps: 6 })
   await page.mouse.move(target.x, target.y, { steps: 25 })
-  await page.waitForTimeout(150)
+  // 跨多列长距离拖动时，最后一个 dragover 常常仍落在中途经过的列上（ghost 已插入该列，
+  // 光标下的元素变成 ghost 本身），导致目标列高亮不生效。收尾时在原位附近微移两次，
+  // 保证最后一次 dragover 确实命中目标列。
+  await page.waitForTimeout(120)
+  await page.mouse.move(target.x + 6, target.y + 6, { steps: 4 })
+  await page.mouse.move(target.x, target.y, { steps: 4 })
+  // 等 Vue 把 dragOverCol 的允许/拒绝态渲染到 DOM 再断言
+  await page.waitForTimeout(300)
 }
 
 async function centerOf(locator: Locator) {
@@ -79,33 +93,45 @@ async function centerOf(locator: Locator) {
 
 test.describe('09 看板拖拽落库', () => {
   let projectId = ''
-  let todoId = ''      // 待确认 TO_CONFIRM
-  let doingId = ''     // 处理中 IN_PROGRESS
-  let closedId = ''    // 已关闭 CLOSED
-  let reopenedId = ''  // 再次打开 REOPENED
+  let todoId = ''      // 需求：待处理 REQ_TODO
+  let doingId = ''     // 需求：设计中 REQ_DESIGNING
+  let closedId = ''    // 需求：已完成 REQ_DONE
+  let reopenedId = ''  // 需求：测试中 REQ_TESTING（独占列，避免与其他用例互相干扰）
+  let bugTodoId = ''   // 缺陷：待确认 TO_CONFIRM
+  let bugDoingId = ''  // 缺陷：处理中 IN_PROGRESS
 
   test.beforeAll(async ({ request }) => {
     await loginApi(request)
     projectId = await createProject(request, 'TBDG', `${PREFIX}PROJ`)
 
-    const statuses = await listProjectStatuses(request, projectId)
+    // 状态与工作项类别必须匹配：用缺陷工作流的状态去建 STORY 会被后端拒绝
+    const statuses = await listProjectStatuses(request, projectId, 'REQUIREMENT')
     const pick = (code: string) => {
       const s = statuses.find((x) => x.code === code)
-      if (!s) throw new Error(`默认工作流缺少状态 ${code}，拖拽用例前提不成立`)
+      if (!s) throw new Error(`需求工作流缺少状态 ${code}，拖拽用例前提不成立`)
       return s.id
     }
-    todoId = pick('TO_CONFIRM')
-    doingId = pick('IN_PROGRESS')
-    closedId = pick('CLOSED')
-    reopenedId = pick('REOPENED')
+    todoId = pick('REQ_TODO')
+    doingId = pick('REQ_DESIGNING')
+    closedId = pick('REQ_DONE')
+    reopenedId = pick('REQ_TESTING')
 
-    // 前置校验：流转规则必须包含「待确认→处理中」且不含「待确认→已关闭」，
+    const bugStatuses = await listProjectStatuses(request, projectId, 'BUG')
+    const pickBug = (code: string) => {
+      const s = bugStatuses.find((x) => x.code === code)
+      if (!s) throw new Error(`缺陷工作流缺少状态 ${code}，拖拽用例前提不成立`)
+      return s.id
+    }
+    bugTodoId = pickBug('TO_CONFIRM')
+    bugDoingId = pickBug('IN_PROGRESS')
+
+    // 前置校验：流转规则必须包含「待处理→设计中」且不含「待处理→已完成」，
     // 否则本组「合法/非法各一条」的前提不成立，应直接失败而不是含糊放过
-    const transitions = await listTransitions(request, projectId)
+    const transitions = await listTransitions(request, projectId, 'REQUIREMENT')
     const has = (from: string, to: string) =>
       transitions.some((t) => t.fromStatusId === from && t.toStatusId === to)
-    expect(has(todoId, doingId), '默认工作流应有「待确认 → 处理中」').toBe(true)
-    expect(has(todoId, closedId), '默认工作流不应有「待确认 → 已关闭」').toBe(false)
+    expect(has(todoId, doingId), '需求工作流应有「待处理 → 设计中」').toBe(true)
+    expect(has(todoId, closedId), '需求工作流不应有「待处理 → 已完成」').toBe(false)
   })
 
   test.afterAll(async ({ request }) => {
@@ -250,8 +276,8 @@ test.describe('09 看板拖拽落库', () => {
   test('TC-605 缺陷看板跨列拖拽（源列多卡）同样落库', async ({ request, page }) => {
     const first = `${PREFIX}BUG_A`
     const second = `${PREFIX}BUG_B`
-    await createIssue(request, { projectId, statusId: todoId, issueTypeCode: 'BUG', title: first })
-    const moved = await createIssue(request, { projectId, statusId: todoId, issueTypeCode: 'BUG', title: second })
+    await createIssue(request, { projectId, statusId: bugTodoId, issueTypeCode: 'BUG', title: first })
+    const moved = await createIssue(request, { projectId, statusId: bugTodoId, issueTypeCode: 'BUG', title: second })
 
     await gotoAsAdmin(page, `/projects/${projectId}/defects`)
     // 缺陷页视图存在 localStorage，默认是列表视图，这里固定切到看板
@@ -260,17 +286,17 @@ test.describe('09 看板拖拽落库', () => {
       projectId
     )
     await page.reload()
-    await expect(cards(page, todoId).filter({ hasText: first })).toBeVisible({ timeout: 15000 })
+    await expect(cards(page, bugTodoId).filter({ hasText: first })).toBeVisible({ timeout: 15000 })
 
     // DefectManageView 与 BoardView 共用 dragNeighbors，同一缺陷曾同时存在于两处，这里单独回归
-    const target = await centerOf(column(page, doingId))
-    await dragCardTo(page, cards(page, todoId).filter({ hasText: second }), target)
+    const target = await centerOf(column(page, bugDoingId))
+    await dragCardTo(page, cards(page, bugTodoId).filter({ hasText: second }), target)
     await page.mouse.up()
 
-    await expect(cards(page, doingId).filter({ hasText: second })).toBeVisible({ timeout: 10000 })
+    await expect(cards(page, bugDoingId).filter({ hasText: second })).toBeVisible({ timeout: 10000 })
     const cols = await boardColumns(request, projectId, 'BUG')
     expect(
-      cols.find((c) => c.statusId === doingId)?.issues.some((i) => i.id === moved.id),
+      cols.find((c) => c.statusId === bugDoingId)?.issues.some((i) => i.id === moved.id),
       '缺陷看板：处理中列应包含被拖拽的缺陷'
     ).toBe(true)
   })

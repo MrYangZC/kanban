@@ -267,7 +267,8 @@ test.describe('08 项目规划域', () => {
     await gotoAsAdmin(page, `/projects/${projectId}/metrics`)
     await expect(page.getByText('加载报表中…')).toHaveCount(0, { timeout: 15000 })
 
-    for (const label of ['总数', '进行中', '已完成', '逾期']) {
+    // 分类型概览卡片下排的可点数字（ProjectMetricsPanel.TYPE_FILTERS）
+    for (const label of ['全部', '待处理', '处理中', '已完成', '逾期']) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible({ timeout: 10000 })
     }
     for (const panel of ['状态分布', '优先级分布', '燃尽图', '按负责人工作量', '周期时间']) {

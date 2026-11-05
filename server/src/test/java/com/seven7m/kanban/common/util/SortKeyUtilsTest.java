@@ -85,4 +85,43 @@ class SortKeyUtilsTest {
         // left >= right 属调用方异常：退化为 after(left)，保证键唯一即可
         assertThat(SortKeyUtils.between("b", "a")).isGreaterThan("b");
     }
+
+    @Test
+    @DisplayName("重排键：等宽、严格递增、且首键之前仍可插入")
+    void rebalancedKeysAreOrderedAndLeaveRoom() {
+        for (int count : new int[]{1, 5, 61, 62, 1000, 3782, 3783}) {
+            java.util.List<String> keys = SortKeyUtils.rebalancedKeys(count);
+            assertThat(keys).hasSize(count);
+            for (int i = 1; i < keys.size(); i++) {
+                assertThat(keys.get(i))
+                        .as("count=%d, i=%d", count, i)
+                        .isGreaterThan(keys.get(i - 1));
+            }
+            // 等宽：字典序等价于数值序（长度不一致时字典序会把 "10" 排到 "9" 前面）
+            assertThat(keys.stream().map(String::length).distinct().count())
+                    .as("count=%d 的键应等宽", count)
+                    .isEqualTo(1L);
+            // 重排后仍能往列首插、往两个相邻键之间插
+            assertThat(SortKeyUtils.between(null, keys.get(0))).isLessThan(keys.get(0));
+            if (keys.size() > 1) {
+                String mid = SortKeyUtils.between(keys.get(0), keys.get(1));
+                assertThat(mid).isGreaterThan(keys.get(0)).isLessThan(keys.get(1));
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("重排键不会因为反复追加而立刻变长（修复后列内可容纳更多次插入）")
+    void rebalanceAllowsManyAppendsBeforeGrowing() {
+        java.util.List<String> keys = SortKeyUtils.rebalancedKeys(100);
+        String tail = keys.get(keys.size() - 1);
+        int before = tail.length();
+        // 连续 20 次"拖到列尾"，键最多增长 20 个字符；重排把起点从 200 压回个位数
+        String key = tail;
+        for (int i = 0; i < 20; i++) {
+            key = SortKeyUtils.after(key);
+        }
+        assertThat(before).isLessThan(10);
+        assertThat(key.length()).isLessThan(80);
+    }
 }

@@ -48,3 +48,9 @@ Skill.iml
 target
 *.log
 *.err
+
+# 运行期上传的附件（用户数据，不入库）
+/server/uploads/
+
+# TypeScript 增量构建产物（vue-tsc -b 生成，不入库）
+*.tsbuildinfo

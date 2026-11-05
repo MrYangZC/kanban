@@ -18,7 +18,8 @@ import {
  * （根容器 .app-drawer-panel）里，从列表/看板/表格点击工作项打开，不跳路由。
  *   - 主标签：动态&评论 / 关联项 / 其他
  *   - 子标签：全部 / 评论·N / 动态
- *   - 评论：点击「添加评论」展开 RichTextEditor（textarea），「提交」发送；删除走二次确认
+ *   - 评论：底部常驻「点击输入评论…」占位条，点开才渲染 RichTextEditor（textarea），「提交」发送；
+ *           删除走二次确认
  *   - 附件：真实文件上传入口在评论编辑器内（「附件」按钮 + 隐藏 file input），
  *           「其他」页签是按文件名登记附件的兼容入口，两者共用同一份附件列表
  *   - 关联项：el-select 远程搜索选择 + 关联类型，选中即建立关联
@@ -157,8 +158,9 @@ test.describe('07 工作项详情协作', () => {
     const acts = await listActivities(request, activityId)
     const changed = acts.find((a) => a.type === 'STATUS_CHANGED')
     expect(changed, '状态流转应写入动态').toBeTruthy()
-    expect(changed!.oldValue ?? '', '动态应记录变更前状态码').toContain(from.code)
-    expect(changed!.newValue ?? '', '动态应记录变更后状态码').toContain(to.code)
+    // 后端在 ActivityTextResolver 里已把状态 code 翻成中文名再下发，前端只负责拼句
+    expect(changed!.oldValue ?? '', '动态应记录变更前状态名').toBe(from.name)
+    expect(changed!.newValue ?? '', '动态应记录变更后状态名').toBe(to.name)
     expect(
       acts.length,
       '该工作项动态应只有「创建 + 状态变更」两条（title 变更未留痕）'
@@ -167,10 +169,10 @@ test.describe('07 工作项详情协作', () => {
     const drawer = await openDefectDetail(page, projectId, newTitle)
     await drawer.getByRole('button', { name: /^动态$/ }).click()
 
-    const row = drawer.locator('div.flex.gap-3').filter({ hasText: '变更了状态' }).first()
+    const row = drawer.locator('div.flex.gap-3').filter({ hasText: '将 状态 从' }).first()
     await expect(row, '动态流应展示状态变更记录').toBeVisible({ timeout: 10000 })
-    await expect(row, '动态流应展示变更前状态码').toContainText(from.code)
-    await expect(row, '动态流应展示变更后状态码').toContainText(to.code)
+    await expect(row, '动态流应展示变更前状态').toContainText(from.name)
+    await expect(row, '动态流应展示变更后状态').toContainText(to.name)
 
     test.info().annotations.push({
       type: '观察',

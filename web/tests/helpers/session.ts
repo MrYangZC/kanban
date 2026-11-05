@@ -10,7 +10,13 @@ export async function loginViaApi(page: Page, username: string, password: string
   const body = await resp.json()
   expect(body.code, `登录 ${username} 应成功`).toBe(200)
   await page.goto('/login')
-  await page.evaluate((vo) => localStorage.setItem('kanban_user', JSON.stringify(vo)), body.data)
+  await page.evaluate((vo) => {
+    localStorage.clear()
+    localStorage.setItem('kanban_user', JSON.stringify(vo))
+  }, body.data)
+  // 必须 reload：SPA 已在 /login 挂载并持有上一个用户的内存态，
+  // 若直接 goto 目标页，路由守卫与 store 可能沿用旧用户（同一 context 内换人时会串号）
+  await page.reload()
   return body.data as { id: string; username: string; token: string }
 }
 
@@ -53,10 +59,16 @@ export async function openDefectDetail(page: Page, projectId: string, title: str
   return drawer
 }
 
-/** 展开评论富文本编辑器（编辑器打开时「添加评论」按钮会隐藏） */
+/**
+ * 展开评论富文本编辑器。
+ * 评论区是钉在左侧面板底部的常驻条：未编辑时是「点击输入评论…」占位条（整条可点），
+ * 点开才 v-if 切到 RichTextEditor（placeholder = Ctrl+V 直接上传截图…），此时占位条消失，
+ * 因此重复调用不会误点。
+ */
 export async function openCommentEditor(page: Page) {
   const drawer = detailDrawer(page)
-  await drawer.getByRole('button', { name: '添加评论' }).click()
+  const trigger = drawer.locator('div.cursor-text').filter({ hasText: '点击输入评论' })
+  if (await trigger.count()) await trigger.first().click()
   const editor = drawer.getByPlaceholder(/Ctrl\+V 直接上传截图/)
   await expect(editor).toBeVisible({ timeout: 10000 })
   return editor

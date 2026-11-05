@@ -55,7 +55,9 @@ const roleCheckbox = (row: Locator, label: string) => {
 
 async function rolesOf(page: Page, username: string): Promise<string[]> {
   const tags = memberRow(page, username).locator('span')
-  return (await tags.allInnerTexts()).map((t) => t.trim()).filter(Boolean)
+  // 行内还有头像首字等装饰性 span，只保留角色标签文案，避免把「成」这类单字算成角色
+  const roleNames = Object.keys(ROLE_CODE)
+  return (await tags.allInnerTexts()).map((t) => t.trim()).filter((t) => roleNames.includes(t))
 }
 
 test.describe('10 设置页成员管理', () => {
