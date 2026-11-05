@@ -122,18 +122,18 @@ function goRequirements() {
           <div class="flex items-center gap-1">
             <button
               class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-primary-50 hover:text-primary"
-              :class="{ 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-400': !project.canManage }"
-              :title="project.canManage ? '编辑项目' : '仅项目所有者/管理员/项目经理可编辑'"
-              :disabled="!project.canManage"
+              :class="{ 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-400': !project.canEdit }"
+              :title="project.canEdit ? '编辑项目' : '仅项目所有者/管理员/项目经理可编辑'"
+              :disabled="!project.canEdit"
               @click.stop="emit('openEdit', project)"
             >
               <Pencil :size="15" />
             </button>
             <button
               class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-primary-50 hover:text-primary"
-              :class="{ 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-400': !project.canManage }"
-              :title="project.status === 'ARCHIVED' ? '取消归档' : '归档'"
-              :disabled="!project.canManage"
+              :class="{ 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-400': !project.canArchive }"
+              :title="project.status === 'ARCHIVED' ? '取消归档' : '归档（仅所有者/管理员）'"
+              :disabled="!project.canArchive"
               @click.stop="onArchive(project)"
             >
               <ArchiveRestore v-if="project.status === 'ARCHIVED'" :size="15" />
@@ -141,9 +141,9 @@ function goRequirements() {
             </button>
             <button
               class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
-              :class="{ 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-400': !project.canManage }"
-              :title="project.canManage ? '删除项目' : '仅项目所有者/管理员/项目经理可删除项目'"
-              :disabled="!project.canManage"
+              :class="{ 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-400': !project.canDelete }"
+              :title="project.canDelete ? '删除项目' : '仅项目所有者/管理员可删除项目'"
+              :disabled="!project.canDelete"
               @click.stop="emit('delete', project)"
             >
               <Trash2 :size="15" />

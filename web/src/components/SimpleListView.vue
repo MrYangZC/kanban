@@ -12,6 +12,8 @@ const props = withDefaults(defineProps<{
   emptyText?: string
   canCreate?: boolean
   createLabel?: string
+  /** 是否显示「导出」按钮（由调用方按 issue:export 权限决定） */
+  canExport?: boolean
   keyword?: string
   showSearch?: boolean
   showRefresh?: boolean
@@ -53,6 +55,7 @@ const emit = defineEmits<{
   (e: 'search'): void
   (e: 'refresh'): void
   (e: 'create'): void
+  (e: 'export'): void
   (e: 'back'): void
 }>()
 
@@ -102,6 +105,7 @@ function onSizeChange(v: number) {
           />
         </div>
         <button v-if="showRefresh" class="btn-ghost" @click="emit('refresh')">刷新</button>
+        <button v-if="canExport" class="btn-ghost" title="导出当前筛选结果为 CSV" @click="emit('export')">导出</button>
         <slot name="header-extra" />
         <button v-if="canCreate" class="btn-create" @click="emit('create')">
           <Plus :size="16" /> {{ createLabel }}

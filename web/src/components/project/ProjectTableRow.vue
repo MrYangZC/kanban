@@ -140,9 +140,9 @@ async function onArchive(p: Project) {
         </button>
         <button
           class="rounded-md p-1.5 text-ink-secondary transition-all duration-200 hover:bg-surface-hover hover:text-primary"
-          :class="{ 'cursor-not-allowed opacity-50': !project.canManage }"
-          :title="project.status === 'ARCHIVED' ? '取消归档' : '归档'"
-          :disabled="!project.canManage"
+          :class="{ 'cursor-not-allowed opacity-50': !project.canArchive }"
+          :title="project.status === 'ARCHIVED' ? '取消归档' : '归档（仅所有者/管理员）'"
+          :disabled="!project.canArchive"
           @click.stop="onArchive(project)"
         >
           <ArchiveRestore v-if="project.status === 'ARCHIVED'" :size="15" />
@@ -150,9 +150,9 @@ async function onArchive(p: Project) {
         </button>
         <button
           class="rounded-md p-1.5 text-ink-secondary transition-all duration-200 hover:bg-rose-50 hover:text-rose-500"
-          :class="{ 'cursor-not-allowed opacity-50': !project.canManage }"
-          :title="project.canManage ? '删除项目' : '仅项目所有者/管理员/项目经理可删除项目'"
-          :disabled="!project.canManage"
+          :class="{ 'cursor-not-allowed opacity-50': !project.canDelete }"
+          :title="project.canDelete ? '删除项目' : '仅项目所有者/管理员可删除项目'"
+          :disabled="!project.canDelete"
           @click.stop="emit('delete', project)"
         >
           <Trash2 :size="15" />

@@ -2,17 +2,18 @@
 import { onMounted, ref, reactive, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  filterIssues, updateIssue, listProjectStatuses,
+  filterIssues, updateIssue, listProjectStatuses, listWorkflowColumns,
   listProjectTags, listProjectMembers, listUsers, getProject
 } from '@/api'
 import type {
-  Issue, LabelVO, ProjectMember, UserVO, IssueStatusVO,
-  IssueActivity, Project
+  Issue, LabelVO, ProjectMember, UserOption, IssueStatusVO,
+  IssueActivity, Project, WorkflowColumnVO
 } from '@/api/types'
 import { REQUIREMENT_TYPE_CODES, TASK_TYPE_CODES, DEFECT_TYPE_CODES, categoryOfTypeCode } from '@/api/types'
 import type { WorkItemCategory } from '@/api/types'
 import { ElMessage } from 'element-plus'
 import { confirmAction } from '@/utils/confirm'
+import { confirmHandoff } from '@/utils/handoff'
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Plus, X,
   Paperclip, Link2, Trash2,
@@ -54,8 +55,10 @@ const loading = ref(false)
 const allIssues = ref<Issue[]>([])
 const allTags = ref<LabelVO[]>([])
 const members = ref<ProjectMember[]>([])
-const users = ref<UserVO[]>([])
+const users = ref<UserOption[]>([])
 const statuses = ref<IssueStatusVO[]>([])
+// statusId → 该列的交接配置，用于改状态前的转交确认
+const handoffByStatus = ref<Record<string, WorkflowColumnVO>>({})
 const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => pid.value)
 const canWrite = computed(() => hasPermission('issue:edit'))
 const canComment = computed(() => hasPermission('issue:comment'))
@@ -101,6 +104,10 @@ const {
   attachments,
   links,
   tags,
+  hasEarlier,
+  loadingEarlier,
+  loadEarlierActivities,
+  commentTotal,
   reload: reloadTabs,
   sendComment: sendCommentApi,
   uploadFile: uploadFileApi,
@@ -110,7 +117,8 @@ const {
   removeAttachment: removeAttach,
   removeLink: removeLinkApi,
   addTag: addTagApi,
-  removeTag
+  removeTag,
+  revokeHandoff: revokeHandoffApi
 } = useIssueTabs({
   issueId: () => currentIssue.value?.id || '',
   projectId: () => pid.value
@@ -125,7 +133,6 @@ const commentEditorRef = ref<InstanceType<typeof RichTextEditor> | null>(null)
 const attachInputRef = ref<HTMLInputElement | null>(null)
 const linkType = ref('关联')
 const linkFilter = ref<'all' | 'requirement' | 'task' | 'defect'>('all')
-const linkKeyword = ref('')
 const linkOptions = ref<Issue[]>([])
 const linkLoading = ref(false)
 const linkSelected = ref<string[]>([])
@@ -171,7 +178,8 @@ const filteredActivities = computed(() => {
   if (subTab.value === 'dynamic') return activities.value.filter((a) => a.type !== 'COMMENT')
   return activities.value
 })
-const commentCount = computed(() => activities.value.filter((a) => a.type === 'COMMENT').length)
+// 评论总数由后端随分页一起返回（分页后当前页长度不等于总数）
+const commentCount = computed(() => commentTotal.value)
 
 // 评论楼层：由纯函数构建，与抽屉面板共用同一套嵌套/排序规则
 const commentTree = computed<(IssueActivity | CommentNode)[]>(() =>
@@ -241,6 +249,46 @@ async function ensureStatuses(category: WorkItemCategory) {
   } catch {
     statuses.value = []
   }
+  try {
+    const columns = await listWorkflowColumns(pid.value, category)
+    handoffByStatus.value = Object.fromEntries(columns.map((c) => [c.statusId, c]))
+  } catch {
+    // 交接配置缺失只降级为「不提示交接」，不影响状态修改
+    handoffByStatus.value = {}
+  }
+}
+
+/**
+ * 字段变更统一入口。状态是唯一带交接副作用的字段：
+ * 换状态前若目标列会换人，先确认；用户取消则把下拉还原，不落库。
+ */
+async function onFieldChange(e: { field: string; payload: { patch: Record<string, unknown>; clear?: string[] } }) {
+  const patch = e.payload?.patch || {}
+  const nextStatus = patch.statusId
+  if (typeof nextStatus === 'string' && nextStatus !== currentIssue.value?.statusId) {
+    const confirmed = await confirmHandoff(
+      handoffByStatus.value[nextStatus],
+      form.assigneeId || currentIssue.value?.assigneeId
+    )
+    if (!confirmed) {
+      form.statusId = currentIssue.value?.statusId || ''
+      return
+    }
+  }
+  await saveField(e.field, patch, e.payload.clear)
+}
+
+/**
+ * 撤销交接后负责人回到交接前的人：本地状态要同步更新，
+ * 否则页面上仍显示刚接手的人，继续操作会带着过期的负责人提交。
+ */
+async function onRevokeHandoff() {
+  const updated = await revokeHandoffApi()
+  if (!updated) return
+  currentIssue.value = updated
+  const idx = allIssues.value.findIndex((i) => i.id === updated.id)
+  if (idx >= 0) allIssues.value[idx] = updated
+  form.assigneeId = updated.assigneeId || ''
 }
 
 async function selectIssue(issue: Issue) {
@@ -455,6 +503,11 @@ async function onRemoveAttach(attachmentId: string) {
   if (await confirmRemove('确定删除该附件吗？', '删除附件')) {
     await removeAttach(attachmentId)
   }
+}
+
+/** 附件只能由上传者本人删除；系统管理员可代删（与后端权限判定一致） */
+function canRemoveAttachment(uploadedBy: string): boolean {
+  return uploadedBy === userStore.user?.id || userStore.isAdmin
 }
 
 async function searchLinks(keyword?: string) {
@@ -738,10 +791,25 @@ onMounted(async () => {
                     @remove="onRemoveComment"
                   />
                   <!-- 动态与评论共用 ActivityItem：同款头像 + 姓名 + 时间 + 正文 -->
-                  <ActivityItem v-else :node="a" />
+                  <ActivityItem
+                    v-else
+                    :node="a"
+                    :can-write="canWrite"
+                    @revoke="onRevokeHandoff"
+                  />
                 </template>
                 <div v-if="!filteredActivities.length" class="py-8 text-center text-sm text-ink-placeholder">
                   暂无内容
+                </div>
+                <!-- 时间线分页：首屏最新 50 条，更早的按需追加 -->
+                <div v-if="hasEarlier" class="pt-1 text-center">
+                  <button
+                    class="rounded px-3 py-1.5 text-xs text-ink-placeholder transition hover:bg-surface-hover hover:text-ink"
+                    :disabled="loadingEarlier"
+                    @click="loadEarlierActivities"
+                  >
+                    {{ loadingEarlier ? '加载中…' : '加载更早的动态' }}
+                  </button>
                 </div>
               </div>
             </div>
@@ -859,7 +927,7 @@ onMounted(async () => {
                     <span class="text-ink">{{ a.fileName }}</span>
                     <span class="text-xs text-ink-placeholder">{{ a.uploaderName }} · {{ fmtTime(a.createdAt) }}</span>
                   </div>
-                  <button class="text-ink-placeholder hover:text-danger" @click="onRemoveAttach(a.id)"><Trash2 :size="14" /></button>
+                  <button v-if="canRemoveAttachment(a.uploadedBy)" class="text-ink-placeholder hover:text-danger" @click="onRemoveAttach(a.id)"><Trash2 :size="14" /></button>
                 </div>
                 <div v-if="!attachments.length" class="py-8 text-center text-sm text-ink-placeholder">暂无附件</div>
               </div>
@@ -960,6 +1028,7 @@ onMounted(async () => {
               :model-value="form"
               @update:model-value="(e) => Object.assign(form, e)"
               :statuses="statuses"
+              :handoff-by-status="handoffByStatus"
               :members="members"
               :priority-options="priorityOptions"
               :severity-options="severityOptions"
@@ -967,7 +1036,7 @@ onMounted(async () => {
               :can-write="canWrite"
               :show-severity="isDefect"
               :show-no-fix-reason="isDefect"
-              @field-change="(e) => saveField(e.field, e.payload.patch, e.payload.clear)"
+              @field-change="onFieldChange"
               @add-tag="onAddTag"
               @remove-tag="(id) => removeTag(id)"
             />
@@ -1013,7 +1082,7 @@ onMounted(async () => {
                 <Paperclip :size="14" class="text-ink-secondary" />
                 <span class="flex-1 truncate text-ink">{{ a.fileName }}</span>
                 <span class="text-xs text-ink-placeholder">{{ fmtDate(a.createdAt) }}</span>
-                <button class="text-ink-placeholder hover:text-danger" @click="onRemoveAttach(a.id)"><Trash2 :size="13" /></button>
+                <button v-if="canRemoveAttachment(a.uploadedBy)" class="text-ink-placeholder hover:text-danger" @click="onRemoveAttach(a.id)"><Trash2 :size="13" /></button>
               </div>
               <div v-if="!attachments.length" class="py-4 text-center text-xs text-ink-placeholder">
                 暂无附件，点击 + 上传

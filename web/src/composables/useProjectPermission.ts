@@ -1,4 +1,4 @@
-import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, type Ref } from 'vue'
 import { listProjectMembers, getMyPermissions } from '@/api'
 import type { ProjectMember } from '@/api/types'
 import { useUserStore } from '@/stores/user'

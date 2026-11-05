@@ -29,6 +29,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   (e: 'reply', node: IssueActivity): void
   (e: 'remove', id: string): void
+  (e: 'revoke', node: IssueActivity): void
 }>()
 
 const isComment = computed(() => props.node.type === 'COMMENT')
@@ -36,6 +37,8 @@ const isDeleted = computed(() => props.node.deleted === 1)
 const isMine = computed(() => !!props.currentUserName && props.node.actorName === props.currentUserName)
 const canRemove = computed(() => props.canWrite && isComment.value && isMine.value && !isDeleted.value)
 const canReply = computed(() => props.replyable && props.canWrite && isComment.value && !isDeleted.value)
+/** 撤销交接：可撤销性由后端判定（最后一条交接 + 接手人仍是当前负责人），这里只做权限把关 */
+const canRevoke = computed(() => props.canWrite && !!props.node.revocable)
 const bodyHtml = computed(() => renderCommentContent(props.node.content))
 </script>
 
@@ -53,7 +56,8 @@ const bodyHtml = computed(() => renderCommentContent(props.node.content))
       <div class="mb-1.5 flex items-center gap-2 text-xs">
         <span class="font-medium text-ink" :class="isDeleted ? 'opacity-50' : ''">{{ node.actorName }}</span>
         <span class="text-ink-placeholder">{{ fmtTime(node.createdAt) }}</span>
-        <div v-if="canReply || canRemove" class="ml-auto flex items-center gap-3">
+        <div v-if="canReply || canRemove || canRevoke" class="ml-auto flex items-center gap-3">
+          <button v-if="canRevoke" class="text-primary hover:underline" @click="emit('revoke', node)">撤销交接</button>
           <button v-if="canReply" class="text-primary hover:underline" @click="emit('reply', node)">回复</button>
           <button
             v-if="canRemove"

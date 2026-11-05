@@ -1,24 +1,22 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   filterIssues, listProjectStatuses, listProjectMembers,
-  getBoardGrouped, listTransitions, moveIssue
+  getBoardGrouped, listTransitions, exportIssuesUrl
 } from '@/api'
 import type { Issue, IssueTreeNode, IssueStatusVO, BoardGroupView, GroupColumnView, WorkflowTransitionVO, WorkItemCategory } from '@/api/types'
 import type { LucideIcon } from 'lucide-vue-next'
 import { List, GitBranch, LayoutGrid, User, UserCheck, Inbox, Archive } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
-import {
-  draggedIssue, dragFromStatusId, dropStatusId, dragNeighbors, findColumnIssues,
-  type WorkItemDragEvent
-} from '@/utils/dragEvent'
+import { useBoardDrag } from '@/composables/useBoardDrag'
 import SimpleListView from '@/components/SimpleListView.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
 import { useWorkflowTransition } from '@/composables/useWorkflowTransition'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { useScopeCounts } from '@/composables/useScopeCounts'
+import { useIssueFilterParams } from '@/composables/useIssueFilterParams'
 import { PRIORITY_COLOR as priorityColor } from '@/constants/issueDict'
 import DataTable, { type TableColumn } from '@/components/common/DataTable.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
@@ -68,14 +66,22 @@ const allIssues = ref<Issue[]>([])
 const board = ref<BoardGroupView | null>(null)
 const filteredIds = ref<Set<string>>(new Set())
 /** 拖拽悬停的列及其是否允许落入，用于列头/列体高亮 */
-const dragOverCol = ref<{ statusId: string; allowed: boolean } | null>(null)
-
 const createOpen = ref(false)
 const detailDrawer = ref<InstanceType<typeof IssueDetailDrawer> | null>(null)
 
 const { transitionMap, build: buildTransitionMap } = useWorkflowTransition()
 // 只读访问者（VIEWER）不应看到「新建」入口：后端的写权限校验拦得住请求，但入口必须同步隐藏
-const { canWrite, refresh: refreshPermission } = useProjectPermission(() => projectId.value)
+const { canWrite, hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId.value)
+/** 导出按钮与后端 issue:export 权限码对齐（此前该权限码从未被任何功能使用） */
+const canExport = computed(() => hasPermission('issue:export'))
+
+function onExport() {
+  window.open(exportIssuesUrl(projectId.value, {
+    types: props.typeCodes,
+    scope: scope.value || undefined,
+    keyword: keyword.value.trim() || undefined
+  }), '_blank')
+}
 
 // 左侧各范围的条数：与视图无关，切到看板/树形后仍取自 filter 的 total
 const { counts: scopeCounts, refresh: refreshScopeCounts } = useScopeCounts(
@@ -166,22 +172,20 @@ const { statusCategoryFilter, overdueFilter, activeFilterLabel, clearQueryFilter
     load()
   })
 
-function baseParams(extra: Record<string, unknown> = {}) {
-  return {
-    projectId: projectId.value,
-    scope: scope.value || undefined,
-    keyword: keyword.value || undefined,
-    issueTypeCodes: props.typeCodes,
-    statusCategory: statusCategoryFilter.value || undefined,
-    overdue: overdueFilter.value || undefined,
-    ...extra
-  }
-}
+// 列表/树/看板共用的筛选参数：字段定义收敛在 useIssueFilterParams，避免各视图各拼一份
+const filterParams = useIssueFilterParams({
+  projectId: () => projectId.value,
+  typeCodes: () => props.typeCodes,
+  scope: () => scope.value,
+  keyword: () => keyword.value,
+  statusCategory: () => statusCategoryFilter.value,
+  overdue: () => overdueFilter.value
+})
 
 async function loadList() {
   loading.value = true
   try {
-    const res = await filterIssues(baseParams({ page: page.value, size: size.value }))
+    const res = await filterIssues(filterParams({ page: page.value, size: size.value }))
     tableData.value = res.list
     total.value = res.total
   } catch {
@@ -194,7 +198,7 @@ async function loadList() {
 async function loadTree() {
   loading.value = true
   try {
-    const res = await filterIssues(baseParams({ page: 1, size: 1000 }))
+    const res = await filterIssues(filterParams({ page: 1, size: 1000 }))
     allIssues.value = res.list
     total.value = res.total
   } catch {
@@ -214,7 +218,7 @@ async function loadBoard() {
     ])
     board.value = boardRes
     transitionMap.value = buildTransitionMap(transitions)
-    const res = await filterIssues(baseParams({ page: 1, size: 1000 }))
+    const res = await filterIssues(filterParams({ page: 1, size: 1000 }))
     filteredIds.value = new Set(res.list.map((i: Issue) => i.id))
     total.value = res.total
   } catch {
@@ -230,41 +234,12 @@ async function load() {
   return loadBoard()
 }
 
-/** 拖拽过程中的实时校验：不合格的列会立刻回弹（返回 false），并高亮为拒绝色 */
-function onMove(evt: WorkItemDragEvent): boolean {
-  const fromId = dragFromStatusId(evt)
-  const toId = dropStatusId(evt)
-  if (!fromId || !toId) return true
-  // 同列排序恒允许；跨列须存在本类别工作流的流转规则
-  const allowed = fromId === toId || transitionMap.value[fromId]?.has(toId) === true
-  if (dragOverCol.value?.statusId !== toId || dragOverCol.value?.allowed !== allowed) {
-    dragOverCol.value = { statusId: toId, allowed }
-  }
-  return allowed
-}
-
-async function onEnd(event: WorkItemDragEvent) {
-  dragOverCol.value = null
-  const moved = draggedIssue(event)
-  if (!moved) return
-  const toStatusId = dropStatusId(event)
-  if (!toStatusId) return
-  const fromStatusId = moved.statusId
-  const allowed = fromStatusId === toStatusId || transitionMap.value[fromStatusId]?.has(toStatusId) === true
-  if (!allowed) {
-    // 服务端也会拒绝，这里先按规则回弹，避免不必要的请求
-    await loadBoard()
-    return
-  }
-  const { before, after } = dragNeighbors(event, findColumnIssues(renderGroups.value, toStatusId))
-  try {
-    await moveIssue(moved.id, { statusId: toStatusId, beforeId: before?.id, afterId: after?.id })
-  } catch {
-    // 失败提示由接口层统一弹出；finally 重新拉取看板，把乐观移动的卡片回滚到服务端真实顺序
-  } finally {
-    await loadBoard()
-  }
-}
+/** 拖拽编排收敛在 useBoardDrag：列高亮、流转预判、落点邻接与失败回滚只有一份实现 */
+const { dragOverCol, onMove, onEnd } = useBoardDrag({
+  transitionMap,
+  groups: () => renderGroups.value,
+  reload: loadBoard
+})
 
 /** 数据发生增删改后：刷新列表与左侧范围计数（计数与当前视图无关，需单独拉取） */
 function reloadAll() {
@@ -311,6 +286,7 @@ onMounted(() => {
     :search-placeholder="`搜索${noun}`"
     create-label="新建"
     :can-create="canWrite"
+    :can-export="canExport"
     :loading="loading"
     :total="total"
     :is-empty="view === 'list' && !tableData.length"
@@ -327,6 +303,7 @@ onMounted(() => {
     @update:scope="onScopeChange"
     @search="onSearch"
     @refresh="reloadAll"
+    @export="onExport"
     @create="openCreate"
   >
     <template #header-extra>

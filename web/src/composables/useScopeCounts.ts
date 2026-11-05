@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { filterIssues } from '@/api'
+import { useIssueFilterParams } from '@/composables/useIssueFilterParams'
 
 /**
  * 工作项列表左侧范围导航的 scope 取值，与后端 BaseWorkItemService 的 scope 语义一一对应：
@@ -21,6 +22,8 @@ export function isScopeKey(value: string): value is ScopeKey {
  */
 export function useScopeCounts(projectId: () => string, typeCodes: () => string[]) {
   const counts = ref<Record<string, number>>({})
+  // 与列表页共用同一套筛选字段，避免"计数口径"和"列表口径"各写一份
+  const buildFilterParams = useIssueFilterParams({ projectId, typeCodes })
   // 并发刷新时只认最后一次结果，避免旧请求覆盖新数据（如切换项目后回包乱序）
   let seq = 0
 
@@ -29,13 +32,9 @@ export function useScopeCounts(projectId: () => string, typeCodes: () => string[
     const pairs = await Promise.all(
       SCOPE_KEYS.map(async (key) => {
         try {
-          const res = await filterIssues({
-            projectId: projectId(),
-            scope: key || undefined,
-            issueTypeCodes: typeCodes(),
-            page: 1,
-            size: 1
-          })
+          const res = await filterIssues(
+            buildFilterParams({ scope: key || undefined, page: 1, size: 1 })
+          )
           return [key, res.total] as const
         } catch {
           // 单个范围失败不阻塞其它范围（错误提示由接口层统一弹出）

@@ -2,19 +2,20 @@
 import { onMounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import draggable from 'vuedraggable'
-import { getBoardGrouped, createIssue, moveIssue, filterIssues, listProjectTags, listProjectMembers, listTransitions } from '@/api'
-import { Archive, BarChart3, Bug, FileText, Inbox, LayoutGrid, ListTodo, Plus, Table2, User, UserCheck } from 'lucide-vue-next'
-import type { BoardGroupView, Issue, GroupColumnView, LabelVO, ProjectMember, WorkflowTransitionVO, WorkItemCategory } from '@/api/types'
+import { getBoardGrouped, moveIssue, filterIssues, listProjectTags, listTransitions } from '@/api'
+import { Archive, ArrowRightLeft, BarChart3, Bug, FileText, Inbox, LayoutGrid, ListTodo, Plus, Settings2, Table2, User, UserCheck } from 'lucide-vue-next'
+import type { BoardGroupView, Issue, GroupColumnView, LabelVO, WorkflowTransitionVO, WorkItemCategory } from '@/api/types'
 import { TASK_TYPE_CODES, REQUIREMENT_TYPE_CODES, DEFECT_TYPE_CODES } from '@/api/types'
 import IssueCard from '@/components/IssueCard.vue'
 import SimpleListView from '@/components/SimpleListView.vue'
 import type { ViewTab } from '@/components/ViewTabs.vue'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
+import WorkflowHandoffDialog from '@/components/board/WorkflowHandoffDialog.vue'
 import { useBoardFilter } from '@/stores/boardFilter'
-import { ElMessage } from 'element-plus'
 import { useWorkflowTransition } from '@/composables/useWorkflowTransition'
 import { useProjectPermission } from '@/composables/useProjectPermission'
+import { confirmHandoff, handoffLabel } from '@/utils/handoff'
 import {
   draggedIssue, dragFromStatusId, dropStatusId, dragNeighbors, findColumnIssues,
   type WorkItemDragEvent
@@ -93,6 +94,8 @@ const { hasPermission, refresh: refreshPermission } = useProjectPermission(() =>
 // 共用同一个标记会导致「只有 issue:edit」的角色看不到拖拽、或「只有 issue:create」的角色能拖动卡片。
 const canCreate = computed(() => hasPermission('issue:create'))
 const canEdit = computed(() => hasPermission('issue:edit'))
+// 列交接属于项目流程配置，与工作流设置同权限，不能跟着 issue:edit 放开
+const canConfigHandoff = computed(() => hasPermission('project:workflow'))
 
 async function load() {
   loading.value = true
@@ -172,6 +175,23 @@ const { transitionMap, build: buildTransitionMap } = useWorkflowTransition()
 
 const dragOverCol = ref<{ statusId: string; allowed: boolean } | null>(null)
 
+/** 列交接配置弹窗；交接字段随看板一起返回，这里直接复用列对象，不再单独请求 */
+const handoffOpen = ref(false)
+const handoffColumn = ref<GroupColumnView | null>(null)
+
+function openHandoff(col: GroupColumnView) {
+  handoffColumn.value = col
+  handoffOpen.value = true
+}
+
+function findColumn(statusId: string): GroupColumnView | undefined {
+  for (const group of renderGroups.value) {
+    const hit = group.columns.find((c) => c.statusId === statusId)
+    if (hit) return hit
+  }
+  return undefined
+}
+
 function onMove(evt: WorkItemDragEvent): boolean {
   const fromId = dragFromStatusId(evt)
   const toId = dropStatusId(evt)
@@ -199,6 +219,15 @@ async function onEnd(event: WorkItemDragEvent) {
     // 规则不允许：vuedraggable 已阻止放置并回弹，无需调用后端，仅重新拉取保证数据一致
     await load()
     return
+  }
+  // 交接确认：落点列配置了交接且会真正换人时先问一句，取消则回弹（以服务端数据为准重新拉取）
+  const targetCol = findColumn(toStatusId)
+  if (targetCol) {
+    const confirmed = await confirmHandoff(targetCol, moved.assigneeId)
+    if (!confirmed) {
+      await load()
+      return
+    }
   }
   // 取落点列绑定的数组（vuedraggable 已按拖拽结果就地改序），按数组下标定 before/after
   const { before, after } = dragNeighbors(event, findColumnIssues(renderGroups.value, toStatusId))
@@ -332,13 +361,30 @@ onMounted(() => {
                 'kanban-col-deny': dragOverCol?.statusId === col.statusId && !dragOverCol?.allowed
               }"
             >
-              <div class="flex items-center gap-2 px-3 py-3">
-                <span class="h-2.5 w-2.5 rounded-full" :style="{ background: col.color || 'var(--ink-secondary)' }" />
-                <span class="text-sm font-medium text-ink-900">{{ col.name }}</span>
-                <span class="text-xs text-ink-400">{{ col.issues.length }}</span>
-                <button v-if="canCreate" class="ml-auto text-ink-400 hover:text-brand" @click="onNewIssue(col)">
-                  <Plus :size="16" />
-                </button>
+              <div class="px-3 py-3">
+                <div class="flex items-center gap-2">
+                  <span class="h-2.5 w-2.5 rounded-full" :style="{ background: col.color || 'var(--ink-secondary)' }" />
+                  <span class="text-sm font-medium text-ink-900">{{ col.name }}</span>
+                  <span class="text-xs text-ink-400">{{ col.issues.length }}</span>
+                  <button v-if="canCreate" class="ml-auto text-ink-400 hover:text-brand" @click="onNewIssue(col)">
+                    <Plus :size="16" />
+                  </button>
+                </div>
+                <!-- 交接信息：未配置且无权限时整行不渲染，保持原有列头高度 -->
+                <div v-if="handoffLabel(col) || canConfigHandoff" class="group/handoff mt-1 flex items-center gap-1">
+                  <span v-if="handoffLabel(col)" class="flex min-w-0 items-center gap-1 text-xs text-ink-400">
+                    <ArrowRightLeft :size="12" class="shrink-0" />
+                    <span class="truncate" :title="col.handoffNote || handoffLabel(col)">{{ handoffLabel(col) }}</span>
+                  </span>
+                  <button
+                    v-if="canConfigHandoff"
+                    class="ml-auto shrink-0 rounded p-0.5 text-ink-300 opacity-0 transition hover:text-brand group-hover/handoff:opacity-100"
+                    title="配置列交接"
+                    @click="openHandoff(col)"
+                  >
+                    <Settings2 :size="12" />
+                  </button>
+                </div>
               </div>
               <!-- 不要加 force-fallback：.kanban-col / .kanban-group 的 backdrop-filter 会接管
                    fixed 定位，Sortable 用 fixed 跟随鼠标的那张卡片会被算到列容器上，
@@ -373,6 +419,22 @@ onMounted(() => {
     <template #footer>
       <!-- 云效风格缺陷详情：宽抽屉（60% 屏宽），不跳转路由 -->
       <IssueDetailDrawer ref="detailDrawer" :project-id="projectId" @closed="load" />
+
+      <!-- 列交接配置：保存后刷新看板，让列头文案与拖拽确认立即生效 -->
+      <WorkflowHandoffDialog
+        v-if="handoffColumn"
+        v-model:visible="handoffOpen"
+        :project-id="projectId"
+        :category="boardCategory as WorkItemCategory"
+        :status-id="handoffColumn.statusId"
+        :column-name="handoffColumn.name"
+        :handoff-type="handoffColumn.handoffType || 'NONE'"
+        :handoff-user-id="handoffColumn.handoffUserId"
+        :handoff-note="handoffColumn.handoffNote"
+        :target-sprint-id="handoffColumn.targetSprintId"
+        :target-label-id="handoffColumn.targetLabelId"
+        @saved="load"
+      />
 
       <!-- 新建工作项：富文本弹窗 -->
       <CreateIssueDialog

@@ -3,7 +3,10 @@ import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
 import { useUserStore } from '@/stores/user'
+import { useNotificationStore } from '@/stores/notification'
 import { getMyProfile, listProjectStatuses } from '@/api'
+import type { NotificationVO } from '@/api/types'
+import { fmtTime } from '@/utils/datetime'
 import { ElMessage } from 'element-plus'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
@@ -16,6 +19,7 @@ const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
 const userStore = useUserStore()
+const notificationStore = useNotificationStore()
 
 const isInProject = computed(() => !!route.params.projectId)
 const projectId = computed(() => route.params.projectId as string)
@@ -23,6 +27,7 @@ const isAdmin = computed(() => userStore.isAdmin)
 
 const showProjectDropdown = ref(false)
 const showUserDropdown = ref(false)
+const showNoticeDropdown = ref(false)
 const showSearchDialog = ref(false)
 const searchKeyword = ref('')
 const createOpen = ref(false)
@@ -54,6 +59,34 @@ function toggleProjectDropdown() {
 function toggleUserDropdown() {
   showUserDropdown.value = !showUserDropdown.value
   showProjectDropdown.value = false
+  showNoticeDropdown.value = false
+}
+
+function toggleNotice() {
+  showNoticeDropdown.value = !showNoticeDropdown.value
+  showProjectDropdown.value = false
+  showUserDropdown.value = false
+  if (showNoticeDropdown.value) {
+    notificationStore.loadRecent()
+    notificationStore.refreshUnread()
+  }
+}
+
+/**
+ * 点开通知即视为已读，随后跳到对应工作项。
+ * 三类工作项的落地页不同：缺陷有独立详情页，任务/需求只有列表页。
+ */
+async function openNotification(n: NotificationVO) {
+  showNoticeDropdown.value = false
+  await notificationStore.markRead(n.id)
+  if (!n.projectId || !n.issueId) return
+  if (n.category === 'BUG') {
+    router.push(`/projects/${n.projectId}/defects/${n.issueId}`)
+  } else if (n.category === 'REQUIREMENT') {
+    router.push(`/projects/${n.projectId}/requirements`)
+  } else {
+    router.push(`/projects/${n.projectId}/tasks`)
+  }
 }
 
 function switchProject(id: string) {
@@ -124,6 +157,12 @@ function onKeydown(e: KeyboardEvent) {
 function onDocumentClick() {
   showProjectDropdown.value = false
   showUserDropdown.value = false
+  showNoticeDropdown.value = false
+}
+
+/** 切回标签页时立即校正未读数，避免等下一个轮询周期 */
+function onWindowFocus() {
+  notificationStore.refreshUnread()
 }
 
 watch(projectId, async () => {
@@ -150,11 +189,17 @@ onMounted(async () => {
   }
   window.addEventListener('keydown', onKeydown)
   document.addEventListener('click', onDocumentClick)
+  window.addEventListener('focus', onWindowFocus)
+  // 通知是用户级数据，进站即开始轮询未读数（不依赖是否在项目内）
+  notificationStore.refreshUnread()
+  notificationStore.startPolling()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   document.removeEventListener('click', onDocumentClick)
+  window.removeEventListener('focus', onWindowFocus)
+  notificationStore.stopPolling()
 })
 </script>
 
@@ -234,15 +279,63 @@ onBeforeUnmount(() => {
       >
         <Plus :size="18" />
       </button>
-      <!-- 通知中心尚未接入数据源，暂不显示未读数，避免展示编造的数字 -->
-      <button
-        v-if="isInProject"
-        class="relative flex h-8 w-8 items-center justify-center rounded-md text-ink-regular transition hover:bg-surface-hover hover:text-primary"
-        title="通知"
-        disabled
-      >
-        <Bell :size="18" />
-      </button>
+      <!-- 通知：用户级数据，不在项目内也要能看（交接通知可能来自其他项目） -->
+      <div class="relative" @click.stop>
+        <button
+          class="relative flex h-8 w-8 items-center justify-center rounded-md text-ink-regular transition hover:bg-surface-hover hover:text-primary"
+          title="通知"
+          @click="toggleNotice"
+        >
+          <Bell :size="18" />
+          <span
+            v-if="notificationStore.unreadCount"
+            class="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-medium leading-none text-white"
+          >
+            {{ notificationStore.unreadCount > 99 ? '99+' : notificationStore.unreadCount }}
+          </span>
+        </button>
+        <div v-if="showNoticeDropdown" class="glass-pop absolute right-0 top-full z-50 mt-1 w-80 rounded-lg py-1">
+          <div class="flex items-center justify-between px-3 py-2">
+            <span class="text-sm font-medium text-ink">通知</span>
+            <button
+              v-if="notificationStore.unreadCount"
+              class="text-xs text-primary hover:underline"
+              @click="notificationStore.markAllRead()"
+            >
+              全部已读
+            </button>
+          </div>
+          <div class="max-h-80 overflow-y-auto">
+            <div v-if="notificationStore.loading" class="px-3 py-6 text-center text-sm text-ink-secondary">加载中…</div>
+            <div
+              v-else-if="!notificationStore.items.length"
+              class="px-3 py-6 text-center text-sm text-ink-secondary"
+            >
+              暂无通知
+            </div>
+            <button
+              v-for="n in notificationStore.items"
+              :key="n.id"
+              class="flex w-full gap-2 px-3 py-2 text-left transition hover:bg-surface-hover"
+              @click="openNotification(n)"
+            >
+              <span
+                class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                :class="n.readAt ? 'bg-transparent' : 'bg-primary'"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="truncate text-sm" :class="n.readAt ? 'text-ink-regular' : 'font-medium text-ink'">
+                    {{ n.title }}
+                  </span>
+                  <span class="shrink-0 text-xs text-ink-secondary">{{ fmtTime(n.createdAt) }}</span>
+                </div>
+                <p class="mt-0.5 line-clamp-2 text-xs leading-relaxed text-ink-secondary">{{ n.body }}</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
       <div class="relative" @click.stop>
         <button class="flex items-center gap-1.5 rounded-md p-1 transition hover:bg-surface-hover" @click="toggleUserDropdown">
           <UserAvatar :name="userStore.user?.displayName" :src="userStore.user?.avatarUrl" :size="32" />

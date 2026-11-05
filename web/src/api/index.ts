@@ -1,6 +1,6 @@
-import http, { req, type R } from './request'
+import http, { req } from './request'
 import { cached, invalidate, readMyPermissions, writeMyPermissions, clearMyPermissions } from '@/utils/cache'
-import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, AttachmentVO, LinkVO, UserVO, BoardGroupView, DashboardVO, ProjectMember, MemberCandidate, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest, SprintVO, RiskVO, RbacRole, RbacMenu, PermissionDef, WorkItemCategory } from './types'
+import type { Project, Issue, BoardView, LoginVO, LabelVO, IssueActivity, IssueTimeline, AttachmentVO, LinkVO, UserVO, UserOption, BoardGroupView, DashboardVO, ProjectMember, MemberCandidate, PageResult, IssueStatusVO, UploadImageVO, WorkflowTransitionVO, WorkflowColumnVO, SaveHandoffRequest, NotificationVO, MilestoneVO, AnnouncementVO, ProjectActivityVO, ProjectCategoryKey, ProjectCategoryCounts, ProjectFilterRequest, ProfileVO, UpdateProfileRequest, ChangePasswordRequest, SprintVO, RiskVO, RbacRole, RbacMenu, PermissionDef, WorkItemCategory, IssueFilterPayload } from './types'
 
 // 内存缓存 key（项目类数据按 projectId 隔离，会话内仅请求一次）
 // 状态字典按类别分开缓存：任务/需求/缺陷是三套节点，混用一个 key 会串数据
@@ -16,9 +16,12 @@ const C = {
 export function login(username: string, password: string) {
   return req<LoginVO>(http.post('/v1/users/login', { username, password }))
 }
-/** 人员下拉用的全量简表（仅管理员可读，不参与分页） */
+/**
+ * 人员下拉用的精简列表（id/账号/显示名/头像），任何登录用户可读。
+ * 注意：不返回 email/enabled；用户管理列表走 listUsersPage（仅管理员）。
+ */
 export function listUsers() {
-  return cached<UserVO[]>(C.users, () => req<UserVO[]>(http.get('/v1/users/options')))
+  return cached<UserOption[]>(C.users, () => req<UserOption[]>(http.get('/v1/users/options')))
 }
 /** 用户管理列表：分页 + 关键字检索 */
 export function listUsersPage(params?: { page?: number; size?: number; keyword?: string }) {
@@ -30,6 +33,7 @@ export function createUser(payload: {
   email?: string
   avatarUrl?: string
   password?: string
+  isAdmin?: boolean
 }) {
   return req<UserVO>(http.post('/v1/users', payload)).then((r) => {
     invalidate(C.users)
@@ -42,6 +46,7 @@ export function updateUser(id: string, payload: {
   avatarUrl?: string
   enabled?: boolean
   password?: string
+  isAdmin?: boolean
 }) {
   return req<UserVO>(http.put(`/v1/users/${id}`, payload)).then((r) => {
     invalidate(C.users)
@@ -244,27 +249,31 @@ export function updateIssue(id: string, payload: UpdateIssuePayload) {
   return req<Issue>(http.put(`/v1/issues/${id}`, payload))
 }
 
+/** 撤销最近一次工作流交接：负责人退回交接前的人 */
+export function revokeHandoff(issueId: string) {
+  return req<Issue>(http.post(`/v1/issues/${issueId}/handoff/revoke`))
+}
+
 // ---- issue filter ----
-export function filterIssues(payload: {
-  projectId: string
+/**
+ * 工作项导出地址（CSV）。
+ * 直接用 window.open 触发浏览器下载：会话是 Cookie，无需额外请求头。
+ * 注意必须带上 baseURL 的 /api 前缀（window.open 不走 axios）。
+ */
+export function exportIssuesUrl(projectId: string, params: {
+  types?: string[]
   scope?: string
-  statusId?: string
-  priority?: string
-  severity?: string
-  labelId?: string
   keyword?: string
-  /** 状态类别过滤：TODO / IN_PROGRESS / DONE（度量页点统计数字跳转时用） */
-  statusCategory?: string
-  /** 只看逾期（未完成且已过截止日） */
-  overdue?: boolean
-  issueTypeCodes?: string[]
-  /** 迭代过滤：为空表示不过滤，后端会跨 task/requirement/bug 三表查询 */
-  sprintId?: string
-  page?: number
-  size?: number
-  sortField?: string
-  sortOrder?: string
-}) {
+} = {}) {
+  const query = new URLSearchParams()
+  if (params.types?.length) query.set('types', params.types.join(','))
+  if (params.scope) query.set('scope', params.scope)
+  if (params.keyword) query.set('keyword', params.keyword)
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  return `/api/v1/projects/${projectId}/issues/export${suffix}`
+}
+
+export function filterIssues(payload: IssueFilterPayload) {
   return req<PageResult<Issue>>(http.post('/v1/issues/filter', payload))
 }
 
@@ -280,9 +289,9 @@ export function uploadImage(file: File, projectId?: string) {
   return req<UploadImageVO>(http.post('/v1/upload/image', form))
 }
 
-// ---- activities / comments ----
-export function listActivities(issueId: string) {
-  return req<IssueActivity[]>(http.get(`/v1/issues/${issueId}/activities`))
+// ---- activities / comments ----/** 时间线分页：page=1 是最新一页；"加载更早"取 page+1 */
+export function listActivities(issueId: string, page = 1, size = 50) {
+  return req<IssueTimeline>(http.get(`/v1/issues/${issueId}/activities`, { params: { page, size } }))
 }
 export function addComment(issueId: string, content: string, parentId?: string | null) {
   return req<IssueActivity>(http.post(`/v1/issues/${issueId}/comments`, { content, parentId: parentId ?? null }))
@@ -334,6 +343,37 @@ export function listProjectStatuses(projectId: string, category: WorkItemCategor
 /** 指定类别工作流的流转规则（看板拖拽蓝/红提示、详情状态下拉预校验） */
 export function listTransitions(projectId: string, category: WorkItemCategory = 'BUG') {
   return req<WorkflowTransitionVO[]>(http.get(`/v1/projects/${projectId}/transitions`, { params: { category } }))
+}
+
+/** 指定类别工作流的全部列 + 每列交接配置（看板列头、详情状态下拉共用） */
+export function listWorkflowColumns(projectId: string, category: WorkItemCategory = 'TASK') {
+  return req<WorkflowColumnVO[]>(http.get(`/v1/projects/${projectId}/workflow-columns`, { params: { category } }))
+}
+
+/** 保存某一列的交接配置；handoffType=NONE 即清除 */
+export function saveWorkflowHandoff(
+  projectId: string,
+  statusId: string,
+  payload: SaveHandoffRequest,
+  category: WorkItemCategory = 'TASK'
+) {
+  return req<WorkflowColumnVO>(
+    http.put(`/v1/projects/${projectId}/workflow-columns/${statusId}/handoff`, payload, { params: { category } })
+  )
+}
+
+// ---- 通知（当前用户收件箱） ----
+export function listNotifications(params?: { page?: number; size?: number }) {
+  return req<PageResult<NotificationVO>>(http.get('/v1/users/notifications', { params }))
+}
+export function getUnreadNotificationCount() {
+  return req<number>(http.get('/v1/users/notifications/unread-count'))
+}
+export function markNotificationRead(id: string) {
+  return req<void>(http.put(`/v1/users/notifications/${id}/read`))
+}
+export function markAllNotificationsRead() {
+  return req<number>(http.put('/v1/users/notifications/read-all'))
 }
 
 // ---- tags ----

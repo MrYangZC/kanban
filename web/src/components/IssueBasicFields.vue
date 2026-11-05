@@ -3,8 +3,9 @@ import { ref } from 'vue'
 import { X } from 'lucide-vue-next'
 import UserSelect from '@/components/common/UserSelect.vue'
 import { POPPER_OPTIONS } from '@/constants/popper'
-import type { IssueStatusVO, ProjectMember } from '@/api/types'
+import type { IssueStatusVO, ProjectMember, WorkflowColumnVO } from '@/api/types'
 import { PRIMARY } from '@/theme/colorMap'
+import { statusOptionLabel } from '@/utils/handoff'
 
 interface Props {
   /**
@@ -27,6 +28,8 @@ interface Props {
   issueTypeName?: string
   /** 是否显示状态行（详情页显示，新建弹窗用预设状态故隐藏） */
   showStatus?: boolean
+  /** statusId → 该列交接配置；有值时状态下拉会标注「进入后交给谁」 */
+  handoffByStatus?: Record<string, WorkflowColumnVO>
 }
 const props = withDefaults(defineProps<Props>(), {
   statuses: () => [] as IssueStatusVO[],
@@ -36,6 +39,7 @@ const props = withDefaults(defineProps<Props>(), {
   showType: false,
   issueTypeName: '工作项',
   showStatus: true,
+  handoffByStatus: () => ({}) as Record<string, WorkflowColumnVO>,
 })
 
 const emit = defineEmits<{
@@ -98,7 +102,12 @@ defineExpose({ tagInput, clearTagInput })
         :disabled="!canWrite"
         @update:model-value="(v:string)=>{ set('statusId', v); emitChange('状态', { statusId: v }) }"
       >
-        <el-option v-for="s in statuses" :key="s.id" :label="s.name" :value="s.id" />
+        <el-option
+          v-for="s in statuses"
+          :key="s.id"
+          :label="statusOptionLabel(handoffByStatus[s.id], s.name)"
+          :value="s.id"
+        />
       </el-select>
     </div>
 

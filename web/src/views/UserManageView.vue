@@ -20,7 +20,9 @@ const form = reactive({
   displayName: '',
   email: '',
   avatarUrl: '',
-  password: ''
+  password: '',
+  /** 系统管理员（sys_user.is_admin）：可进入用户管理/RBAC，并对全部项目有管理权 */
+  isAdmin: false
 })
 
 /** 检索关键词：交由服务端按 username/显示名/邮箱匹配，避免前端全量过滤掩盖分页问题 */
@@ -68,6 +70,7 @@ function openCreate() {
   form.email = ''
   form.avatarUrl = ''
   form.password = ''
+  form.isAdmin = false
   dialogOpen.value = true
 }
 
@@ -108,6 +111,7 @@ function openEdit(u: UserVO) {
   form.email = u.email || ''
   form.avatarUrl = u.avatarUrl || ''
   form.password = ''
+  form.isAdmin = !!u.isAdmin
   dialogOpen.value = true
 }
 
@@ -126,6 +130,7 @@ async function save() {
       email: form.email,
       avatarUrl: form.avatarUrl.trim(),
       enabled: editing.value.enabled,
+      isAdmin: form.isAdmin,
       password: form.password || undefined
     })
     ElMessage.success('已更新')
@@ -135,6 +140,7 @@ async function save() {
       displayName: form.displayName,
       email: form.email,
       avatarUrl: form.avatarUrl,
+      isAdmin: form.isAdmin,
       password: form.password || undefined
     })
     ElMessage.success('用户已创建')
@@ -192,6 +198,7 @@ onMounted(load)
               <div class="flex items-center gap-3">
                 <UserAvatar :name="u.displayName" :src="u.avatarUrl" :size="32" />
                 <span class="font-medium text-ink">{{ u.displayName }}</span>
+                <span v-if="u.isAdmin" class="rounded bg-surface-hover px-1.5 py-0.5 text-[11px] text-ink-secondary">系统管理员</span>
               </div>
             </td>
             <td class="px-5 py-3 text-ink-regular">{{ u.username }}</td>
@@ -282,6 +289,13 @@ onMounted(load)
               />
             </div>
             <p class="mt-1.5 text-xs text-ink-secondary">支持 jpg / png / gif / webp，不超过 5MB</p>
+          </div>
+          <div>
+            <label class="label-base">系统管理员</label>
+            <label class="flex items-center gap-2 text-sm text-ink-regular">
+              <input v-model="form.isAdmin" type="checkbox" />
+              <span>可进入用户管理 / RBAC，并对全部项目拥有管理权</span>
+            </label>
           </div>
           <div>
             <label class="label-base">{{ editing ? '重置密码（留空不改）' : '初始密码（必填，至少 6 位）' }}</label>

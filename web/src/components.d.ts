@@ -26,6 +26,8 @@ declare module 'vue' {
     ElInput: typeof import('element-plus/es')['ElInput']
     ElOption: typeof import('element-plus/es')['ElOption']
     ElPagination: typeof import('element-plus/es')['ElPagination']
+    ElRadio: typeof import('element-plus/es')['ElRadio']
+    ElRadioGroup: typeof import('element-plus/es')['ElRadioGroup']
     ElSelect: typeof import('element-plus/es')['ElSelect']
     ElTable: typeof import('element-plus/es')['ElTable']
     ElTableColumn: typeof import('element-plus/es')['ElTableColumn']
@@ -67,6 +69,7 @@ declare module 'vue' {
     UserSelect: typeof import('./components/common/UserSelect.vue')['default']
     ViewModeSwitch: typeof import('./components/project/ViewModeSwitch.vue')['default']
     ViewTabs: typeof import('./components/ViewTabs.vue')['default']
+    WorkflowHandoffDialog: typeof import('./components/board/WorkflowHandoffDialog.vue')['default']
     WorkItemListPage: typeof import('./components/workitem/WorkItemListPage.vue')['default']
   }
   export interface GlobalDirectives {

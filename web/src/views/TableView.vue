@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive, computed, watch } from 'vue'
+import { onMounted, ref, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   filterIssues, listIssueChildren, updateIssue, getBoardGrouped,
   listProjectTags, listProjectMembers, listUsers
 } from '@/api'
-import type { Issue, LabelVO, ProjectMember, UserVO } from '@/api/types'
+import type { Issue, LabelVO, ProjectMember, UserOption } from '@/api/types'
 import { TASK_TYPE_CODES, REQUIREMENT_TYPE_CODES, DEFECT_TYPE_CODES, categoryOfTypeCode } from '@/api/types'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
@@ -31,7 +31,7 @@ const size = ref(25)
 const tableData = ref<Issue[]>([])
 const allTags = ref<LabelVO[]>([])
 const members = ref<ProjectMember[]>([])
-const users = ref<UserVO[]>([])
+const users = ref<UserOption[]>([])
 const filter = useBoardFilter(projectId.value)
 const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId.value)
 const canWrite = computed(() => hasPermission('issue:edit'))
@@ -203,9 +203,6 @@ async function toggleChildren(row: Issue) {
   const children = await listIssueChildren(row.id)
   expandChildren[row.id] = children
 }
-
-
-const memberName = (id: string | null) => members.value.find((m) => m.userId === id)?.displayName || '—'
 
 function openIssue(issue: Issue) {
   detailDrawer.value?.open(issue.id)

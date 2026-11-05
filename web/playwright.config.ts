@@ -13,11 +13,16 @@ export default defineConfig({
   timeout: 30000,
   retries: 0,
   workers: 1,
+  // testDir 下的 `_xxx.spec.ts` 是调试/清理脚本（例如 _dbg-keys 会删除指定 key 的项目），
+  // 不能跟着正式用例一起跑：默认执行 `npx playwright test` 时必须排除掉。
+  testIgnore: ['**/_*.spec.ts'],
   // 产物目录保持 ASCII 路径（本机安全删除钩子对中文路径会失败），
   // 执行结束后由测试脚本/人工把 HTML 报告归档到仓库根目录的「测试」文件夹
   reporter: [['list'], ['html', { outputFolder: `./playwright-report/${runStamp}`, open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:5173',
+    // 端口可被 PW_BASE_URL 覆盖：本机 5173 常被其他项目的前端占用，
+    // 此时用 `PW_BASE_URL=http://localhost:5273 npx playwright test` 指向本仓库的 dev server
+    baseURL: process.env.PW_BASE_URL || 'http://localhost:5173',
     channel: 'chrome',
     headless: true,
     viewport: { width: 1440, height: 900 },

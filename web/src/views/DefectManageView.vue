@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import draggable from 'vuedraggable'
 import {
   filterIssues, updateIssue, getBoardGrouped, listProjectStatuses,
   listProjectTags, listProjectMembers, listUsers, getProject,
-  moveIssue, listTransitions
+  listTransitions, exportIssuesUrl
 } from '@/api'
 import { DEFECT_TYPE_CODES } from '@/api/types'
 import type {
-  Issue, IssueTreeNode, LabelVO, ProjectMember, UserVO, IssueStatusVO,
+  Issue, IssueTreeNode, LabelVO, ProjectMember, UserOption, IssueStatusVO,
   BoardGroupView, GroupColumnView, Project, WorkflowTransitionVO
 } from '@/api/types'
 import { ElMessage } from 'element-plus'
@@ -29,10 +29,8 @@ import { useIssueFilterQuery } from '@/composables/useIssueFilterQuery'
 import { useWorkflowTransition } from '@/composables/useWorkflowTransition'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { useScopeCounts, isScopeKey } from '@/composables/useScopeCounts'
-import {
-  draggedIssue, dragFromStatusId, dropStatusId, dragNeighbors, findColumnIssues,
-  type WorkItemDragEvent
-} from '@/utils/dragEvent'
+import { useIssueFilterParams } from '@/composables/useIssueFilterParams'
+import { useBoardDrag } from '@/composables/useBoardDrag'
 import {
   Bug, List, GitBranch, LayoutGrid,
   AlertTriangle, MoreHorizontal, Inbox, UserCheck, User, Share2, Archive
@@ -47,10 +45,20 @@ const project = ref<Project | null>(null)
 const loading = ref(false)
 const allTags = ref<LabelVO[]>([])
 const members = ref<ProjectMember[]>([])
-const users = ref<UserVO[]>([])
+const users = ref<UserOption[]>([])
 const statuses = ref<IssueStatusVO[]>([])
 const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId.value)
 const canWrite = computed(() => hasPermission('issue:edit'))
+/** 导出按钮与后端 issue:export 权限码对齐 */
+const canExport = computed(() => hasPermission('issue:export'))
+
+function onExport() {
+  window.open(exportIssuesUrl(projectId.value, {
+    types: [...DEFECT_TYPE_CODES],
+    scope: scope.value || undefined,
+    keyword: keyword.value.trim() || undefined
+  }), '_blank')
+}
 
 type ViewMode = 'list' | 'tree' | 'board'
 const view = ref<ViewMode>('list')
@@ -64,7 +72,6 @@ const allIssues = ref<Issue[]>([])
 
 const board = ref<BoardGroupView | null>(null)
 const filteredIds = ref<Set<string>>(new Set())
-const dragOverCol = ref<{ statusId: string; allowed: boolean } | null>(null)
 
 // 工作流流转规则：from statusId → 允许的 to statusId 集合
 // 唯一事实来源为后端 workflow_transition 表，前端不硬编码
@@ -169,17 +176,14 @@ const { statusCategoryFilter, overdueFilter, activeFilterLabel, clearQueryFilter
   })
 
 /** 列表/树/看板共用的筛选参数，保证三个视图口径一致 */
-function filterParams(extra: Record<string, unknown> = {}) {
-  return {
-    projectId: projectId.value,
-    scope: scope.value || undefined,
-    keyword: keyword.value || undefined,
-    issueTypeCodes: DEFECT_TYPE_CODES,
-    statusCategory: statusCategoryFilter.value || undefined,
-    overdue: overdueFilter.value || undefined,
-    ...extra
-  }
-}
+const filterParams = useIssueFilterParams({
+  projectId: () => projectId.value,
+  typeCodes: () => DEFECT_TYPE_CODES,
+  scope: () => scope.value,
+  keyword: () => keyword.value,
+  statusCategory: () => statusCategoryFilter.value,
+  overdue: () => overdueFilter.value
+})
 
 async function loadList() {
   loading.value = true
@@ -290,41 +294,12 @@ async function onNewIssue() {
   createOpen.value = true
 }
 
-function onMove(evt: WorkItemDragEvent): boolean {
-  const fromId = dragFromStatusId(evt)
-  const toId = dropStatusId(evt)
-  if (!fromId || !toId) return true
-  // 同列排序恒允许；跨列须存在后端工作流规则
-  const allowed = fromId === toId || transitionMap.value[fromId]?.has(toId) === true
-  if (dragOverCol.value?.statusId !== toId || dragOverCol.value?.allowed !== allowed) {
-    dragOverCol.value = { statusId: toId, allowed }
-  }
-  return allowed
-}
-
-async function onEnd(event: WorkItemDragEvent) {
-  dragOverCol.value = null
-  const moved = draggedIssue(event)
-  if (!moved) return
-  const toStatusId = dropStatusId(event)
-  if (!toStatusId) return
-  // 前端预判流转合法性：同列排序恒允许，跨列须有规则
-  const fromStatusId = moved.statusId
-  const allowed = fromStatusId === toStatusId || transitionMap.value[fromStatusId]?.has(toStatusId) === true
-  if (!allowed) {
-    await loadBoard()
-    return
-  }
-  const { before, after } = dragNeighbors(event, findColumnIssues(renderGroups.value, toStatusId))
-  try {
-    await moveIssue(moved.id, { statusId: toStatusId, beforeId: before?.id, afterId: after?.id })
-  } catch {
-    // 流转失败（并发冲突/无权限）提示由接口层统一弹出；
-    // finally 中重新拉取看板，把乐观移动的卡片回滚到服务端真实顺序
-  } finally {
-    await loadBoard()
-  }
-}
+/** 拖拽编排收敛在 useBoardDrag：列高亮、流转预判、落点邻接与失败回滚只有一份实现 */
+const { dragOverCol, onMove, onEnd } = useBoardDrag({
+  transitionMap,
+  groups: () => renderGroups.value,
+  reload: loadBoard
+})
 
 function back() { router.push('/projects') }
 
@@ -374,6 +349,7 @@ onMounted(() => {
     search-placeholder="搜索缺陷"
     create-label="新建"
     :can-create="canWrite"
+    :can-export="canExport"
     :loading="loading"
     :total="total"
     :is-empty="view === 'list' && !tableData.length"
@@ -390,6 +366,7 @@ onMounted(() => {
     @update:scope="setScope"
     @search="onSearch"
     @refresh="reloadAll"
+    @export="onExport"
     @create="onNewIssue"
     @back="back"
   >

@@ -15,12 +15,45 @@ export interface Project {
   createdAt: string
   stats?: ProjectStats
   favorited?: boolean
+  /** 权限码 project:setting（OWNER/ADMIN/PM） */
   canEdit?: boolean
+  /** 权限码 project:member（OWNER/ADMIN/PM） */
   canManage?: boolean
+  /** 权限码 project:archive（种子数据仅 OWNER/ADMIN） */
+  canArchive?: boolean
+  /** 权限码 project:delete（种子数据仅 OWNER/ADMIN） */
+  canDelete?: boolean
 }
 
 /** 项目分类筛选键 */
 export type ProjectCategoryKey = 'all' | 'managed' | 'participated' | 'favorited' | 'archived'
+
+/**
+ * `/v1/issues/filter` 请求体，与后端 `IssueFilterRequest` 字段对齐。
+ *
+ * <p>抽成公共类型的原因：这个结构此前在列表页、缺陷页、看板页、表格页、范围计数里
+ * 各拼一遍，字段增删要改 5 处，漏改一处就是"某个视图筛选不生效"。
+ */
+export interface IssueFilterPayload {
+  projectId: string
+  scope?: string
+  statusId?: string
+  priority?: string
+  severity?: string
+  labelId?: string
+  keyword?: string
+  /** 状态类别过滤：TODO / IN_PROGRESS / DONE（度量页点统计数字跳转时用） */
+  statusCategory?: string
+  /** 只看逾期（未完成且已过截止日） */
+  overdue?: boolean
+  issueTypeCodes?: string[]
+  /** 迭代过滤：为空表示不过滤，后端会跨 task/requirement/bug 三表查询 */
+  sprintId?: string
+  page?: number
+  size?: number
+  sortField?: string
+  sortOrder?: string
+}
 
 /** 项目分类计数 */
 export interface ProjectCategoryCounts {
@@ -118,6 +151,18 @@ export interface UserVO {
   email: string | null
   avatarUrl: string | null
   enabled: boolean
+  isAdmin?: boolean | null
+}
+
+/**
+ * 人员下拉用的精简用户（GET /users/options）。
+ * 与 UserVO 刻意区分：不含 email/enabled，任何登录用户可读（负责人/验证人/按人筛选用）。
+ */
+export interface UserOption {
+  id: string
+  username: string
+  displayName: string
+  avatarUrl: string | null
 }
 
 export interface BoardColumnView {
@@ -144,6 +189,21 @@ export interface IssueActivity {
   oldValue: string | null
   newValue: string | null
   createdAt: string
+  /** 仅交接动态会有：后端判定的「这次交接现在还能不能撤销」，前端只按标记显示按钮 */
+  revocable?: boolean | null
+}
+
+/**
+ * 工作项时间线一页（评论 + 动态）。
+ * 比通用 PageResult 多带 commentCount：分页后前端手里的评论数只是当前页，
+ * 「评论·N」角标必须用后端给的全量计数。
+ */
+export interface IssueTimeline {
+  total: number
+  commentCount: number
+  page: number
+  size: number
+  list: IssueActivity[]
 }
 
 export interface AttachmentVO {
@@ -170,6 +230,54 @@ export interface WorkflowTransitionVO {
   name: string
 }
 
+/** 进入某一状态列后，负责人是否被转交 */
+export type HandoffType = 'NONE' | 'MEMBER' | 'PROJECT_LEAD'
+
+/** 工作流的一列（状态）+ 该列的交接配置 */
+export interface WorkflowColumnVO {
+  statusId: string
+  name: string
+  category: string
+  color: string
+  sortOrder: number
+  handoffType: HandoffType
+  /** 解析后的目标处理人，PROJECT_LEAD 时已替换为项目负责人 */
+  handoffUserId?: string | null
+  handoffUserName?: string | null
+  handoffNote?: string | null
+  /** 落点迭代：交接时把工作项放进这个迭代，可空 */
+  targetSprintId?: string | null
+  targetSprintName?: string | null
+  /** 落点标签：交接时给工作项补上这个标签，可空 */
+  targetLabelId?: string | null
+  targetLabelName?: string | null
+}
+
+/** 保存某一列的交接配置 */
+export interface SaveHandoffRequest {
+  handoffType: HandoffType
+  handoffUserId?: string | null
+  handoffNote?: string | null
+  /** 落点迭代，可空；handoffType = NONE 时后端会忽略 */
+  targetSprintId?: string | null
+  /** 落点标签，可空；handoffType = NONE 时后端会忽略 */
+  targetLabelId?: string | null
+}
+
+/** 站内通知 */
+export interface NotificationVO {
+  id: string
+  type: string
+  title: string
+  body?: string | null
+  projectId?: string | null
+  issueId?: string | null
+  /** 工作项大类，决定跳转路由 */
+  category?: string | null
+  readAt?: string | null
+  createdAt: string
+}
+
 export interface LinkVO {
   id: string
   issueId: string
@@ -194,6 +302,15 @@ export interface GroupColumnView {
   color: string
   sortOrder: number
   issues: Issue[]
+  /** 进入本列后的交接配置，由后端随看板一次返回，避免逐列再请求 */
+  handoffType?: HandoffType
+  handoffUserId?: string | null
+  handoffUserName?: string | null
+  handoffNote?: string | null
+  targetSprintId?: string | null
+  targetSprintName?: string | null
+  targetLabelId?: string | null
+  targetLabelName?: string | null
 }
 
 export interface BoardGroupView {

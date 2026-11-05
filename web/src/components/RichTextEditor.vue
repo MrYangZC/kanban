@@ -3,7 +3,7 @@ import { ref, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Bold, Italic, List, ListOrdered, Link2, Quote, Smile,
-  Image as ImageIcon, Paperclip
+  Image as ImageIcon
 } from 'lucide-vue-next'
 import { uploadImage } from '@/api'
 
@@ -25,7 +25,6 @@ const emit = defineEmits<{ 'update:modelValue': [val: string] }>()
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const imageInputRef = ref<HTMLInputElement | null>(null)
-const attachInputRef = ref<HTMLInputElement | null>(null)
 const imageUploading = ref(false)
 
 // 已上传图片预览（textarea 仅显示 markdown 文本，预览区展示真实缩略图）
@@ -46,8 +45,10 @@ function wrapSelection(prefix: string, suffix: string, placeholder = '') {
   const end = ta.selectionEnd
   const before = getText().slice(0, start)
   const selected = getText().slice(start, end) || placeholder
+  // 注意：必须保留选区之后的文本。此前这里漏拼了 `after`，
+  // 导致在文中选中一段文字点"粗体/斜体"会把后面的内容整段截断（真实数据丢失）。
   const after = getText().slice(end)
-  setText(before + prefix + selected + suffix)
+  setText(before + prefix + selected + suffix + after)
   nextTick(() => {
     ta.focus()
     const cursor = before.length + prefix.length + selected.length
