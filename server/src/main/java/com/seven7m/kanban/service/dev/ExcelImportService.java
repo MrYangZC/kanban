@@ -441,7 +441,9 @@ public class ExcelImportService {
                 DateTimeFormatter.ofPattern("yyyy-MM-dd")}) {
             try {
                 return LocalDate.parse(s, fmt);
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                // 依次尝试多种日期格式，失败属预期分支，但保留 trace 便于排查"某行日期被丢弃"的原因
+                log.debug("日期解析失败，尝试下一种格式: value={} pattern={}", s, fmt);
             }
         }
         return null;

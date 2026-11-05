@@ -156,7 +156,9 @@ public class SprintService {
         vo.setUpdatedAt(s.getUpdatedAt() == null ? null : s.getUpdatedAt().toString());
         if (s.getCreatedBy() != null) {
             SysUser u = userMap.get(s.getCreatedBy());
-            if (u != null) vo.setCreatorName(u.getDisplayName());
+            if (u != null) {
+                vo.setCreatorName(u.getDisplayName());
+            }
         }
         return vo;
     }

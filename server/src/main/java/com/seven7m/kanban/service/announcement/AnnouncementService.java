@@ -88,7 +88,9 @@ public class AnnouncementService {
         vo.setUpdatedAt(a.getUpdatedAt() != null ? a.getUpdatedAt().toString() : null);
         if (a.getCreatedBy() != null) {
             SysUser u = userMap.get(a.getCreatedBy());
-            if (u != null) vo.setAuthorName(u.getDisplayName());
+            if (u != null) {
+                vo.setAuthorName(u.getDisplayName());
+            }
         }
         return vo;
     }
@@ -104,7 +106,9 @@ public class AnnouncementService {
         vo.setUpdatedAt(a.getUpdatedAt() != null ? a.getUpdatedAt().toString() : null);
         if (a.getCreatedBy() != null) {
             SysUser u = userMapper.selectById(a.getCreatedBy());
-            if (u != null) vo.setAuthorName(u.getDisplayName());
+            if (u != null) {
+                vo.setAuthorName(u.getDisplayName());
+            }
         }
         return vo;
     }

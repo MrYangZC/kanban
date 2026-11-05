@@ -754,7 +754,8 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
 
     /** 排序键计算与列内重排已抽到 {@link WorkItemSortKeyService}（算法与业务字段无关，可独立测试） */
     private String computeSortKey(UUID projectId, UUID statusId, UUID beforeId, UUID afterId) {
-        return sortKeyService.computeSortKey(mapper(), projectId, statusId, beforeId, afterId);
+        return sortKeyService.computeSortKey(mapper(),
+                new WorkItemSortKeyService.SortKeyRequest(projectId, statusId, beforeId, afterId));
     }
 
     // ========================= 看板聚合（供 BoardService 调用，已按表隔离） =========================

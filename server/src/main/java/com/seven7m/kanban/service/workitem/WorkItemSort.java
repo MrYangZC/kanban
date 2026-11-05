@@ -56,8 +56,11 @@ public final class WorkItemSort {
         switch (Field.of(sortField)) {
             case ISSUE_KEY -> {
                 // issue_number 是 varchar：先比长度再比字典序，等价于数字自然序（避免 "1000" 排在 "999" 前）
-                if (asc) q.orderByAsc("LENGTH(issue_number)").orderByAsc("issue_number");
-                else q.orderByDesc("LENGTH(issue_number)").orderByDesc("issue_number");
+                if (asc) {
+                    q.orderByAsc("LENGTH(issue_number)").orderByAsc("issue_number");
+                } else {
+                    q.orderByDesc("LENGTH(issue_number)").orderByDesc("issue_number");
+                }
             }
             case UPDATED_AT -> order(q, "updated_at", asc);
             case CREATED_AT -> order(q, "created_at", asc);
@@ -93,8 +96,11 @@ public final class WorkItemSort {
     }
 
     private static void order(QueryWrapper<?> q, String column, boolean asc) {
-        if (asc) q.orderByAsc(column);
-        else q.orderByDesc(column);
+        if (asc) {
+            q.orderByAsc(column);
+        } else {
+            q.orderByDesc(column);
+        }
     }
 
     private static void defaultOrder(QueryWrapper<?> q) {

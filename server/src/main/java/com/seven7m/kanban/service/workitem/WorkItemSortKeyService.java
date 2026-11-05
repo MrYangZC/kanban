@@ -41,22 +41,38 @@ public class WorkItemSortKeyService {
     private static final int SORT_KEY_REBALANCE_THRESHOLD = 80;
 
     /**
+     * 目标落点：项目、列、以及可选的左右相邻卡片。
+     *
+     * <p>此前 {@code computeSortKey} 有 5 个参数（mapper + 4 个 id），调用处容易传错顺序；
+     * 按手册"参数过多宜封装"收敛为一个值对象。
+     */
+    public record SortKeyRequest(UUID projectId, UUID statusId, UUID beforeId, UUID afterId) {
+
+        /** 追加到列尾（不带相邻卡片） */
+        public static SortKeyRequest appendTo(UUID projectId, UUID statusId) {
+            return new SortKeyRequest(projectId, statusId, null, null);
+        }
+    }
+
+    /**
      * 计算目标位置的 sort_key；结果过长时先把整列改写成等宽键再重算。
      * 重排后相邻键之间恢复大量间隔，后续插入不再退化。
      */
-    public <T extends AbstractWorkItem> String computeSortKey(BaseMapper<T> mapper, UUID projectId, UUID statusId,
-                                                             UUID beforeId, UUID afterId) {
-        String key = computeOnce(mapper, projectId, statusId, beforeId, afterId);
+    public <T extends AbstractWorkItem> String computeSortKey(BaseMapper<T> mapper, SortKeyRequest request) {
+        String key = computeOnce(mapper, request);
         if (key != null && key.length() > SORT_KEY_REBALANCE_THRESHOLD) {
-            int count = rebalanceColumn(mapper, projectId, statusId);
-            log.info("sort_key 超长触发列内重排: project={}, status={}, rows={}", projectId, statusId, count);
-            key = computeOnce(mapper, projectId, statusId, beforeId, afterId);
+            int count = rebalanceColumn(mapper, request);
+            log.info("sort_key 超长触发列内重排: project={}, status={}, rows={}",
+                    request.projectId(), request.statusId(), count);
+            key = computeOnce(mapper, request);
         }
         return key;
     }
 
-    private <T extends AbstractWorkItem> String computeOnce(BaseMapper<T> mapper, UUID projectId, UUID statusId,
-                                                            UUID beforeId, UUID afterId) {
+    private <T extends AbstractWorkItem> String computeOnce(BaseMapper<T> mapper, SortKeyRequest request) {
+        UUID statusId = request.statusId();
+        UUID beforeId = request.beforeId();
+        UUID afterId = request.afterId();
         if (beforeId != null && afterId != null) {
             T b = mapper.selectById(beforeId);
             T a = mapper.selectById(afterId);
@@ -83,7 +99,7 @@ public class WorkItemSortKeyService {
             return SortKeyUtils.between(null, a.getSortKey());
         }
         // 未指定相邻卡片：追加到目标列末尾
-        return SortKeyUtils.after(tailSortKey(mapper, projectId, statusId));
+        return SortKeyUtils.after(tailSortKey(mapper, request.projectId(), statusId));
     }
 
     /** 目标状态列内当前最大的 sort_key，用于把工作项追加到列尾；空列返回 null */
@@ -100,10 +116,10 @@ public class WorkItemSortKeyService {
      * 把某一列的 sort_key 全部改写成等宽键（保持现有顺序）。
      * 只在 {@link #computeSortKey} 检测到键过长时触发，属于低频维护动作。
      */
-    private <T extends AbstractWorkItem> int rebalanceColumn(BaseMapper<T> mapper, UUID projectId, UUID statusId) {
+    private <T extends AbstractWorkItem> int rebalanceColumn(BaseMapper<T> mapper, SortKeyRequest request) {
         List<T> column = mapper.selectList(Wrappers.<T>query()
-                .eq("project_id", projectId)
-                .eq("status_id", statusId)
+                .eq("project_id", request.projectId())
+                .eq("status_id", request.statusId())
                 .orderByAsc("sort_key"));
         if (column.isEmpty()) {
             return 0;

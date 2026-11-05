@@ -82,11 +82,13 @@ public class UserSessionRegistry implements HttpSessionListener {
             if (!userId.equals(entry.userId()) || e.getKey().equals(keepSessionId)) {
                 continue;
             }
-            handled.add(e.getKey());
+            String sessionId = e.getKey();
+            handled.add(sessionId);
             try {
                 entry.session().invalidate();
-            } catch (IllegalStateException ignored) {
-                // 会话已被容器回收（超时/登出），无需处理
+            } catch (IllegalStateException ex) {
+                // 会话已被容器回收（超时/登出），无需处理；留痕避免"强制下线静默失败"
+                log.debug("会话已失效，跳过强制下线: sessionId={}", sessionId);
             }
         }
         handled.forEach(sessions::remove);

@@ -95,9 +95,25 @@ public class IssueVoAssembler {
                         Collectors.mapping(IssueCc::getUserId, Collectors.toList())));
 
         return issues.stream()
-                .map(i -> assemble(i, projectKey, typeMap, statusMap, userMap, tagMap,
-                        commentCountMap, participantMap, ccMap))
+                .map(i -> assemble(i, projectKey, new Lookups(typeMap, statusMap, userMap, tagMap,
+                        commentCountMap, participantMap, ccMap)))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 装配所需的批量查询结果。
+     *
+     * <p>此前 {@code assemble} 有 9 个参数（1 个实体 + 1 个 key + 7 个 Map），
+     * 调用处只能靠位置区分谁是谁；按手册"参数过多宜封装"收敛为一个值对象。
+     */
+    private record Lookups(
+            Map<UUID, IssueType> typeMap,
+            Map<UUID, IssueStatus> statusMap,
+            Map<UUID, SysUser> userMap,
+            Map<UUID, List<IssueTag>> tagMap,
+            Map<UUID, Long> commentCountMap,
+            Map<UUID, List<UUID>> participantMap,
+            Map<UUID, List<UUID>> ccMap) {
     }
 
     /** 单条装配：委托给批量实现，保证与列表页字段口径完全一致 */
@@ -106,51 +122,44 @@ public class IssueVoAssembler {
         return list.isEmpty() ? null : list.get(0);
     }
 
-    private IssueVO assemble(AbstractWorkItem issue, String projectKey,
-                             Map<UUID, IssueType> typeMap,
-                             Map<UUID, IssueStatus> statusMap,
-                             Map<UUID, SysUser> userMap,
-                             Map<UUID, List<IssueTag>> tagMap,
-                             Map<UUID, Long> commentCountMap,
-                             Map<UUID, List<UUID>> participantMap,
-                             Map<UUID, List<UUID>> ccMap) {
+    private IssueVO assemble(AbstractWorkItem issue, String projectKey, Lookups lookups) {
         IssueVO vo = new IssueVO();
         BeanUtils.copyProperties(issue, vo);
         vo.setIssueKey(projectKey + "-" + issue.getIssueNumber());
 
-        IssueType type = issue.getIssueTypeId() == null ? null : typeMap.get(issue.getIssueTypeId());
+        IssueType type = issue.getIssueTypeId() == null ? null : lookups.typeMap().get(issue.getIssueTypeId());
         if (type != null) {
             vo.setIssueTypeCode(type.getCode());
             vo.setIssueTypeIcon(type.getIcon());
             vo.setIssueTypeName(type.getName());
         }
-        IssueStatus st = issue.getStatusId() == null ? null : statusMap.get(issue.getStatusId());
+        IssueStatus st = issue.getStatusId() == null ? null : lookups.statusMap().get(issue.getStatusId());
         if (st != null) {
             vo.setStatusCode(st.getCode());
         }
 
         if (issue.getAssigneeId() != null) {
-            SysUser a = userMap.get(issue.getAssigneeId());
+            SysUser a = lookups.userMap().get(issue.getAssigneeId());
             vo.setAssigneeName(a == null ? null : a.getDisplayName());
             vo.setAssigneeAvatarUrl(a == null ? null : a.getAvatarUrl());
         }
         if (issue.getReporterId() != null) {
-            SysUser r = userMap.get(issue.getReporterId());
+            SysUser r = lookups.userMap().get(issue.getReporterId());
             vo.setReporterName(r == null ? null : r.getDisplayName());
             vo.setReporterAvatarUrl(r == null ? null : r.getAvatarUrl());
         }
         if (issue.getVerifierId() != null) {
-            SysUser v = userMap.get(issue.getVerifierId());
+            SysUser v = lookups.userMap().get(issue.getVerifierId());
             vo.setVerifierName(v == null ? null : v.getDisplayName());
             vo.setVerifierAvatarUrl(v == null ? null : v.getAvatarUrl());
         }
 
-        vo.setLabels(tagMap.getOrDefault(issue.getId(), List.of()).stream()
+        vo.setLabels(lookups.tagMap().getOrDefault(issue.getId(), List.of()).stream()
                 .map(IssueVoAssembler::toLabelVO).collect(Collectors.toList()));
-        vo.setCommentCount(commentCountMap.getOrDefault(issue.getId(), 0L));
-        vo.setParticipants(participantMap.getOrDefault(issue.getId(), List.of()).stream()
+        vo.setCommentCount(lookups.commentCountMap().getOrDefault(issue.getId(), 0L));
+        vo.setParticipants(lookups.participantMap().getOrDefault(issue.getId(), List.of()).stream()
                 .map(UUID::toString).collect(Collectors.toList()));
-        vo.setCcUsers(ccMap.getOrDefault(issue.getId(), List.of()).stream()
+        vo.setCcUsers(lookups.ccMap().getOrDefault(issue.getId(), List.of()).stream()
                 .map(UUID::toString).collect(Collectors.toList()));
         return vo;
     }

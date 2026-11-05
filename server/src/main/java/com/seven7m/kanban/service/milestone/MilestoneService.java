@@ -93,7 +93,9 @@ public class MilestoneService {
         vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().toString() : null);
         if (m.getCreatedBy() != null) {
             SysUser u = userMap.get(m.getCreatedBy());
-            if (u != null) vo.setCreatorName(u.getDisplayName());
+            if (u != null) {
+                vo.setCreatorName(u.getDisplayName());
+            }
         }
         return vo;
     }
@@ -111,7 +113,9 @@ public class MilestoneService {
         vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().toString() : null);
         if (m.getCreatedBy() != null) {
             SysUser u = userMapper.selectById(m.getCreatedBy());
-            if (u != null) vo.setCreatorName(u.getDisplayName());
+            if (u != null) {
+                vo.setCreatorName(u.getDisplayName());
+            }
         }
         return vo;
     }

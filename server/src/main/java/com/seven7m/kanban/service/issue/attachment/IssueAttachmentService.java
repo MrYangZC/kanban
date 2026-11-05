@@ -17,6 +17,7 @@ import com.seven7m.kanban.mapper.user.SysUserMapper;
 import com.seven7m.kanban.service.support.ProjectWriteGuard;
 import com.seven7m.kanban.service.workitem.WorkItemRouter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class IssueAttachmentService {
@@ -171,8 +173,9 @@ public class IssueAttachmentService {
     private void deleteFileQuietly(String filename) {
         try {
             Files.deleteIfExists(uploadProperties.root().resolve(filename));
-        } catch (Exception ignored) {
-            // 见方法注释：清理是尽力而为
+        } catch (Exception e) {
+            // 见方法注释：清理是尽力而为；但要留痕，否则孤儿文件无从追查
+            log.warn("附件文件清理失败（残留文件需运维清理）: file={}, reason={}", filename, e.toString());
         }
     }
 
