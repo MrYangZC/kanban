@@ -42,9 +42,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * 第一版登录桩：用户名存在校验 + BCrypt 密码校验 + 设置线程级 UserContext。
+ * 登录与用户管理：用户名存在校验 + BCrypt 密码校验 + 设置线程级 UserContext。
  * 后续接入 JWT/SaToken 后由拦截器填充 UserContext，本实现替换为真实鉴权。
- * 默认管理员：admin / admin123（bcrypt 校验）。
+ *
+ * <p>口令策略（手册安全规约：禁止在代码中出现默认弱口令）：
+ * 种子管理员口令只以 bcrypt 哈希形式存在于数据库迁移脚本中，代码与注释不再出现明文；
+ * 管理员新建用户时若不填口令，由服务端生成随机口令，不再使用固定值。
  */
 @Service
 @RequiredArgsConstructor
@@ -100,7 +103,7 @@ public class UserService {
         BeanUtils.copyProperties(user, vo);
         // 与 PermissionService#isSuperAdmin 口径保持一致：is_admin 字段或种子管理员 UUID。
         // 不能只依赖 BeanUtils 拷贝的 is_admin，否则种子管理员（该字段可能为空）会被判为非管理员。
-        vo.setIsAdmin(Boolean.TRUE.equals(user.getIsAdmin())
+        vo.setAdmin(Boolean.TRUE.equals(user.getAdmin())
                 || user.getId().equals(UserContext.DEFAULT_ADMIN_ID));
         return vo;
     }
@@ -197,10 +200,10 @@ public class UserService {
         u.setEnabled(true);
         // 系统管理员标识以前只能改库：DTO 里没有字段、Service 也不设置，
         // 文档承诺的"是否管理员"实际不可用，而权限判定又依赖这个字段
-        u.setIsAdmin(Boolean.TRUE.equals(req.getIsAdmin()));
+        u.setAdmin(Boolean.TRUE.equals(req.getAdmin()));
 
         userMapper.insert(u);
-        if (Boolean.TRUE.equals(u.getIsAdmin())) {
+        if (Boolean.TRUE.equals(u.getAdmin())) {
             // 新增管理员会影响 isSuperAdmin 缓存（未命中会查库，命中旧值会误判）
             permissionService.evictAllPermissions();
         }
@@ -218,12 +221,12 @@ public class UserService {
         if (req.getAvatarUrl() != null) u.setAvatarUrl(req.getAvatarUrl());
         if (req.getEnabled() != null) u.setEnabled(req.getEnabled());
         boolean adminChanged = false;
-        if (req.getIsAdmin() != null && !req.getIsAdmin().equals(Boolean.TRUE.equals(u.getIsAdmin()))) {
+        if (req.getAdmin() != null && !req.getAdmin().equals(Boolean.TRUE.equals(u.getAdmin()))) {
             // 内置种子管理员是保底的管理入口，不允许被降级（否则可能把系统锁死在一个没有管理员的库上）
-            if (id.equals(UserContext.DEFAULT_ADMIN_ID) && !req.getIsAdmin()) {
+            if (id.equals(UserContext.DEFAULT_ADMIN_ID) && !req.getAdmin()) {
                 throw new ServiceException(400, "内置管理员账号不允许取消管理员身份");
             }
-            u.setIsAdmin(req.getIsAdmin());
+            u.setAdmin(req.getAdmin());
             adminChanged = true;
         }
         boolean passwordChanged = req.getPassword() != null && !req.getPassword().isBlank();
@@ -282,7 +285,7 @@ public class UserService {
         vo.setEmail(u.getEmail());
         vo.setAvatarUrl(u.getAvatarUrl());
         vo.setEnabled(u.getEnabled());
-        vo.setIsAdmin(u.getIsAdmin());
+        vo.setAdmin(u.getAdmin());
         return vo;
     }
 

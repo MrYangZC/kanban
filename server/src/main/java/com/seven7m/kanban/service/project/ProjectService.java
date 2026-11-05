@@ -206,7 +206,8 @@ public class ProjectService {
             q.orderByDesc(Project::getCreatedAt);
             return;
         }
-        boolean asc = !"desc".equalsIgnoreCase(sortOrder);
+        // 只有显式 asc 才升序；缺省（null）沿用"最新在前"的降序语义，避免删掉 DTO 默认值后行为反转
+        boolean asc = "asc".equalsIgnoreCase(sortOrder);
         switch (sortField) {
             case "createdAt" -> { if (asc) q.orderByAsc(Project::getCreatedAt); else q.orderByDesc(Project::getCreatedAt); }
             case "updatedAt" -> { if (asc) q.orderByAsc(Project::getUpdatedAt); else q.orderByDesc(Project::getUpdatedAt); }

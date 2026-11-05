@@ -38,7 +38,7 @@ public class AnnouncementController {
     @PutMapping("/{id}")
     public R<AnnouncementVO> update(@PathVariable UUID projectId,
                                     @PathVariable UUID id,
-                                    @RequestBody UpdateAnnouncementRequest req) {
+                                    @Valid @RequestBody UpdateAnnouncementRequest req) {
         return R.ok(announcementService.update(projectId, id, req));
     }
 

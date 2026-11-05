@@ -73,7 +73,7 @@ public class WorkflowService {
         ItemCategory cat = category == null ? ItemCategory.TASK : category;
         return workflowMapper.selectOne(Wrappers.<Workflow>lambdaQuery()
                 .eq(Workflow::getAppliesTo, cat.name())
-                .eq(Workflow::getIsDefault, true)
+                .eq(Workflow::getDefaultFlag, true)
                 .orderByAsc(Workflow::getId)
                 .last("LIMIT 1"));
     }

@@ -38,7 +38,7 @@ public class MilestoneController {
     @PutMapping("/{id}")
     public R<MilestoneVO> update(@PathVariable UUID projectId,
                                  @PathVariable UUID id,
-                                 @RequestBody UpdateMilestoneRequest req) {
+                                 @Valid @RequestBody UpdateMilestoneRequest req) {
         return R.ok(milestoneService.update(projectId, id, req));
     }
 

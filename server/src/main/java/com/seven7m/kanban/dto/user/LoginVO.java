@@ -1,5 +1,6 @@
 package com.seven7m.kanban.dto.user;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.UUID;
@@ -21,6 +22,9 @@ public class LoginVO {
      * 必须与后端 PermissionService#isSuperAdmin 口径一致：
      * sys_user.is_admin = true 或 种子管理员（固定 UUID）。
      * 前端此前用 username === 'admin' 自行推断，与后端口径不一致。
+     *
+     * <p>属性名不带 {@code is} 前缀（手册强制），下发给前端的 JSON 字段名仍是 {@code isAdmin}。
      */
-    private Boolean isAdmin;
+    @JsonProperty("isAdmin")
+    private Boolean admin;
 }

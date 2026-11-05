@@ -8,12 +8,15 @@ import com.seven7m.kanban.dto.project.MemberCandidateVO;
 import com.seven7m.kanban.dto.project.ProjectMemberVO;
 import com.seven7m.kanban.service.project.ProjectMemberService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 
+@Validated
 @RestController
 @RequestMapping("/projects/{projectId}/members")
 @RequiredArgsConstructor
@@ -57,7 +60,7 @@ public class ProjectMemberController {
     @PutMapping("/{userId}/roles")
     public R<ProjectMemberVO> updateRoles(@PathVariable UUID projectId,
                                           @PathVariable UUID userId,
-                                          @RequestBody List<String> roles) {
+                                          @NotEmpty(message = "至少指定一个角色") @RequestBody List<String> roles) {
         return R.ok(projectMemberService.updateRoles(projectId, userId, roles));
     }
 }

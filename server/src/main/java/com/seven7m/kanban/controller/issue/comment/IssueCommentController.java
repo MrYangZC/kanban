@@ -7,6 +7,7 @@ import com.seven7m.kanban.dto.issue.AddCommentRequest;
 import com.seven7m.kanban.dto.issue.IssueActivityVO;
 import com.seven7m.kanban.dto.issue.IssueTimelineVO;
 import com.seven7m.kanban.service.issue.comment.IssueCommentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,7 +30,7 @@ public class IssueCommentController {
 
     @ProjectRoleAnnotation(Permission.ISSUE_COMMENT)
     @PostMapping("/{issueId}/comments")
-    public R<IssueActivityVO> add(@PathVariable UUID issueId, @RequestBody AddCommentRequest body) {
+    public R<IssueActivityVO> add(@PathVariable UUID issueId, @Valid @RequestBody AddCommentRequest body) {
         return R.ok(commentService.addComment(issueId, body.getContent(), body.getParentId()));
     }
 

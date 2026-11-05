@@ -4,10 +4,11 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.seven7m.kanban.entity.rbac.UserRole;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Mapper
@@ -40,15 +41,21 @@ public interface UserRoleMapper extends BaseMapper<UserRole> {
                                              @Param("userId") UUID userId);
 
     /**
-     * 批量查询项目下所有用户的角色编码，key=userId, value=角色编码列表。
+     * 批量查询项目下所有用户的角色编码。
+     *
+     * <p>结果用 {@link UserRoleCodeRow} 承载并显式映射（手册 ORM 规约：禁止 Map 作查询结果）。
      */
     @Select("""
-            SELECT ur.user_id, r.code
+            SELECT ur.user_id AS user_id, r.code AS role_code
             FROM user_role ur
             JOIN role r ON r.id = ur.role_id
             WHERE ur.project_id = #{projectId}
             ORDER BY r.sort_order
             """)
-    List<Map<String, Object>> selectRoleCodesByProject(@Param("projectId") UUID projectId);
+    @Results(id = "userRoleCodeRow", value = {
+            @Result(column = "user_id", property = "userId"),
+            @Result(column = "role_code", property = "roleCode")
+    })
+    List<UserRoleCodeRow> selectRoleCodesByProject(@Param("projectId") UUID projectId);
 
 }

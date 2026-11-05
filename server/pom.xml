@@ -136,4 +136,62 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+          阿里 Java 开发手册静态检查（p3c 规则集）。
+          故意放在 profile 里而不绑默认生命周期：默认构建不需要联网解析 PMD 与 p3c 依赖，
+          本地离线 `mvn -o test` 保持可用；CI 用 `mvn -Pquality verify` 跑门禁。
+
+          过渡期策略：先出报告不阻断（failOnViolation=false），把 阿里巴巴规约评估.md 里的
+          P1/P2 清理完再改成 true。改 true 之后任何新违规都会让 CI 失败。
+        -->
+        <profile>
+            <id>quality</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-pmd-plugin</artifactId>
+                        <version>3.21.2</version>
+                        <configuration>
+                            <sourceEncoding>UTF-8</sourceEncoding>
+                            <targetJdk>17</targetJdk>
+                            <failOnViolation>false</failOnViolation>
+                            <printFailingErrors>true</printFailingErrors>
+                            <linkXRef>false</linkXRef>
+                            <rulesets>
+                                <ruleset>rulesets/java/ali-comment.xml</ruleset>
+                                <ruleset>rulesets/java/ali-concurrent.xml</ruleset>
+                                <ruleset>rulesets/java/ali-constant.xml</ruleset>
+                                <ruleset>rulesets/java/ali-exception.xml</ruleset>
+                                <ruleset>rulesets/java/ali-flowcontrol.xml</ruleset>
+                                <ruleset>rulesets/java/ali-naming.xml</ruleset>
+                                <ruleset>rulesets/java/ali-oop.xml</ruleset>
+                                <ruleset>rulesets/java/ali-orm.xml</ruleset>
+                                <ruleset>rulesets/java/ali-other.xml</ruleset>
+                                <ruleset>rulesets/java/ali-set.xml</ruleset>
+                            </rulesets>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>p3c-check</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.alibaba.p3c</groupId>
+                                <artifactId>p3c-pmd</artifactId>
+                                <version>2.1.1</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

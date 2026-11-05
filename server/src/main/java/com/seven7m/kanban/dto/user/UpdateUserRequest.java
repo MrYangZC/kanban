@@ -1,5 +1,6 @@
 package com.seven7m.kanban.dto.user;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -23,8 +24,12 @@ public class UpdateUserRequest {
 
     private Boolean enabled;
 
-    /** 是否系统管理员；为 null 表示不修改。内置种子管理员不允许取消 */
-    private Boolean isAdmin;
+    /**
+     * 是否系统管理员；为 null 表示不修改。内置种子管理员不允许取消。
+     * 属性名按手册去掉 {@code is} 前缀，JSON 字段名保持 {@code isAdmin} 以兼容前端。
+     */
+    @JsonProperty("isAdmin")
+    private Boolean admin;
 
     /** 仅填写时修改密码（bcrypt 加密） */
     private String password;

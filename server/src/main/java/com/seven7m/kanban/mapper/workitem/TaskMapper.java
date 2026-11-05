@@ -12,14 +12,6 @@ import java.util.UUID;
 @Mapper
 public interface TaskMapper extends BaseMapper<Task> {
 
-    /** 一次拉取项目全量 task（看板聚合用），只看板列内排序 */
-    @Select("""
-            SELECT * FROM task
-            WHERE project_id = #{projectId}
-            ORDER BY status_id, sort_key
-            """)
-    List<Task> selectByProjectForBoard(@Param("projectId") UUID projectId);
-
     /** 全局序列取下一个 issue_number（字符串） */
     @Select("SELECT nextval('issue_number_seq')::text")
     String nextIssueNumber();

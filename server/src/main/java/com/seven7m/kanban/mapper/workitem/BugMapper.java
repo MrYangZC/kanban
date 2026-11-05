@@ -12,13 +12,6 @@ import java.util.UUID;
 @Mapper
 public interface BugMapper extends BaseMapper<Bug> {
 
-    @Select("""
-            SELECT * FROM bug
-            WHERE project_id = #{projectId}
-            ORDER BY status_id, sort_key
-            """)
-    List<Bug> selectByProjectForBoard(@Param("projectId") UUID projectId);
-
     @Select("SELECT nextval('issue_number_seq')::text")
     String nextIssueNumber();
 

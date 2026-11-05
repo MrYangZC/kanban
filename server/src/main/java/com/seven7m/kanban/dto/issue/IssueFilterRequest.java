@@ -36,15 +36,15 @@ public class IssueFilterRequest {
     /** 分组维度（可选）：STATUS / ASSIGNEE / PRIORITY / SPRINT。为空时按状态列展示。 */
     private String groupBy;
 
-    /** 分页页码，默认 1（表格视图使用） */
-    private Integer page = 1;
+    /** 分页页码；为空时由 Service 按 1 处理（POJO 不设默认值，见手册） */
+    private Integer page;
 
-    /** 每页数量，默认 20（表格视图使用） */
-    private Integer size = 20;
+    /** 每页数量；为空时由 Service 按 20 处理，上限 1000（表格视图使用） */
+    private Integer size;
 
     /** 排序字段，仅允许白名单：updatedAt / priority / severity / statusId / sortKey / createdAt */
     private String sortField;
 
-    /** 排序方向：asc / desc，默认 asc */
-    private String sortOrder = "asc";
+    /** 排序方向：asc / desc；为空按 asc 处理 */
+    private String sortOrder;
 }

@@ -44,7 +44,7 @@ public class ProjectInitializer {
         // V31 起每类工作项各有一条默认模板（TASK/REQUIREMENT/BUG）；
         // project.workflow_id 仍指向缺陷流（默认看板列按它建），其它类别由 WorkflowService 按类别解析
         Workflow defaultWf = workflowMapper.selectOne(Wrappers.<Workflow>lambdaQuery()
-                .eq(Workflow::getIsDefault, true)
+                .eq(Workflow::getDefaultFlag, true)
                 .eq(Workflow::getAppliesTo, "BUG")
                 .orderByAsc(Workflow::getId)
                 .last("LIMIT 1"));

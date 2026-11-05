@@ -42,3 +42,29 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
+
+  # 阿里 Java 开发手册（p3c）静态检查。
+  # 过渡期不阻断构建：pom 里 failOnViolation=false，这里 continue-on-error，
+  # 报告作为 artifact 上传。清理完 阿里巴巴规约评估.md 的 P1/P2 后，
+  # 把 pom 里的 failOnViolation 改成 true、并去掉这里的 continue-on-error。
+  quality:
+    name: quality (p3c rules)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Run p3c ruleset (ali-*.xml)
+        run: mvn -B -f server/pom.xml -Pquality verify -DskipTests
+      - name: Upload PMD report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmd-report
+          path: server/target/pmd.xml
+          if-no-files-found: warn

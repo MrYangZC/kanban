@@ -14,6 +14,7 @@ import com.seven7m.kanban.mapper.project.ProjectMemberMapper;
 import com.seven7m.kanban.entity.rbac.Role;
 import com.seven7m.kanban.entity.rbac.UserRole;
 import com.seven7m.kanban.mapper.rbac.RoleMapper;
+import com.seven7m.kanban.mapper.rbac.UserRoleCodeRow;
 import com.seven7m.kanban.mapper.rbac.UserRoleMapper;
 import com.seven7m.kanban.entity.user.SysUser;
 import com.seven7m.kanban.mapper.user.SysUserMapper;
@@ -131,11 +132,8 @@ public class ProjectMemberService implements MemberRolePort {
 
     private Map<UUID, Set<String>> buildRoleMap(UUID projectId) {
         Map<UUID, Set<String>> map = new HashMap<>();
-        List<Map<String, Object>> rows = userRoleMapper.selectRoleCodesByProject(projectId);
-        for (Map<String, Object> row : rows) {
-            UUID userId = (UUID) row.get("user_id");
-            String code = (String) row.get("code");
-            map.computeIfAbsent(userId, k -> new LinkedHashSet<>()).add(code);
+        for (UserRoleCodeRow row : userRoleMapper.selectRoleCodesByProject(projectId)) {
+            map.computeIfAbsent(row.getUserId(), k -> new LinkedHashSet<>()).add(row.getRoleCode());
         }
         return map;
     }

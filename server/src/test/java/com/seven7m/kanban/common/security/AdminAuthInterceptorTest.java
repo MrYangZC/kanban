@@ -61,7 +61,7 @@ class AdminAuthInterceptorTest {
     private static SysUser user(boolean isAdmin) {
         SysUser u = new SysUser();
         u.setId(NORMAL_USER_ID);
-        u.setIsAdmin(isAdmin);
+        u.setAdmin(isAdmin);
         return u;
     }
 

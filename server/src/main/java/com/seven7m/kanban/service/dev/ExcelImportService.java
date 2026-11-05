@@ -320,7 +320,9 @@ public class ExcelImportService {
 
     /** 按 display_name 查；无则建用户（username=imp_<随机UUID前8位>） */
     private UUID resolveUser(String displayName) {
-        SysUser exist = sysUserMapper.selectByDisplayName(displayName);
+        SysUser exist = sysUserMapper.selectOne(Wrappers.<SysUser>lambdaQuery()
+                .eq(SysUser::getDisplayName, displayName)
+                .last("LIMIT 1"));
         if (exist != null) {
             return exist.getId();
         }

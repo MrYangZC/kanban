@@ -10,6 +10,7 @@ import com.seven7m.kanban.dto.workflow.WorkflowColumnVO;
 import com.seven7m.kanban.dto.workflow.WorkflowTransitionVO;
 import com.seven7m.kanban.service.board.BoardService;
 import com.seven7m.kanban.service.workflow.WorkflowService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -64,7 +65,7 @@ public class WorkflowController {
     public R<WorkflowColumnVO> saveHandoff(@PathVariable UUID projectId,
                                           @PathVariable UUID statusId,
                                           @RequestParam(required = false) String category,
-                                          @RequestBody SaveHandoffRequest req) {
+                                          @Valid @RequestBody SaveHandoffRequest req) {
         ItemCategory cat = boardService.resolveCategory(category, ItemCategory.TASK);
         return R.ok(workflowService.saveHandoff(projectId, cat, statusId, req, UserContext.getUserId()));
     }

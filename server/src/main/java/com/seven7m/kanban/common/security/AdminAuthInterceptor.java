@@ -42,7 +42,7 @@ public class AdminAuthInterceptor implements HandlerInterceptor {
             return true;
         }
         SysUser user = userMapper.selectById(userId);
-        if (user == null || !Boolean.TRUE.equals(user.getIsAdmin())) {
+        if (user == null || !Boolean.TRUE.equals(user.getAdmin())) {
             // 审计线索：非管理员访问后台接口需要留痕
             log.warn("管理员权限校验失败 userId={} {} {}", userId,
                     request.getMethod(), request.getRequestURI());

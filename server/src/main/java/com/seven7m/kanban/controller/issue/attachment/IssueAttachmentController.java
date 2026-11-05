@@ -6,6 +6,7 @@ import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
 import com.seven7m.kanban.dto.issue.AddAttachmentRequest;
 import com.seven7m.kanban.dto.issue.AttachmentVO;
 import com.seven7m.kanban.service.issue.attachment.IssueAttachmentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,7 +37,7 @@ public class IssueAttachmentController {
     /** 兼容旧客户端：仅登记附件元信息，新客户端请使用 upload */
     @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
     @PostMapping("/{issueId}/attachments")
-    public R<AttachmentVO> add(@PathVariable UUID issueId, @RequestBody AddAttachmentRequest body) {
+    public R<AttachmentVO> add(@PathVariable UUID issueId, @Valid @RequestBody AddAttachmentRequest body) {
         return R.ok(attachmentService.add(issueId, body.getFileName(), body.getContentType(), body.getFileSize()));
     }
 

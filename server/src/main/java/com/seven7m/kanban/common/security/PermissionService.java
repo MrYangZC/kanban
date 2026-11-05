@@ -89,7 +89,7 @@ public class PermissionService {
             return true;
         }
         SysUser user = sysUserMapper.selectById(userId);
-        return user != null && Boolean.TRUE.equals(user.getIsAdmin());
+        return user != null && Boolean.TRUE.equals(user.getAdmin());
     }
 
     /** 按角色直接查权限码列表（供管理后台使用） */

@@ -12,13 +12,6 @@ import java.util.UUID;
 @Mapper
 public interface RequirementMapper extends BaseMapper<Requirement> {
 
-    @Select("""
-            SELECT * FROM requirement
-            WHERE project_id = #{projectId}
-            ORDER BY status_id, sort_key
-            """)
-    List<Requirement> selectByProjectForBoard(@Param("projectId") UUID projectId);
-
     @Select("SELECT nextval('issue_number_seq')::text")
     String nextIssueNumber();
 

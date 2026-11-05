@@ -48,7 +48,7 @@ public class ProjectController {
      * 分页查询项目列表，支持分类筛选、关键词搜索与排序。
      */
     @PostMapping("/filter")
-    public R<PageResult<ProjectVO>> filter(@RequestBody ProjectFilterRequest req) {
+    public R<PageResult<ProjectVO>> filter(@Valid @RequestBody ProjectFilterRequest req) {
         return R.ok(projectService.listByFilter(req));
     }
 

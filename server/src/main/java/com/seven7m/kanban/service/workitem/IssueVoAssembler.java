@@ -8,6 +8,7 @@ import com.seven7m.kanban.entity.issue.IssueCc;
 import com.seven7m.kanban.entity.issue.IssueParticipant;
 import com.seven7m.kanban.entity.issue.IssueType;
 import com.seven7m.kanban.entity.issue.tag.IssueTag;
+import com.seven7m.kanban.mapper.issue.comment.CommentCountRow;
 import com.seven7m.kanban.entity.issuestatus.IssueStatus;
 import com.seven7m.kanban.entity.user.SysUser;
 import com.seven7m.kanban.entity.workitem.AbstractWorkItem;
@@ -75,11 +76,8 @@ public class IssueVoAssembler {
                 .stream().collect(Collectors.groupingBy(IssueTag::getIssueId));
 
         Map<UUID, Long> commentCountMap = new HashMap<>();
-        for (Map<String, Object> row : shared.issueCommentMapper().countByIssueIds(ids, categoryName)) {
-            Object rawId = row.get("issue_id");
-            UUID issueId = rawId instanceof UUID u ? u : UUID.fromString(String.valueOf(rawId));
-            Object cnt = row.get("cnt");
-            commentCountMap.put(issueId, cnt instanceof Number n ? n.longValue() : 0L);
+        for (CommentCountRow row : shared.issueCommentMapper().countByIssueIds(ids, categoryName)) {
+            commentCountMap.put(row.getIssueId(), row.getCnt() == null ? 0L : row.getCnt());
         }
 
         Map<UUID, List<UUID>> participantMap = shared.issueParticipantMapper().selectList(
