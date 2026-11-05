@@ -162,6 +162,8 @@ function onDocumentClick() {
 
 /** 切回标签页时立即校正未读数，避免等下一个轮询周期 */
 function onWindowFocus() {
+  // 未登录时不打这个接口：会在控制台留下 401 噪声，也拿不到有意义的数据
+  if (!userStore.isLoggedIn) return
   notificationStore.refreshUnread()
 }
 
@@ -173,10 +175,12 @@ watch(projectId, async () => {
 }, { immediate: false })
 
 onMounted(async () => {
-  if (!projectStore.loaded) {
+  // 未登录（首次访问 / 会话过期）时不要打任何用户级接口：
+  // 头部在路由守卫跳转 /login 之前会短暂挂载，否则控制台会留下 401 噪声。
+  if (userStore.isLoggedIn && !projectStore.loaded) {
     try { await projectStore.loadList() } catch { /* 切换项目下拉降级为空列表 */ }
   }
-  if (projectId.value) {
+  if (userStore.isLoggedIn && projectId.value) {
     try { await projectStore.loadCurrent(projectId.value) } catch { /* 项目名降级为占位文案 */ }
   }
   // 本地缓存的登录信息可能早于头像上传（老用户/换头像后未重新登录），启动时用 /users/me 校正一次，
@@ -190,9 +194,27 @@ onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   document.addEventListener('click', onDocumentClick)
   window.addEventListener('focus', onWindowFocus)
-  // 通知是用户级数据，进站即开始轮询未读数（不依赖是否在项目内）
-  notificationStore.refreshUnread()
-  notificationStore.startPolling()
+  // 通知是用户级数据，进站即开始轮询未读数（不依赖是否在项目内）。
+  // 但必须先确认已登录：启动时若先落到受保护路由再被守卫弹回 /login，
+  // 头部会短暂挂载，无条件请求 unread-count 会在控制台留下 401 噪声。
+  if (userStore.isLoggedIn) {
+    notificationStore.refreshUnread()
+    notificationStore.startPolling()
+  }
+})
+
+/**
+ * 登录态变化时启停轮询：
+ * 之前只在 onMounted 里启动，登录页不挂头部 → 登录成功后要刷新页面才开始轮询，
+ * 反过来登出后定时器还活着，仍在后台打接口。
+ */
+watch(() => userStore.isLoggedIn, (loggedIn) => {
+  if (loggedIn) {
+    notificationStore.refreshUnread()
+    notificationStore.startPolling()
+  } else {
+    notificationStore.reset()
+  }
 })
 
 onBeforeUnmount(() => {

@@ -11,7 +11,7 @@ import { UserRound, FileText, Bug, ListTodo } from 'lucide-vue-next'
 import type { LucideIcon } from 'lucide-vue-next'
 import ProgressBar from '@/components/ProgressBar.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
-import { CHART_PALETTE, CHART_AXIS_LINE, CHART_SPLIT_LINE, METRIC_DONE, METRIC_OVERDUE } from '@/theme/colorMap'
+import { CHART_PALETTE, CHART_AXIS_LINE, CHART_AXIS_LABEL, CHART_SPLIT_LINE, METRIC_DONE, METRIC_OVERDUE } from '@/theme/colorMap'
 
 echarts.use([PieChart, BarChart, LineChart, TooltipComponent, LegendComponent, GridComponent, CanvasRenderer])
 
@@ -54,11 +54,19 @@ function renderCharts() {
   const priorityChart = echarts.init(priorityEl.value!)
   priorityChart.setOption({
     tooltip: { trigger: 'axis' },
-    grid: { top: 16, left: 8, right: 8, bottom: 8, containLabel: true },
-    xAxis: { type: 'category', data: data.value.priorityDist.map((p) => priorityLabel[p.name] || p.name), axisLine: { lineStyle: { color: CHART_AXIS_LINE } } },
-    yAxis: { type: 'value', splitLine: { lineStyle: { color: CHART_SPLIT_LINE } } },
+    // bottom 必须给足轴标签的高度：只靠 containLabel 时（尤其分类只有一项、y 轴从 0 起时）
+    // 标签会贴到画布底边被裁掉，只露出小半个字。这里显式留 28px 兜底。
+    grid: { top: 16, left: 8, right: 8, bottom: 28, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: data.value.priorityDist.map((p) => priorityLabel[p.name] || p.name),
+      axisLine: { lineStyle: { color: CHART_AXIS_LINE } },
+      axisLabel: { color: CHART_AXIS_LABEL, margin: 10 }
+    },
+    yAxis: { type: 'value', splitLine: { lineStyle: { color: CHART_SPLIT_LINE } }, axisLabel: { color: CHART_AXIS_LABEL } },
     series: [{
-      type: 'bar', barWidth: '52%', itemStyle: { color: CHART_PALETTE[0], borderRadius: [6, 6, 0, 0] },
+      // 分类很少时按百分比算出的柱宽会大到失真，用 barMaxWidth 收一下
+      type: 'bar', barWidth: '52%', barMaxWidth: 56, itemStyle: { color: CHART_PALETTE[0], borderRadius: [6, 6, 0, 0] },
       data: data.value.priorityDist.map((p) => p.count)
     }]
   })
@@ -68,9 +76,16 @@ function renderCharts() {
   burndownChart.setOption({
     tooltip: { trigger: 'axis' },
     legend: { top: 0, data: ['剩余', '已完成'] },
-    grid: { top: 36, left: 8, right: 16, bottom: 8, containLabel: true },
-    xAxis: { type: 'category', data: data.value.burndown.map((b) => b.date.slice(5)), boundaryGap: false, axisLine: { lineStyle: { color: CHART_AXIS_LINE } } },
-    yAxis: { type: 'value', splitLine: { lineStyle: { color: CHART_SPLIT_LINE } } },
+    // 同 priorityChart：底边留够轴标签高度，否则日期标签会被裁掉下半截
+    grid: { top: 36, left: 8, right: 16, bottom: 28, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: data.value.burndown.map((b) => b.date.slice(5)),
+      boundaryGap: false,
+      axisLine: { lineStyle: { color: CHART_AXIS_LINE } },
+      axisLabel: { color: CHART_AXIS_LABEL, margin: 10 }
+    },
+    yAxis: { type: 'value', splitLine: { lineStyle: { color: CHART_SPLIT_LINE } }, axisLabel: { color: CHART_AXIS_LABEL } },
     series: [
       { name: '剩余', type: 'line', smooth: true, data: data.value.burndown.map((b) => b.remaining), itemStyle: { color: METRIC_OVERDUE.ring }, areaStyle: { color: METRIC_OVERDUE.area } },
       { name: '已完成', type: 'line', smooth: true, data: data.value.burndown.map((b) => b.completed), itemStyle: { color: METRIC_DONE.ring } }

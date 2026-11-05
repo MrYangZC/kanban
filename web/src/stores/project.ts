@@ -18,9 +18,27 @@ export const useProjectStore = defineStore('project', () => {
     refreshKey.value += 1
   }
 
-  async function loadList() {
-    list.value = await listProjects()
-    loaded.value = true
+  /**
+   * 项目列表（顶部切换器 / 项目布局都会调用）。
+   *
+   * <p>两个组件几乎同时挂载时各调一次，会打出两条完全相同的 `GET /projects`：
+   * 未登录时就是两条 401 噪声，登录后也是白跑一趟。这里做单飞（single-flight）：
+   * 请求在途就复用同一个 promise，已经加载过就直接返回。
+   */
+  let loadListTask: Promise<void> | null = null
+
+  async function loadList(force = false) {
+    if (!force && loaded.value) return
+    if (loadListTask) return loadListTask
+    loadListTask = (async () => {
+      try {
+        list.value = await listProjects()
+        loaded.value = true
+      } finally {
+        loadListTask = null
+      }
+    })()
+    return loadListTask
   }
 
   /**

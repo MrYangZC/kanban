@@ -31,6 +31,10 @@ public class BoardController {
     /**
      * 看板视图：用 board:view（此前借用了 issue:view，导致 board:view 定义了却从未生效）。
      * 种子里所有能看工作项的角色都持有 board:view，因此不会收窄可见范围。
+     *
+     * <p><b>category 必须显式传</b>：不同类别是不同工作流，列数与列名都不一样
+     * （TASK 4 列 vs REQUIREMENT 6 列）。不传时按 TASK 处理，只适合「任务看板」这一种场景；
+     * 前端所有调用点都显式传类别，避免出现「列数对不上、卡片全空」的假象。
      */
     @ProjectRoleAnnotation(Permission.BOARD_VIEW)
     @GetMapping("/{projectId}/board")

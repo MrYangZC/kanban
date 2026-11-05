@@ -4,7 +4,6 @@ import { cached, invalidate } from '@/utils/cache'
 import type {
   AttachmentVO,
   BoardGroupView,
-  BoardView,
   DashboardVO,
   Issue,
   IssueActivity,
@@ -101,10 +100,11 @@ export function exportIssuesUrl(projectId: string, params: {
 }
 
 // ---- 看板 / 度量 ----
-export function getBoard(projectId: string) {
-  return req<BoardView>(http.get(`/v1/projects/${projectId}/board`))
-}
-
+/**
+ * 分组看板。**必须显式传 category**：
+ * 后端 `/board` 不带类别时按 TASK 工作流返回列（4 列），带 REQUIREMENT/BUG 才是对应类别的列（6 列），
+ * 少传会得到「列数对不上、卡片全空」的假象。此前还有一个不带 category 的 getBoard()，已删除。
+ */
 export function getBoardGrouped(projectId: string, groupBy?: string, category?: string) {
   return req<BoardGroupView>(http.get(`/v1/projects/${projectId}/board/grouped`, { params: { groupBy, category } }))
 }

@@ -42,6 +42,8 @@ export const CHART_PALETTE: readonly string[] = [
 ]
 export const CHART_AXIS_LINE = '#E5E6EB'
 export const CHART_SPLIT_LINE = '#F0F2F5'
+/** 图表轴标签文字色：与 --ink-secondary 同值，显式指定避免 echarts 默认灰过浅看不清 */
+export const CHART_AXIS_LABEL = '#909399'
 
 /* ---------- 报表语义色（按 variant 区分 ring / border，area 为燃尽图填充底色） ---------- */
 export const METRIC_DONE = { ring: '#52C41A', border: '#28A745' }
