@@ -1,6 +1,7 @@
 package com.seven7m.kanban.service.project;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.MemberRolePort;
 import com.seven7m.kanban.common.security.PermissionService;
@@ -110,17 +111,17 @@ public class ProjectMemberService implements MemberRolePort {
                         .eq(ProjectMember::getProjectId, projectId))
                 .stream().map(ProjectMember::getUserId).collect(Collectors.toSet());
         String kw = keyword == null ? "" : keyword.trim();
+        int max = Math.min(Math.max(limit, 1), 50);
         var q = Wrappers.<SysUser>lambdaQuery()
                 .select(SysUser::getId, SysUser::getUsername, SysUser::getDisplayName, SysUser::getAvatarUrl)
-                .orderByAsc(SysUser::getUsername)
-                .last("LIMIT " + Math.min(Math.max(limit, 1), 50));
+                .orderByAsc(SysUser::getUsername);
         if (!memberIds.isEmpty()) {
             q.notIn(SysUser::getId, memberIds);
         }
         if (!kw.isEmpty()) {
             q.and(w -> w.like(SysUser::getUsername, kw).or().like(SysUser::getDisplayName, kw));
         }
-        return userMapper.selectList(q).stream().map(u -> {
+        return userMapper.selectPage(new Page<>(1, max, false), q).getRecords().stream().map(u -> {
             MemberCandidateVO vo = new MemberCandidateVO();
             vo.setId(u.getId());
             vo.setUsername(u.getUsername());

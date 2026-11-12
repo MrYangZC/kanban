@@ -24,6 +24,13 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <!--
+          surefire 的 argLine 走属性而不是插件里写死：JaCoCo 的 prepare-agent 往同名属性里
+          追加 -javaagent，写死在插件配置里会把 agent 覆盖掉，导致 jacoco.exec 根本不生成
+          （表现是覆盖率 check "通过"但其实什么都没检查）。
+          Mockito 的 inline mock-maker 需要这条：JDK 9+ 默认禁止自 attach。
+        -->
+        <argLine>-Djdk.attach.allowAttachSelf=true</argLine>
     </properties>
 
     <dependencies>
@@ -125,13 +132,13 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <!--
-                      Mockito 的 inline mock-maker 通过运行时 attach 注入 agent。
-                      JDK 9+ 默认禁止自 attach：在 JDK 21 上直接跑 mvn test 会报
-                      “Could not initialize plugin: interface org.mockito.plugins.MockMaker”，
-                      6 个 AdminAuthInterceptorTest 用例全部 Errors（不是断言失败，是脚手架起不来）。
-                      这里放开自 attach，保证 mvn test 在 JDK 17/21 上都能跑。
+                      这里**不要**写 <argLine>${argLine}</argLine>：Maven 在模型插值阶段就会把它解析成
+                      <properties> 里的字面值，而 JaCoCo prepare-agent 是在运行期才往 argLine 属性追加
+                      -javaagent 的，于是 agent 被这个已解析的值覆盖 → jacoco.exec 不生成，
+                      覆盖率 check 变成 "Skipping ... missing execution data file" 的假通过。
+                      不写即使用 surefire 的默认参数 ${argLine}（执行期解析），两条参数才能共存：
+                      Mockito 需要的 -Djdk.attach.allowAttachSelf 来自 <properties>，jacoco 的 agent 由插件追加。
                     -->
-                    <argLine>-Djdk.attach.allowAttachSelf=true</argLine>
                 </configuration>
             </plugin>
         </plugins>
@@ -189,6 +196,111 @@
                                 <version>2.1.1</version>
                             </dependency>
                         </dependencies>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+          单元测试覆盖率（JaCoCo）。
+
+          同样放进 profile：默认 `mvn -o test` 不付插桩开销，也不需要额外依赖解析；
+          需要看覆盖率或跑门槛时用 `mvn -o -Pcoverage test`（报告在 target/site/jacoco/）。
+
+          门槛说明：`check` 绑在 test 阶段而不是 verify —— 本机离线环境缺少 jar 插件，
+          verify 阶段会先失败，绑 test 才能在任何机器上直接跑。
+          门槛值取「当前实测值向下取整再留 3 个点余量」，作用是防止覆盖率倒退，
+          不是追求好看的数字；提高它之前先把测试补上。
+
+          destFile 特意放在 ${java.io.tmpdir}（ASCII 路径），不放 target/：
+          本仓库路径含中文（E:\sevenM\河图\...），-javaagent 的 destfile 经 Windows 命令行传参时
+          会被按代码页转换，中文变成 ??? → agent 启动失败、jacoco.exec 不生成，
+          而 check 在缺少数据时只是 "Skipping"（假通过）。用 ASCII 路径才能两边都跑通。
+        -->
+        <profile>
+            <id>coverage</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <version>0.8.12</version>
+                        <executions>
+                            <execution>
+                                <id>prepare-agent</id>
+                                <goals>
+                                    <goal>prepare-agent</goal>
+                                </goals>
+                                <configuration>
+                                    <destFile>${java.io.tmpdir}/kanban-jacoco.exec</destFile>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>report</id>
+                                <phase>test</phase>
+                                <goals>
+                                    <goal>report</goal>
+                                </goals>
+                                <configuration>
+                                    <dataFile>${java.io.tmpdir}/kanban-jacoco.exec</dataFile>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>check-line-coverage</id>
+                                <phase>test</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                                <configuration>
+                                    <dataFile>${java.io.tmpdir}/kanban-jacoco.exec</dataFile>
+                                    <rules>
+                                        <!--
+                                          2026-11-12 实测：整体行覆盖 10.9%（446/4109），分支 11.7%。
+                                          所以门槛按「实测值留余量」设，作用是防倒退，不是达标线：
+                                          整体 10%（当前 10.9%）、安全层 38%（当前 40.7%）、上传 60%（当前 63.9%）。
+                                          想提高到 90% 需要补的是集成测试（controller/service 目前 0%），
+                                          不是改这个数字。
+                                        -->
+                                        <rule>
+                                            <element>BUNDLE</element>
+                                            <limits>
+                                                <limit>
+                                                    <counter>LINE</counter>
+                                                    <value>COVEREDRATIO</value>
+                                                    <minimum>0.10</minimum>
+                                                </limit>
+                                            </limits>
+                                        </rule>
+                                        <rule>
+                                            <element>PACKAGE</element>
+                                            <includes>
+                                                <include>com.seven7m.kanban.common.security</include>
+                                            </includes>
+                                            <limits>
+                                                <limit>
+                                                    <counter>LINE</counter>
+                                                    <value>COVEREDRATIO</value>
+                                                    <minimum>0.38</minimum>
+                                                </limit>
+                                            </limits>
+                                        </rule>
+                                        <rule>
+                                            <element>PACKAGE</element>
+                                            <includes>
+                                                <include>com.seven7m.kanban.common.upload</include>
+                                            </includes>
+                                            <limits>
+                                                <limit>
+                                                    <counter>LINE</counter>
+                                                    <value>COVEREDRATIO</value>
+                                                    <minimum>0.60</minimum>
+                                                </limit>
+                                            </limits>
+                                        </rule>
+                                    </rules>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>

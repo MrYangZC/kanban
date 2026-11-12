@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.seven7m.kanban.common.activity.ActivityValue;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.enums.ItemCategory;
@@ -207,9 +208,8 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
 
         long total = mapper().selectCount(q);
         applySort(q, req.getSortField(), req.getSortOrder());
-        q.last("LIMIT " + size + " OFFSET " + ((long) (page - 1) * size));
 
-        List<T> issues = mapper().selectList(q);
+        List<T> issues = mapper().selectPage(new Page<>(page, size, false), q).getRecords();
         Project project = projectMapper().selectById(req.getProjectId());
         String key = project == null ? "" : project.getProjectKey();
         return new PageResult<>(total, page, size, toVOList(issues, key));

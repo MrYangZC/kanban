@@ -1,6 +1,7 @@
 package com.seven7m.kanban.service.notification;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.dto.notification.NotificationVO;
@@ -110,10 +111,12 @@ public class NotificationService {
         if (total == 0) {
             return new PageResult<>(0, page, size, List.of());
         }
-        List<Notification> records = notificationMapper.selectList(Wrappers.<Notification>lambdaQuery()
+        // 分页交给 MyBatis-Plus：Page(searchCount=false) 沿用上面的 selectCount，
+        // LIMIT/OFFSET 由分页插件以绑定参数生成，不再拼 SQL 字符串
+        Page<Notification> pageReq = new Page<>(page, size, false);
+        List<Notification> records = notificationMapper.selectPage(pageReq, Wrappers.<Notification>lambdaQuery()
                 .eq(Notification::getUserId, userId)
-                .orderByDesc(Notification::getCreatedAt)
-                .last("LIMIT " + size + " OFFSET " + ((page - 1) * size)));
+                .orderByDesc(Notification::getCreatedAt)).getRecords();
         return new PageResult<>(total, page, size, records.stream().map(NotificationService::toVO).toList());
     }
 

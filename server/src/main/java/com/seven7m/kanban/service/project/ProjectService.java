@@ -3,6 +3,7 @@ package com.seven7m.kanban.service.project;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.Permission;
@@ -173,9 +174,8 @@ public class ProjectService {
         long total = projectMapper.selectCount(query);
 
         applyProjectSort(query, req.getSortField(), req.getSortOrder());
-        query.last("LIMIT " + size + " OFFSET " + ((long) (page - 1) * size));
 
-        List<Project> projects = projectMapper.selectList(query);
+        List<Project> projects = projectMapper.selectPage(new Page<>(page, size, false), query).getRecords();
         return new PageResult<>(total, page, size, assembleBatch(projects, currentUser));
     }
 

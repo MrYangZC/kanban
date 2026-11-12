@@ -2,6 +2,7 @@ package com.seven7m.kanban.service.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.PermissionService;
@@ -178,9 +179,9 @@ public class UserService {
                     pattern, pattern, pattern));
         }
         long total = userMapper.selectCount(q);
-        q.orderByAsc(SysUser::getDisplayName)
-                .last("LIMIT " + s + " OFFSET " + ((long) (p - 1) * s));
-        List<UserVO> list = userMapper.selectList(q).stream().map(this::toVO).collect(Collectors.toList());
+        q.orderByAsc(SysUser::getDisplayName);
+        List<UserVO> list = userMapper.selectPage(new Page<>(p, s, false), q).getRecords()
+                .stream().map(this::toVO).collect(Collectors.toList());
         return new PageResult<>(total, p, s, list);
     }
 
