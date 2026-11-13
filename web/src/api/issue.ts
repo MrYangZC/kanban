@@ -138,9 +138,11 @@ export function deleteIssue(id: string) {
   return req<void>(http.delete(`/v1/issues/${id}`))
 }
 
-/** 批量删除结果：成功/跳过/失败三类计数，跳过来自"不属于该项目或已被删除" */
+/** 批量删除结果：删除/上提/跳过/失败四类计数 */
 export interface BatchDeleteResult {
   deleted: number
+  /** 因父节点被删而保留、并上提到上一级的子任务数 */
+  promoted: number
   skipped: number
   failed: number
   errors: string[]

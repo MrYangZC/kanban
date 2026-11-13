@@ -172,12 +172,17 @@ function onTreeSelect({ ids, checked }: { ids: string[]; checked: boolean }) {
   setSelected(ids, checked)
 }
 
-/** 批量删除：一次请求，后端逐条级联删除并返回成功/跳过/失败计数 */
+/** 批量删除：只删勾选的这些，未勾选的子任务会被上提到上一级 */
 async function onBatchDelete() {
   const ids = [...selectedIds.value]
   if (!ids.length || deleting.value) return
+  const keptChildren = countKeptDescendants(ids)
   const ok = await confirmAction(
-    `将删除选中的 ${ids.length} 个工作项，其子任务、评论与附件会一并删除，且不可恢复。`,
+    `将删除选中的 ${ids.length} 个工作项。` +
+      (keptChildren > 0
+        ? `其中 ${keptChildren} 个子任务未被勾选，会保留并上提到其父级的上一级。`
+        : '') +
+      '评论与附件会随工作项一并删除，且不可恢复。',
     '批量删除',
     '删除'
   )
@@ -186,6 +191,7 @@ async function onBatchDelete() {
   try {
     const res = await batchDeleteIssues(projectId.value, ids)
     const parts = [`已删除 ${res.deleted} 个`]
+    if (res.promoted) parts.push(`${res.promoted} 个子任务已上提到上一级`)
     if (res.skipped) parts.push(`跳过 ${res.skipped} 个（不属于当前项目或已被删除）`)
     if (res.failed) parts.push(`失败 ${res.failed} 个`)
     if (res.failed) ElMessage.warning(parts.join('，'))
@@ -197,6 +203,35 @@ async function onBatchDelete() {
   } finally {
     deleting.value = false
   }
+}
+
+/**
+ * 统计"父节点被删、但自身未被勾选"的子任务数量。
+ *
+ * 后端会把这些子任务上提到上一级，而不是删掉；确认框里先把这个后果说清楚，
+ * 避免用户以为取消勾选就能让子任务原地不动（它保住了，但会换父级）。
+ * 数据不够时（列表分页只加载当前页）返回 0，退化为后端返回的 promoted 数字。
+ */
+function countKeptDescendants(ids: string[]): number {
+  const parents = new Map<string, string | null>()
+  for (const i of allIssues.value) parents.set(i.id, i.parentId ?? null)
+  if (!parents.size) return 0
+  const selected = new Set(ids)
+  let kept = 0
+  for (const i of allIssues.value) {
+    if (selected.has(i.id)) continue
+    // 自身未被选中，但某个祖先在删除集合里 → 会被上提
+    let cursor = i.parentId ?? null
+    let guard = 0
+    while (cursor && guard++ < 200) {
+      if (selected.has(cursor)) {
+        kept++
+        break
+      }
+      cursor = parents.get(cursor) ?? null
+    }
+  }
+  return kept
 }
 
 /** 统计条的数据源：树形视图用已全量加载的 allIssues，列表视图单独拉一次全量（分页只有当页） */

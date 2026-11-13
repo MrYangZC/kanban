@@ -55,6 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -669,6 +670,85 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
         requireProjectWritable(root.getProjectId());
         List<UUID> ids = new ArrayList<>();
         collectDescendantIds(id, ids);
+        deleteRows(ids);
+    }
+
+    /**
+     * 只删除给定 id 本身，**不**连带子孙。
+     *
+     * <p>批量删除按用户勾选集合删除时用这个：用户明确取消了某几个子任务，
+     * 就不能因为"父节点被删"把它们一起带走。被删节点的子任务由
+     * {@link #promoteOrphanChildren(Set)} 提前上提。
+     */
+    public void deleteExactly(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        for (UUID id : ids) {
+            T item = mapper().selectById(id);
+            if (item != null) {
+                requireProjectWritable(item.getProjectId());
+            }
+        }
+        deleteRows(new ArrayList<>(ids));
+    }
+
+    /**
+     * 把「即将被删除的节点」下、且本身不在删除集合里的子任务，上提到最近的存活祖先。
+     *
+     * <p>语义：删掉父节点但保留其中几个子任务时，这些子任务不能失去挂载点，
+     * 因此向上找第一个不会被删的祖先；父节点是顶层则上提为顶层。
+     *
+     * <p><b>必须用 UpdateWrapper 显式 set</b>：{@code updateById} 默认忽略 null 字段，
+     * 而"上提为顶层"恰恰是把 parent_id 置为 null——用 updateById 会静默不生效，
+     * 子任务仍指向即将删除的父节点，再被数据库的
+     * {@code parent_id REFERENCES ... ON DELETE CASCADE} 一起级联删掉。
+     *
+     * @return 被上提的子任务数量
+     */
+    public int promoteOrphanChildren(Set<UUID> deleting) {
+        if (deleting == null || deleting.isEmpty()) {
+            return 0;
+        }
+        int promoted = 0;
+        for (UUID id : deleting) {
+            T node = mapper().selectById(id);
+            if (node == null) {
+                continue;
+            }
+            UUID target = survivingAncestor(node.getParentId(), deleting);
+            List<T> children = mapper().selectList(Wrappers.<T>query().eq("parent_id", id));
+            for (T child : children) {
+                if (deleting.contains(child.getId())) {
+                    continue; // 本来就要删，无需上提
+                }
+                int updated = mapper().update(null, Wrappers.<T>update()
+                        .eq("id", child.getId())
+                        .set("parent_id", target));
+                if (updated > 0) {
+                    promoted++;
+                }
+            }
+        }
+        return promoted;
+    }
+
+    /** 沿 parent_id 向上找第一个不在删除集合里的祖先；找不到（父链全被删或本来无父）返回 null（顶层） */
+    private UUID survivingAncestor(UUID parentId, Set<UUID> deleting) {
+        UUID cursor = parentId;
+        // 防御异常数据造成的环：最多上溯 200 层
+        for (int guard = 0; cursor != null && deleting.contains(cursor) && guard < 200; guard++) {
+            T parent = mapper().selectById(cursor);
+            cursor = parent == null ? null : parent.getParentId();
+        }
+        return cursor != null && deleting.contains(cursor) ? null : cursor;
+    }
+
+    /** 真正落库的删除：主表 + 评论/附件/标签/参与人/抄送/关联/动态，附带清理物理文件与缓存 */
+    private void deleteRows(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
         String category = categoryName();
 
         // 先取附件 storage_key：记录删掉后就无从得知磁盘上该删哪些文件了

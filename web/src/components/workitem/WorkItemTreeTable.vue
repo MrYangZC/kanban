@@ -156,7 +156,7 @@ function assigneeName(node: IssueTreeNode) {
   return props.memberName ? props.memberName(node.assigneeId) : (node.assigneeName || '')
 }
 
-/** 勾选：父节点连带其全部子孙（后端删除父任务时本来就会级联删除子任务） */
+/** 勾选：勾父节点会连带子孙（方便一次删一大片），但**可以**再单独取消某个子孙 */
 function isChecked(id: string) { return props.selected?.has(id) ?? false }
 
 function subtreeIds(node: IssueTreeNode): string[] {
@@ -169,8 +169,20 @@ function subtreeIds(node: IssueTreeNode): string[] {
   return out
 }
 
-function onToggle(node: IssueTreeNode, checked: boolean) {
-  emit('select', { ids: subtreeIds(node), checked })
+/**
+ * 子树勾选状态：全选 / 部分 / 未选。
+ * 部分选中必须显示成 indeterminate——否则"父节点显示打勾、里面还有没勾的子任务"会误导用户。
+ */
+function subtreeState(node: IssueTreeNode): 'all' | 'some' | 'none' {
+  const ids = subtreeIds(node)
+  const picked = ids.filter((id) => isChecked(id)).length
+  if (picked === 0) return 'none'
+  return picked === ids.length ? 'all' : 'some'
+}
+
+function onToggle(node: IssueTreeNode) {
+  // 全选 → 全部取消；未选或部分选中 → 补齐整个子树
+  emit('select', { ids: subtreeIds(node), checked: subtreeState(node) !== 'all' })
 }
 
 /** 可见行全选/全不选（含已折叠节点，全部数据都在 nodes 里） */
@@ -261,8 +273,9 @@ function allIds(list: IssueTreeNode[]): string[] {
               <input
                 type="checkbox"
                 class="wi-check"
-                :checked="isChecked(node.id)"
-                @click.stop="onToggle(node, !isChecked(node.id))"
+                :checked="subtreeState(node) === 'all'"
+                :indeterminate="subtreeState(node) === 'some'"
+                @click.stop="onToggle(node)"
               />
             </td>
             <!-- 任务：整行贯通的层级引导线 + 展开箭头 + 优先级点 + 标题 + 子任务数 -->
