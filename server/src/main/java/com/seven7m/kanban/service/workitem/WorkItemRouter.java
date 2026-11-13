@@ -186,6 +186,48 @@ public class WorkItemRouter implements IssueLocationPort {
     }
 
     /**
+     * 批量删除工作项。
+     *
+     * <p>逐条复用 {@link #delete(UUID)}，因此子任务、评论、附件、标签的级联清理与单条删除完全一致。
+     * 有三点与"直接循环调接口"不同：
+     * <ol>
+     *   <li>只删属于 {@code projectId} 的条目：权限拦截器校验的是请求体里的项目，
+     *       若不做归属校验，构造别的项目 id 就能删掉别人的工作项；</li>
+     *   <li>已不存在的 id 记为"跳过"而不是报错——并发删除时不该让整批失败；</li>
+     *   <li>单条失败不中断整批，失败原因收集后返回，前端能给出准确反馈。</li>
+     * </ol>
+     * 不加整体事务：一批里某条失败（例如项目刚被归档）不应该把已成功的删除回滚，
+     * 否则用户点一次删除、实际结果与提示都是错的。
+     */
+    public com.seven7m.kanban.dto.issue.BatchDeleteResult batchDelete(UUID projectId, List<UUID> ids) {
+        com.seven7m.kanban.dto.issue.BatchDeleteResult result = new com.seven7m.kanban.dto.issue.BatchDeleteResult();
+        // 去重但保持顺序：前端可能同时勾选了父任务与其子任务
+        Set<UUID> unique = new LinkedHashSet<>(ids);
+        for (UUID id : unique) {
+            UUID ownerProject = getProjectId(id);
+            if (ownerProject == null) {
+                result.incSkipped();
+                continue;
+            }
+            if (!ownerProject.equals(projectId)) {
+                log.warn("[batch-delete] 跳过跨项目工作项 id={} 属于项目={} 请求项目={}", id, ownerProject, projectId);
+                result.incSkipped();
+                continue;
+            }
+            try {
+                delete(id);
+                result.incDeleted();
+            } catch (Exception e) {
+                log.warn("[batch-delete] 删除失败 id={}: {}", id, e.getMessage());
+                result.addFailure(id + ": " + e.getMessage());
+            }
+        }
+        log.info("[batch-delete] projectId={} 请求={} 去重后={} 删除={} 跳过={} 失败={}",
+                projectId, ids.size(), unique.size(), result.getDeleted(), result.getSkipped(), result.getFailed());
+        return result;
+    }
+
+    /**
      * 类型码 → 物理表类别；null 表示未知编码。
      * 未注册编码不再静默落到任务表（曾导致类型与物理表不一致），由调用方返回 400。
      */

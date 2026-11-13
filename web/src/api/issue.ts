@@ -138,6 +138,24 @@ export function deleteIssue(id: string) {
   return req<void>(http.delete(`/v1/issues/${id}`))
 }
 
+/** 批量删除结果：成功/跳过/失败三类计数，跳过来自"不属于该项目或已被删除" */
+export interface BatchDeleteResult {
+  deleted: number
+  skipped: number
+  failed: number
+  errors: string[]
+}
+
+/**
+ * 批量删除工作项（一次请求，避免逐条调用）。
+ *
+ * <p>必须带 projectId：后端权限拦截器从请求体解析项目来校验 issue:delete，
+ * 并据此拒绝删除其它项目下的工作项。
+ */
+export function batchDeleteIssues(projectId: string, ids: string[]) {
+  return req<BatchDeleteResult>(http.post('/v1/issues/batch-delete', { projectId, ids }))
+}
+
 // ---- 附件 ----
 export function listAttachments(issueId: string) {
   return req<AttachmentVO[]>(http.get(`/v1/issues/${issueId}/attachments`))

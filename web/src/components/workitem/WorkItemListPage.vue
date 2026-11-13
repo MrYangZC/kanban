@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   filterIssues, listProjectStatuses, listProjectMembers,
-  getBoardGrouped, listTransitions, exportIssuesUrl
+  getBoardGrouped, listTransitions, exportIssuesUrl, batchDeleteIssues
 } from '@/api'
 import type { Issue, IssueTreeNode, IssueStatusVO, BoardGroupView, GroupColumnView, WorkflowTransitionVO, WorkItemCategory } from '@/api/types'
 import type { LucideIcon } from 'lucide-vue-next'
@@ -18,16 +18,17 @@ import { useProjectPermission } from '@/composables/useProjectPermission'
 import { useScopeCounts } from '@/composables/useScopeCounts'
 import { useIssueFilterParams } from '@/composables/useIssueFilterParams'
 import { PRIORITY_COLOR, priorityColor as priorityColorOf, priorityLabel as priorityLabelOf } from '@/constants/issueDict'
-import DataTable, { type TableColumn } from '@/components/common/DataTable.vue'
 import WorkItemTreeTable from '@/components/workitem/WorkItemTreeTable.vue'
 import WorkItemStatsBar, { type WorkItemStat } from '@/components/workitem/WorkItemStatsBar.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
 import PriorityPill from '@/components/common/PriorityPill.vue'
 import UserCell from '@/components/common/UserCell.vue'
-import EmptyRow from '@/components/common/EmptyRow.vue'
 import type { ViewTab } from '@/components/ViewTabs.vue'
 import { fmtDateOrDash as fmtDate } from '@/utils/datetime'
 import { useIssueFilterQuery } from '@/composables/useIssueFilterQuery'
+import { ElMessage } from 'element-plus'
+import { confirmAction } from '@/utils/confirm'
+import { reportError } from '@/utils/error'
 
 /**
  * 需求/任务列表页通用实现：两类页面结构完全一致，仅业务参数不同。
@@ -76,6 +77,8 @@ const { transitionMap, build: buildTransitionMap } = useWorkflowTransition()
 const { canWrite, hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId.value)
 /** 导出按钮与后端 issue:export 权限码对齐（此前该权限码从未被任何功能使用） */
 const canExport = computed(() => hasPermission('issue:export'))
+/** 批量删除入口的可见性：与后端 issue:delete 同一权限码 */
+const canDelete = computed(() => hasPermission('issue:delete'))
 
 function onExport() {
   window.open(exportIssuesUrl(projectId.value, {
@@ -116,14 +119,85 @@ const viewTabs: ViewTab[] = [
   { key: 'board', label: '看板', icon: LayoutGrid }
 ]
 
-const columns: TableColumn[] = [
-  { key: 'title', label: '任务' },
-  { key: 'key', label: '编号', width: '110px' },
-  { key: 'assignee', label: '负责人', width: '136px' },
-  { key: 'status', label: '状态', width: '96px' },
-  { key: 'dueDate', label: '计划完成', width: '92px', align: 'right' },
-  { key: 'updatedAt', label: '更新于', width: '84px', align: 'right' }
-]
+const columns = computed<{ key: string; label: string; width?: string; align?: 'left' | 'right' | 'center' }[]>(() => {
+  const base: { key: string; label: string; width?: string; align?: 'left' | 'right' | 'center' }[] = [
+    { key: 'title', label: '任务' },
+    { key: 'key', label: '编号', width: '110px' },
+    { key: 'assignee', label: '负责人', width: '136px' },
+    { key: 'status', label: '状态', width: '96px' },
+    { key: 'dueDate', label: '计划完成', width: '92px', align: 'right' },
+    { key: 'updatedAt', label: '更新于', width: '84px', align: 'right' }
+  ]
+  // 有删除权限才出现勾选列：没权限却给勾选框，勾完点删除才报错，体验更差
+  return canDelete.value ? [{ key: 'select', label: '', width: '36px' }, ...base] : base
+})
+
+// ---- 批量删除：勾选状态由页面持有，列表与树形共用 ----
+const selectedIds = ref<Set<string>>(new Set())
+const selectedCount = computed(() => selectedIds.value.size)
+const deleting = ref(false)
+
+function isSelected(id: string) {
+  return selectedIds.value.has(id)
+}
+
+function setSelected(ids: string[], checked: boolean) {
+  const next = new Set(selectedIds.value)
+  for (const id of ids) {
+    if (checked) next.add(id)
+    else next.delete(id)
+  }
+  selectedIds.value = next
+}
+
+function toggleRow(id: string, checked: boolean) {
+  setSelected([id], checked)
+}
+
+/** 列表页头部的「全选本页」：只作用于当前页已加载的行 */
+const pageAllSelected = computed(() =>
+  tableData.value.length > 0 && tableData.value.every((i) => selectedIds.value.has(i.id))
+)
+
+function toggleSelectPage() {
+  setSelected(tableData.value.map((i) => i.id), !pageAllSelected.value)
+}
+
+function clearSelection() {
+  selectedIds.value = new Set()
+}
+
+/** 树形勾选：父节点会连带其全部子孙一起勾上 */
+function onTreeSelect({ ids, checked }: { ids: string[]; checked: boolean }) {
+  setSelected(ids, checked)
+}
+
+/** 批量删除：一次请求，后端逐条级联删除并返回成功/跳过/失败计数 */
+async function onBatchDelete() {
+  const ids = [...selectedIds.value]
+  if (!ids.length || deleting.value) return
+  const ok = await confirmAction(
+    `将删除选中的 ${ids.length} 个工作项，其子任务、评论与附件会一并删除，且不可恢复。`,
+    '批量删除',
+    '删除'
+  )
+  if (!ok) return
+  deleting.value = true
+  try {
+    const res = await batchDeleteIssues(projectId.value, ids)
+    const parts = [`已删除 ${res.deleted} 个`]
+    if (res.skipped) parts.push(`跳过 ${res.skipped} 个（不属于当前项目或已被删除）`)
+    if (res.failed) parts.push(`失败 ${res.failed} 个`)
+    if (res.failed) ElMessage.warning(parts.join('，'))
+    else ElMessage.success(parts.join('，'))
+    clearSelection()
+    reloadAll()
+  } catch (e: unknown) {
+    reportError(e, '批量删除失败')
+  } finally {
+    deleting.value = false
+  }
+}
 
 /** 统计条的数据源：树形视图用已全量加载的 allIssues，列表视图单独拉一次全量（分页只有当页） */
 const statsIssues = ref<Issue[]>([])
@@ -370,47 +444,92 @@ onMounted(() => {
           <component :is="icon" :size="16" class="text-brand" />
           <span class="wi-card-title">全部{{ noun }}</span>
           <span class="count-pill">{{ total }}</span>
-          <span class="ml-auto text-xs text-ink-secondary">按更新时间倒序</span>
+          <!-- 勾选后就地出现批量操作，不额外占一行 -->
+          <template v-if="selectedCount">
+            <span class="wi-sel-pill">已选 {{ selectedCount }} 项</span>
+            <button class="wi-sel-clear" @click="clearSelection">清空</button>
+            <button class="wi-danger-btn" :disabled="deleting" @click="onBatchDelete">
+              <Trash2 :size="13" /> {{ deleting ? '删除中…' : '删除选中' }}
+            </button>
+          </template>
+          <span v-else class="ml-auto text-xs text-ink-secondary">按更新时间倒序</span>
         </div>
         <div class="wi-card-body wi-table">
-          <DataTable :columns="columns">
-            <tr
-              v-for="i in tableData"
-              :key="i.id"
-              class="data-tr cursor-pointer"
-              @click="detailDrawer?.open(i.id)"
-            >
-              <td class="data-td data-td-first">
-                <div class="flex items-center gap-2">
-                  <span
-                    v-if="i.priority && i.priority !== 'P2'"
-                    class="wi-prio"
-                    :style="{ color: priorityColorOf(i.priority) }"
-                    :title="`优先级 ${priorityText(i.priority)}`"
+          <div class="min-h-0 flex-1 overflow-auto">
+            <!-- 直接用 table 而不是 DataTable：表头需要塞「全选本页」勾选框 -->
+            <table class="data-table">
+              <thead class="data-thead">
+                <tr>
+                  <th v-if="canDelete" class="data-th wi-th-select" style="width: 38px">
+                    <input
+                      type="checkbox"
+                      class="wi-check"
+                      :checked="pageAllSelected"
+                      :disabled="!tableData.length"
+                      title="全选本页"
+                      @click.stop="toggleSelectPage"
+                    />
+                  </th>
+                  <th
+                    v-for="(col, i) in columns.filter((c) => c.key !== 'select')"
+                    :key="col.key"
+                    class="data-th"
+                    :class="[i === 0 ? 'data-th-first' : '', col.align === 'right' ? 'text-right' : '']"
+                    :style="col.width ? { width: col.width } : undefined"
                   >
-                    <span class="wi-prio-dot" />
-                  </span>
-                  <span class="wi-title-leaf min-w-0 truncate">{{ i.title }}</span>
-                </div>
-              </td>
-              <td class="data-td"><span class="wi-key">{{ i.issueKey }}</span></td>
-              <td class="data-td">
-                <UserCell
-                  v-if="i.assigneeId"
-                  :avatar-name="i.assigneeName"
-                  :avatar-url="i.assigneeAvatarUrl"
-                  :display-name="memberName(i.assigneeId)"
-                />
-                <span v-else class="wi-unassigned">—</span>
-              </td>
-              <td class="data-td">
-                <StatusPill :label="statusName(i.statusId)" :color="statusColor(i.statusId)" />
-              </td>
-              <td class="data-td"><span class="wi-date">{{ shortDate(i.dueDate) }}</span></td>
-              <td class="data-td"><span class="wi-date">{{ shortDate(i.updatedAt) }}</span></td>
-            </tr>
-            <EmptyRow v-if="!loading && !tableData.length" :colspan="columns.length" :text="`暂无${noun}`" />
-          </DataTable>
+                    {{ col.label }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="i in tableData"
+                  :key="i.id"
+                  class="data-tr cursor-pointer"
+                  :class="isSelected(i.id) ? 'wi-row-selected' : ''"
+                  @click="detailDrawer?.open(i.id)"
+                >
+                  <td v-if="canDelete" class="data-td wi-td-select" @click.stop>
+                    <input
+                      type="checkbox"
+                      class="wi-check"
+                      :checked="isSelected(i.id)"
+                      @click.stop="toggleRow(i.id, ($event.target as HTMLInputElement).checked)"
+                    />
+                  </td>
+                  <td class="data-td data-td-first">
+                    <div class="flex items-center gap-2">
+                      <span
+                        v-if="i.priority && i.priority !== 'P2'"
+                        class="wi-prio"
+                        :style="{ color: priorityColorOf(i.priority) }"
+                        :title="`优先级 ${priorityText(i.priority)}`"
+                      >
+                        <span class="wi-prio-dot" />
+                      </span>
+                      <span class="wi-title-leaf min-w-0 truncate">{{ i.title }}</span>
+                    </div>
+                  </td>
+                  <td class="data-td"><span class="wi-key">{{ i.issueKey }}</span></td>
+                  <td class="data-td">
+                    <UserCell
+                      v-if="i.assigneeId"
+                      :avatar-name="i.assigneeName"
+                      :avatar-url="i.assigneeAvatarUrl"
+                      :display-name="memberName(i.assigneeId)"
+                    />
+                    <span v-else class="wi-unassigned">—</span>
+                  </td>
+                  <td class="data-td">
+                    <StatusPill :label="statusName(i.statusId)" :color="statusColor(i.statusId)" />
+                  </td>
+                  <td class="data-td"><span class="wi-date">{{ shortDate(i.dueDate) }}</span></td>
+                  <td class="data-td"><span class="wi-date">{{ shortDate(i.updatedAt) }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-if="!loading && !tableData.length" class="empty-row text-sm">暂无{{ noun }}</div>
+          </div>
         </div>
       </div>
 
@@ -422,8 +541,21 @@ onMounted(() => {
         :status-color="statusColor"
         :member-name="memberName"
         :noun="noun"
+        :selected="selectedIds"
+        :selectable="canDelete"
+        @select="onTreeSelect"
         @open="(id: string) => detailDrawer?.open(id)"
-      />
+      >
+        <template #head-actions>
+          <template v-if="selectedCount">
+            <span class="wi-sel-pill">已选 {{ selectedCount }} 项</span>
+            <button class="wi-sel-clear" @click="clearSelection">清空</button>
+            <button class="wi-danger-btn" :disabled="deleting" @click="onBatchDelete">
+              <Trash2 :size="13" /> {{ deleting ? '删除中…' : '删除选中' }}
+            </button>
+          </template>
+        </template>
+      </WorkItemTreeTable>
     </div>
     <!-- 看板视图 -->
     <div v-else class="kanban-page">

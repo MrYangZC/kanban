@@ -4,6 +4,8 @@ import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
+import com.seven7m.kanban.dto.issue.BatchDeleteIssueRequest;
+import com.seven7m.kanban.dto.issue.BatchDeleteResult;
 import com.seven7m.kanban.dto.issue.CreateIssueRequest;
 import com.seven7m.kanban.dto.issue.IssueFilterRequest;
 import com.seven7m.kanban.dto.issue.IssueVO;
@@ -72,6 +74,19 @@ public class IssueController {
     public R<Void> delete(@PathVariable UUID id) {
         workItemRouter.delete(id);
         return R.ok();
+    }
+
+    /**
+     * 批量删除工作项。
+     *
+     * <p>权限走与单条删除相同的 {@code issue:delete}；项目由拦截器从请求体的 projectId 解析，
+     * 服务端还会校验每个 id 确实属于该项目（否则"换个 projectId 就能删别人的工作项"）。
+     * 返回 deleted/skipped/failed 三项计数，前端据此给出准确提示。
+     */
+    @ProjectRoleAnnotation(Permission.ISSUE_DELETE)
+    @PostMapping("/batch-delete")
+    public R<BatchDeleteResult> batchDelete(@RequestBody @Valid BatchDeleteIssueRequest req) {
+        return R.ok(workItemRouter.batchDelete(req.getProjectId(), req.getIds()));
     }
 
     /** 列表过滤：左侧过滤器 + 顶部筛选，返回分页 IssueVO（只读，项目成员含 VIEWER 可读） */

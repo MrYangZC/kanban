@@ -629,8 +629,7 @@ body {
     font-size: 12px;
   }
   /* 子任务数量徽标：极轻，不抢标题 */
-  .wi-count {
-    display: inline-flex;
+  .wi-count {    display: inline-flex;
     align-items: center;
     justify-content: center;
     min-width: 18px;
@@ -730,6 +729,74 @@ body {
     flex-direction: column;
     min-height: 0;
     flex: 1 1 auto;
+  }
+  /* 批量删除：勾选框、选中行、选中态操作条 */
+  .wi-check {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: var(--primary);
+    vertical-align: middle;
+    display: block;
+    margin: 0 auto;
+  }
+  /* 勾选列专用：通用 td 的 12px 左右内边距 + text-overflow:ellipsis，
+     在 38px 列宽下会把复选框挤出可视区、渲染出一个多余的省略号，故单独收紧 */
+  .wi-table .wi-th-select,
+  .wi-table .wi-td-select {
+    padding-left: 8px;
+    padding-right: 2px;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .wi-table .wi-row-selected {
+    background-color: rgba(64, 158, 255, 0.1);
+  }
+  .wi-table .wi-row-selected:hover {
+    background-color: rgba(64, 158, 255, 0.14);
+  }
+  .wi-sel-pill {
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .wi-sel-clear {
+    margin-left: 4px;
+    font-size: 12px;
+    color: var(--ink-secondary);
+    transition: color 0.15s;
+  }
+  .wi-sel-clear:hover {
+    color: var(--brand, var(--primary));
+  }
+  .wi-danger-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(245, 108, 108, 0.35);
+    background-color: rgba(245, 108, 108, 0.08);
+    color: var(--danger);
+    font-size: 12px;
+    transition: background-color 0.15s, border-color 0.15s;
+  }
+  .wi-danger-btn:hover:not(:disabled) {
+    background-color: rgba(245, 108, 108, 0.16);
+    border-color: rgba(245, 108, 108, 0.5);
+  }
+  .wi-danger-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  /* 树形卡片头：勾选后同样就地出现批量操作 */
+  .wi-card-head .wi-sel-pill:first-of-type {
+    margin-left: 8px;
   }
   /* 行高回到概览页的呼吸感：38px 太挤，44px 与卡片留白更协调 */
   .wi-table .data-td {

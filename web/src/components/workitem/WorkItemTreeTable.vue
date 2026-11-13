@@ -25,20 +25,32 @@ const props = withDefaults(defineProps<{
   statusColor: (id: string) => string
   memberName?: (id: string | null) => string
   noun?: string
+  /** 已勾选的工作项 id（批量删除用，由父组件持有） */
+  selected?: Set<string>
+  /** 没有批量删除权限时传 false，勾选框不渲染 */
+  selectable?: boolean
 }>(), {
-  noun: '工作项'
+  noun: '工作项',
+  selectable: false
 })
 
-const emit = defineEmits<{ (e: 'open', id: string): void }>()
+const emit = defineEmits<{
+  (e: 'open', id: string): void
+  /** 勾选变化：parent 传 true 表示勾上 node 及其所有子孙（删除父任务必然连子任务一起删） */
+  (e: 'select', payload: { ids: string[]; checked: boolean }): void
+}>()
 
-const columns = [
-  { key: 'title', label: '任务' },
-  { key: 'key', label: '编号', width: '110px' },
-  { key: 'assignee', label: '负责人', width: '136px' },
-  { key: 'status', label: '状态', width: '96px' },
-  { key: 'dueDate', label: '计划完成', width: '92px', align: 'right' as const },
-  { key: 'updatedAt', label: '更新于', width: '84px', align: 'right' as const }
-]
+const columns = computed(() => {
+  const base = [
+    { key: 'title', label: '任务' },
+    { key: 'key', label: '编号', width: '110px' },
+    { key: 'assignee', label: '负责人', width: '136px' },
+    { key: 'status', label: '状态', width: '96px' },
+    { key: 'dueDate', label: '计划完成', width: '92px', align: 'right' as const },
+    { key: 'updatedAt', label: '更新于', width: '84px', align: 'right' as const }
+  ]
+  return props.selectable ? [{ key: 'select', label: '', width: '38px' }, ...base] : base
+})
 
 /** 已展开的节点 id 集合 */
 const expanded = ref<Set<string>>(new Set())
@@ -143,6 +155,45 @@ function shortDate(value: string | null | undefined) {
 function assigneeName(node: IssueTreeNode) {
   return props.memberName ? props.memberName(node.assigneeId) : (node.assigneeName || '')
 }
+
+/** 勾选：父节点连带其全部子孙（后端删除父任务时本来就会级联删除子任务） */
+function isChecked(id: string) { return props.selected?.has(id) ?? false }
+
+function subtreeIds(node: IssueTreeNode): string[] {
+  const out: string[] = []
+  const walk = (n: IssueTreeNode) => {
+    out.push(n.id)
+    for (const c of n.children ?? []) walk(c)
+  }
+  walk(node)
+  return out
+}
+
+function onToggle(node: IssueTreeNode, checked: boolean) {
+  emit('select', { ids: subtreeIds(node), checked })
+}
+
+/** 可见行全选/全不选（含已折叠节点，全部数据都在 nodes 里） */
+const allVisibleSelected = computed(() => {
+  if (!props.selectable || !rows.value.length) return false
+  return rows.value.every((r) => isChecked(r.node.id))
+})
+
+function toggleSelectAll() {
+  emit('select', { ids: allIds(props.nodes), checked: !allVisibleSelected.value })
+}
+
+function allIds(list: IssueTreeNode[]): string[] {
+  const out: string[] = []
+  const walk = (items: IssueTreeNode[]) => {
+    for (const n of items) {
+      out.push(n.id)
+      if (n.children?.length) walk(n.children)
+    }
+  }
+  walk(list)
+  return out
+}
 </script>
 
 <template>
@@ -151,6 +202,8 @@ function assigneeName(node: IssueTreeNode) {
       <GitBranch :size="16" class="text-brand" />
       <span class="wi-card-title">全部{{ noun }}</span>
       <span class="count-pill">{{ totalCount }}</span>
+      <!-- 批量操作由页面注入：勾选状态在页面里统一持有，组件不重复管一份 -->
+      <slot name="head-actions" />
       <span class="ml-auto text-xs text-ink-secondary">当前显示 {{ visibleCount }} 条</span>
       <div class="flex items-center gap-0.5">
         <button
@@ -176,8 +229,17 @@ function assigneeName(node: IssueTreeNode) {
         <table class="data-table">
         <thead class="data-thead">
           <tr>
+            <th v-if="selectable" class="data-th wi-th-select" style="width: 38px">
+              <input
+                type="checkbox"
+                class="wi-check"
+                :checked="allVisibleSelected"
+                title="全选/全不选"
+                @click.stop="toggleSelectAll"
+              />
+            </th>
             <th
-              v-for="(col, i) in columns"
+              v-for="(col, i) in columns.filter((c) => c.key !== 'select')"
               :key="col.key"
               class="data-th"
               :class="[i === 0 ? 'data-th-first' : '', col.align === 'right' ? 'text-right' : '']"
@@ -192,9 +254,17 @@ function assigneeName(node: IssueTreeNode) {
             v-for="{ node, depth } in rows"
             :key="node.id"
             class="data-tr cursor-pointer"
-            :class="depth === 0 ? 'wi-row-root' : ''"
+            :class="[depth === 0 ? 'wi-row-root' : '', isChecked(node.id) ? 'wi-row-selected' : '']"
             @click="emit('open', node.id)"
           >
+            <td v-if="selectable" class="data-td wi-td-select" @click.stop>
+              <input
+                type="checkbox"
+                class="wi-check"
+                :checked="isChecked(node.id)"
+                @click.stop="onToggle(node, !isChecked(node.id))"
+              />
+            </td>
             <!-- 任务：整行贯通的层级引导线 + 展开箭头 + 优先级点 + 标题 + 子任务数 -->
             <td class="data-td data-td-first wi-tree-cell" :style="{ '--depth': depth }">
               <span v-if="depth > 0" class="wi-guides" />
