@@ -522,6 +522,155 @@ body {
     padding-left: 1rem;
     padding-right: 1rem;
   }
+
+  /* ------------------------------------------------------------------
+     工作项表格（列表 / 树形）视觉收紧
+     默认 .data-* 是通用样式（用户管理、RBAC 等页也在用），这里只在
+     .wi-table 容器内做覆盖：行更紧凑、表头更轻、数值列等宽右对齐。
+     ------------------------------------------------------------------ */
+  .wi-table .data-th {
+    padding: 0.5rem 0.75rem;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--ink-placeholder);
+    text-transform: none;
+    white-space: nowrap;
+  }
+  .wi-table .data-tr {
+    border-bottom: 1px solid rgba(48, 49, 51, 0.045);
+  }
+  .wi-table .data-tr:hover {
+    background-color: rgba(64, 158, 255, 0.05);
+  }
+  .wi-table .data-td {
+    padding: 0.5rem 0.75rem;
+    vertical-align: middle;
+  }
+  .wi-table .data-td-first {
+    padding-left: 0.75rem;
+  }
+  /* 表格不再随窗口无限拉伸：列宽固定后，宽屏下「任务」列会吸走全部空白，
+     标题与「编号」之间拉出一大块空隙。限宽后各列间距才是正常视觉节奏。 */
+  .wi-table .data-table {
+    width: 100%;
+    max-width: 1060px;
+    table-layout: fixed;
+  }
+  .wi-table .data-table .data-th,
+  .wi-table .data-table .data-td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* 层级引导线：整行贯通的竖线（钉钉多维表那种），用渐变画在首个单元格的绝对层里，
+     比逐个 span 画短竖线更连贯——短竖线在行高变化时会断开 */
+  .wi-tree-cell {
+    position: relative;
+  }
+  /* 层级引导线：整行贯通的竖线，位置对准「父节点箭头」的中心。
+     几何关系：单元格 padding-left 12px，每级缩进 18px，箭头宽 18px（中心在 +9px）：
+     第 d 层的箭头中心 = 12 + 18d + 9 = 21 + 18d，故该层的竖线分别落在 21, 39, 57… */
+  .wi-guides {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 21px;
+    width: calc(var(--depth, 0) * 18px);
+    background-image: repeating-linear-gradient(
+      to right,
+      rgba(48, 49, 51, 0.11) 0 1px,
+      transparent 1px 18px
+    );
+    pointer-events: none;
+  }
+  .wi-caret {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    border-radius: 4px;
+    color: var(--ink-placeholder);
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .wi-caret:hover {
+    background-color: rgba(64, 158, 255, 0.12);
+    color: var(--primary);
+  }
+  .wi-caret-spacer {
+    display: inline-block;
+    width: 18px;
+    flex: none;
+  }
+  /* 编号列：等宽数字，弱化成"标识"而不是正文 */
+  .wi-key {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    color: var(--ink-placeholder);
+    letter-spacing: 0.01em;
+  }
+  /* 日期列：右对齐、等宽数字，避免参差不齐 */
+  .wi-date {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    color: var(--ink-secondary);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .wi-empty {
+    color: var(--ink-placeholder);
+    font-size: 12px;
+  }
+  /* 子任务数量徽标：极轻，不抢标题 */
+  .wi-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 16px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background-color: rgba(48, 49, 51, 0.05);
+    color: var(--ink-secondary);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .wi-title-leaf {
+    color: var(--ink-regular);
+  }
+  .wi-title-root {
+    color: var(--ink);
+    font-weight: 500;
+  }
+  /* 根节点整行极浅底色：238 行摊平后靠它区分"分组"，比加粗标题更有效 */
+  .wi-table .wi-row-root {
+    background-color: rgba(48, 49, 51, 0.018);
+  }
+  .wi-table .wi-row-root:hover {
+    background-color: rgba(64, 158, 255, 0.06);
+  }
+  /* 非默认优先级的标记：8px 圆点 + 文案，只在需要时出现 */
+  .wi-prio {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+    font-size: 11px;
+    color: var(--ink-secondary);
+  }
+  .wi-prio-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background-color: currentColor;
+    flex: none;
+  }
+  /* 负责人为空时不要渲染灰色头像圆点 */
+  .wi-unassigned {
+    color: var(--ink-placeholder);
+    font-size: 12px;
+  }
   .empty-row {
     padding-top: 3rem;
     padding-bottom: 3rem;

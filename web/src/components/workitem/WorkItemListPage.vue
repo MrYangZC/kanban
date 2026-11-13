@@ -17,7 +17,7 @@ import { useWorkflowTransition } from '@/composables/useWorkflowTransition'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { useScopeCounts } from '@/composables/useScopeCounts'
 import { useIssueFilterParams } from '@/composables/useIssueFilterParams'
-import { PRIORITY_COLOR as priorityColor } from '@/constants/issueDict'
+import { PRIORITY_COLOR, priorityColor as priorityColorOf, priorityLabel as priorityLabelOf } from '@/constants/issueDict'
 import DataTable, { type TableColumn } from '@/components/common/DataTable.vue'
 import WorkItemTreeTable from '@/components/workitem/WorkItemTreeTable.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
@@ -116,12 +116,24 @@ const viewTabs: ViewTab[] = [
 ]
 
 const columns: TableColumn[] = [
-  { key: 'title', label: '标题' },
-  { key: 'status', label: '状态' },
-  { key: 'priority', label: '优先级' },
-  { key: 'assignee', label: '负责人' },
-  { key: 'createdAt', label: '创建时间' }
+  { key: 'title', label: '任务' },
+  { key: 'key', label: '编号', width: '110px' },
+  { key: 'assignee', label: '负责人', width: '136px' },
+  { key: 'status', label: '状态', width: '96px' },
+  { key: 'dueDate', label: '计划完成', width: '92px', align: 'right' },
+  { key: 'updatedAt', label: '更新于', width: '84px', align: 'right' }
 ]
+
+/** 优先级文案：默认值 P2（中）在列表里不显示，避免整列同色块 */
+function priorityText(priority: string) {
+  return priorityLabelOf(priority)
+}
+
+/** 短日期：列表里 238 行同一天的完整日期是噪音 */
+function shortDate(value: string | null | undefined) {
+  const full = fmtDate(value)
+  return full && full !== '—' ? full.slice(5) : '—'
+}
 
 const statusNameMap = computed(() => {
   const m: Record<string, string> = {}
@@ -313,34 +325,47 @@ onMounted(() => {
         <button class="text-xs text-ink-400 hover:text-brand" @click="clearQueryFilter">清除</button>
       </div>
     </template>
-    <!-- 列表视图 -->
-    <DataTable v-if="view === 'list'" :columns="columns">
-      <tr
-        v-for="i in tableData"
-        :key="i.id"
-        class="data-tr cursor-pointer"
-        @click="detailDrawer?.open(i.id)"
-      >
-        <td class="data-td data-td-first">
-          <div class="flex items-center gap-2">
-            <component :is="icon" :size="14" class="shrink-0 text-brand" />
-            <span class="cell-key">{{ i.issueKey }}</span>
-            <span class="cell-title">{{ i.title }}</span>
-          </div>
-        </td>
-        <td class="data-td">
-          <StatusPill :label="statusName(i.statusId)" :color="statusColor(i.statusId)" />
-        </td>
-        <td class="data-td">
-          <PriorityPill :priority="i.priority" />
-        </td>
-        <td class="data-td">
-          <UserCell :avatar-name="i.assigneeName" :avatar-url="i.assigneeAvatarUrl" :display-name="memberName(i.assigneeId)" />
-        </td>
-        <td class="data-td cell-muted">{{ fmtDate(i.createdAt) }}</td>
-      </tr>
-      <EmptyRow v-if="!loading && !tableData.length" :colspan="columns.length" :text="`暂无${noun}`" />
-    </DataTable>
+    <!-- 列表视图：列与树形视图保持一致，视觉收紧见 style.css 的 .wi-table -->
+    <div v-if="view === 'list'" class="wi-table">
+      <DataTable :columns="columns">
+        <tr
+          v-for="i in tableData"
+          :key="i.id"
+          class="data-tr cursor-pointer"
+          @click="detailDrawer?.open(i.id)"
+        >
+          <td class="data-td data-td-first">
+            <div class="flex items-center gap-2">
+              <span
+                v-if="i.priority && i.priority !== 'P2'"
+                class="wi-prio"
+                :style="{ color: priorityColorOf(i.priority) }"
+                :title="`优先级 ${priorityText(i.priority)}`"
+              >
+                <span class="wi-prio-dot" />
+              </span>
+              <span class="wi-title-leaf min-w-0 truncate text-[13px]">{{ i.title }}</span>
+            </div>
+          </td>
+          <td class="data-td"><span class="wi-key">{{ i.issueKey }}</span></td>
+          <td class="data-td">
+            <UserCell
+              v-if="i.assigneeId"
+              :avatar-name="i.assigneeName"
+              :avatar-url="i.assigneeAvatarUrl"
+              :display-name="memberName(i.assigneeId)"
+            />
+            <span v-else class="wi-unassigned">—</span>
+          </td>
+          <td class="data-td">
+            <StatusPill :label="statusName(i.statusId)" :color="statusColor(i.statusId)" />
+          </td>
+          <td class="data-td"><span class="wi-date">{{ shortDate(i.dueDate) }}</span></td>
+          <td class="data-td"><span class="wi-date">{{ shortDate(i.updatedAt) }}</span></td>
+        </tr>
+        <EmptyRow v-if="!loading && !tableData.length" :colspan="columns.length" :text="`暂无${noun}`" />
+      </DataTable>
+    </div>
 
     <!-- 树形视图：层级 + 展开/收起（此前只渲染根节点，238 条数据只显示 3 条） -->
     <WorkItemTreeTable
@@ -398,7 +423,7 @@ onMounted(() => {
               <template #item="{ element }">
                 <div class="kanban-card" @click="detailDrawer?.open(element.id)">
                   <div class="mb-1.5 flex items-center gap-2">
-                    <span class="h-1.5 w-1.5 rounded-full" :style="{ background: priorityColor[element.priority] || 'var(--ink-secondary)' }" />
+                    <span class="h-1.5 w-1.5 rounded-full" :style="{ background: PRIORITY_COLOR[element.priority] || 'var(--ink-secondary)' }" />
                     <span class="font-mono text-xs text-ink-secondary">{{ element.issueKey }}</span>
                   </div>
                   <div class="line-clamp-2 text-sm leading-snug text-ink">{{ element.title }}</div>

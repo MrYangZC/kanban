@@ -3,18 +3,20 @@
  * 工作项树形表格。
  *
  * <p>之前「树形」视图只渲染根节点（238 条数据只显示 3 条），递归组件 {@code TreeNode.vue}
- * 也没被用上。这里做成真正的树表：按 parentId 组装的层级 + 逐节点展开/收起 + 缩进与连线，
- * 列结构与列表视图保持一致（任务/编号/负责人/状态/优先级/计划完成/更新于）。
+ * 也没被用上。这里做成真正的树表：层级引导线 + 逐节点展开/收起 + 与列表视图一致的列。
  *
- * <p>默认只展开根节点（根 + 它的直接子级），避免 200+ 条一次铺满；工具栏可一键全展开/全收起。
+ * <p>视觉上刻意压低"噪音"：
+ * · 编号/日期弱化并等宽右对齐，日期只显示 MM-DD；
+ * · 优先级默认值 P2（中）不占列，只在非默认时于标题前显示一个色点；
+ * · 未指派不渲染灰色头像圆点，只留一个淡横线；
+ * · 根节点整行极浅底色，238 行摊平后靠它区分分组。
  */
 import { computed, ref, watch } from 'vue'
 import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-vue-next'
-import DataTable, { type TableColumn } from '@/components/common/DataTable.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
-import PriorityPill from '@/components/common/PriorityPill.vue'
 import UserCell from '@/components/common/UserCell.vue'
 import { fmtDateOrDash as fmtDate } from '@/utils/datetime'
+import { PRIORITY_LABEL, PRIORITY_COLOR } from '@/constants/issueDict'
 import type { IssueTreeNode } from '@/api/types'
 
 const props = withDefaults(defineProps<{
@@ -29,28 +31,24 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ (e: 'open', id: string): void }>()
 
-const columns: TableColumn[] = [
+const columns = [
   { key: 'title', label: '任务' },
-  { key: 'key', label: '编号', width: '132px' },
-  { key: 'assignee', label: '负责人', width: '150px' },
-  { key: 'status', label: '状态', width: '110px' },
-  { key: 'priority', label: '优先级', width: '92px' },
-  { key: 'dueDate', label: '计划完成', width: '116px' },
-  { key: 'updatedAt', label: '更新于', width: '116px' }
+  { key: 'key', label: '编号', width: '110px' },
+  { key: 'assignee', label: '负责人', width: '136px' },
+  { key: 'status', label: '状态', width: '96px' },
+  { key: 'dueDate', label: '计划完成', width: '92px', align: 'right' as const },
+  { key: 'updatedAt', label: '更新于', width: '84px', align: 'right' as const }
 ]
 
 /** 已展开的节点 id 集合 */
 const expanded = ref<Set<string>>(new Set())
 
-/** 默认展开所有「有子节点」的根节点，深一层收起 */
+/** 默认展开根节点的直接子级，深一层收起 */
 function defaultExpanded(nodes: IssueTreeNode[]): Set<string> {
   const set = new Set<string>()
-  const walkRoots = (list: IssueTreeNode[]) => {
-    for (const n of list) {
-      if (n.children?.length) set.add(n.id)
-    }
+  for (const n of nodes) {
+    if (n.children?.length) set.add(n.id)
   }
-  walkRoots(nodes)
   return set
 }
 
@@ -58,7 +56,7 @@ watch(() => props.nodes, (nodes) => {
   expanded.value = defaultExpanded(nodes)
 }, { immediate: true })
 
-/** 按展开状态摊平成行，depth 决定缩进层级 */
+/** 按展开状态摊平成行，depth 决定缩进与引导线数量 */
 const rows = computed(() => {
   const out: { node: IssueTreeNode; depth: number }[] = []
   const walk = (list: IssueTreeNode[], depth: number) => {
@@ -119,25 +117,46 @@ function collapseAll() {
   expanded.value = new Set()
 }
 
-/** 子孙总数（用于父节点右侧的数量徽标） */
 function descendantCount(node: IssueTreeNode): number {
   return node.children?.length ? countAll(node.children) : 0
+}
+
+/** 优先级：默认值 P2（中）不显示，避免每行一个相同的标记 */
+function showPriority(priority: string) {
+  return !!priority && priority !== 'P2'
+}
+
+function priorityLabel(priority: string) {
+  return (PRIORITY_LABEL as Record<string, string>)[priority] || priority
+}
+
+function priorityDotColor(priority: string) {
+  return (PRIORITY_COLOR as Record<string, string>)[priority] || 'var(--ink-placeholder)'
+}
+
+/** 短日期：238 行同一天的完整日期是噪音，只留 MM-DD */
+function shortDate(value: string | null | undefined) {
+  const full = fmtDate(value)
+  return full && full !== '—' ? full.slice(5) : '—'
+}
+
+function assigneeName(node: IssueTreeNode) {
+  return props.memberName ? props.memberName(node.assigneeId) : (node.assigneeName || '')
 }
 </script>
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <div class="mb-2 flex items-center justify-between px-1">
+    <div class="mb-1.5 flex items-center justify-between px-1">
       <div class="flex items-center gap-2 text-xs text-ink-400">
         <span>共 {{ totalCount }} 条</span>
         <span class="text-ink-placeholder">·</span>
         <span>当前显示 {{ visibleCount }} 条</span>
       </div>
-      <div class="flex items-center gap-1">
+      <div class="flex items-center gap-0.5">
         <button
-          class="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-500 transition hover:bg-surface-muted hover:text-brand"
+          class="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-500 transition hover:bg-surface-muted hover:text-brand disabled:cursor-not-allowed disabled:opacity-40"
           :disabled="allExpanded"
-          :class="allExpanded ? 'cursor-not-allowed opacity-50' : ''"
           @click="expandAll"
         >
           <ChevronsUpDown :size="13" />
@@ -153,51 +172,78 @@ function descendantCount(node: IssueTreeNode): number {
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-auto">
-      <DataTable :columns="columns">
-        <tr
-          v-for="{ node, depth } in rows"
-          :key="node.id"
-          class="data-tr cursor-pointer"
-          @click="emit('open', node.id)"
-        >
-          <!-- 任务：缩进 + 展开箭头 + 标题 -->
-          <td class="data-td data-td-first">
-            <div class="flex items-center gap-1.5" :style="{ paddingLeft: `${depth * 18}px` }">
-              <button
-                v-if="node.children?.length"
-                class="flex size-4 shrink-0 items-center justify-center rounded text-ink-400 transition hover:bg-surface-muted hover:text-brand"
-                :title="isExpanded(node.id) ? '收起子任务' : '展开子任务'"
-                @click.stop="toggle(node)"
-              >
-                <ChevronRight :size="14" :class="isExpanded(node.id) ? 'rotate-90 transition-transform' : 'transition-transform'" />
-              </button>
-              <span v-else class="size-4 shrink-0" />
-              <span class="cell-title truncate" :class="depth === 0 ? 'font-medium text-ink' : 'text-ink-700'">{{ node.title }}</span>
-              <span
-                v-if="node.children?.length"
-                class="shrink-0 rounded-full bg-surface-muted px-1.5 py-0.5 text-[11px] text-ink-400"
-              >{{ descendantCount(node) }}</span>
-            </div>
-          </td>
-          <td class="data-td cell-key">{{ node.issueKey }}</td>
-          <td class="data-td">
-            <UserCell
-              :avatar-name="node.assigneeName"
-              :avatar-url="node.assigneeAvatarUrl"
-              :display-name="memberName ? memberName(node.assigneeId) : (node.assigneeName || '—')"
-            />
-          </td>
-          <td class="data-td">
-            <StatusPill :label="statusName(node.statusId)" :color="statusColor(node.statusId)" />
-          </td>
-          <td class="data-td">
-            <PriorityPill :priority="node.priority" />
-          </td>
-          <td class="data-td cell-muted">{{ fmtDate(node.dueDate) }}</td>
-          <td class="data-td cell-muted">{{ fmtDate(node.updatedAt) }}</td>
-        </tr>
-      </DataTable>
+    <div class="wi-table min-h-0 flex-1 overflow-auto">
+      <table class="data-table">
+        <thead class="data-thead">
+          <tr>
+            <th
+              v-for="(col, i) in columns"
+              :key="col.key"
+              class="data-th"
+              :class="[i === 0 ? 'data-th-first' : '', col.align === 'right' ? 'text-right' : '']"
+              :style="col.width ? { width: col.width } : undefined"
+            >
+              {{ col.label }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="{ node, depth } in rows"
+            :key="node.id"
+            class="data-tr cursor-pointer"
+            :class="depth === 0 ? 'wi-row-root' : ''"
+            @click="emit('open', node.id)"
+          >
+            <!-- 任务：整行贯通的层级引导线 + 展开箭头 + 优先级点 + 标题 + 子任务数 -->
+            <td class="data-td data-td-first wi-tree-cell" :style="{ '--depth': depth }">
+              <span v-if="depth > 0" class="wi-guides" />
+              <div class="flex items-center gap-1" :style="{ paddingLeft: `${depth * 18}px` }">
+                <button
+                  v-if="node.children?.length"
+                  class="wi-caret"
+                  :title="isExpanded(node.id) ? '收起子任务' : '展开子任务'"
+                  @click.stop="toggle(node)"
+                >
+                  <ChevronRight
+                    :size="13"
+                    :class="isExpanded(node.id) ? 'rotate-90 transition-transform' : 'transition-transform'"
+                  />
+                </button>
+                <span v-else class="wi-caret-spacer" />
+                <span
+                  v-if="showPriority(node.priority)"
+                  class="wi-prio"
+                  :style="{ color: priorityDotColor(node.priority) }"
+                  :title="`优先级 ${priorityLabel(node.priority)}`"
+                >
+                  <span class="wi-prio-dot" />
+                </span>
+                <span
+                  class="min-w-0 truncate text-[13px]"
+                  :class="depth === 0 ? 'wi-title-root' : 'wi-title-leaf'"
+                >{{ node.title }}</span>
+                <span v-if="node.children?.length" class="wi-count">{{ descendantCount(node) }}</span>
+              </div>
+            </td>
+            <td class="data-td"><span class="wi-key">{{ node.issueKey }}</span></td>
+            <td class="data-td">
+              <UserCell
+                v-if="node.assigneeId"
+                :avatar-name="node.assigneeName"
+                :avatar-url="node.assigneeAvatarUrl"
+                :display-name="assigneeName(node)"
+              />
+              <span v-else class="wi-unassigned">—</span>
+            </td>
+            <td class="data-td">
+              <StatusPill :label="statusName(node.statusId)" :color="statusColor(node.statusId)" />
+            </td>
+            <td class="data-td"><span class="wi-date">{{ shortDate(node.dueDate) }}</span></td>
+            <td class="data-td"><span class="wi-date">{{ shortDate(node.updatedAt) }}</span></td>
+          </tr>
+        </tbody>
+      </table>
       <div v-if="!rows.length" class="empty-row text-sm">暂无{{ noun }}</div>
     </div>
   </div>
