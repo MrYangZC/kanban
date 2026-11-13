@@ -650,6 +650,97 @@ body {
     color: var(--ink);
     font-weight: 500;
   }
+
+  /* ------------------------------------------------------------------
+     列表 / 树形页的卡片化外壳
+     概览页之所以好看，靠的是「卡片分组 + 彩色统计 + 统一留白」；
+     这两个数据页原本是"工具栏下面直接贴一张裸表"，缺的正是这层结构。
+     ------------------------------------------------------------------ */
+  .wi-page {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px 24px;
+    min-height: 100%;
+  }
+  /* 统计条：与概览页 StatCard 同一套语法，只缩小内边距与字号 */
+  .wi-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    flex: none;
+  }
+  @media (min-width: 768px) {
+    .wi-stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .wi-stat {
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    transition: box-shadow 0.2s var(--ease-expo), transform 0.2s var(--ease-expo);
+  }
+  .wi-stat:hover {
+    box-shadow: var(--shadow-glass-lift), var(--specular);
+  }
+  .wi-stat-label {
+    font-size: 12px;
+    line-height: 1.2;
+    color: var(--ink-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .wi-stat-value {
+    margin-top: 6px;
+    font-size: 22px;
+    line-height: 1.1;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .wi-stat-icon {
+    flex: none;
+    margin-top: 1px;
+    opacity: 0.9;
+  }
+  /* 表格卡片：与概览页其它区块同样的玻璃卡 + 圆角 + 顶部信息条 */
+  .wi-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 auto;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .wi-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--glass-line);
+    flex: none;
+  }
+  .wi-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .wi-card-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+  /* 行高回到概览页的呼吸感：38px 太挤，44px 与卡片留白更协调 */
+  .wi-table .data-td {
+    padding-top: 0.6875rem;
+    padding-bottom: 0.6875rem;
+  }
+  .wi-table .data-tr .wi-title-leaf,
+  .wi-table .data-tr .wi-title-root {
+    font-size: 13.5px;
+    font-weight: 500;
+  }
   /* 根节点整行极浅底色：238 行摊平后靠它区分"分组"，比加粗标题更有效 */
   .wi-table .wi-row-root {
     background-color: rgba(48, 49, 51, 0.018);

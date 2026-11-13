@@ -20,6 +20,7 @@ import { useIssueFilterParams } from '@/composables/useIssueFilterParams'
 import { PRIORITY_COLOR, priorityColor as priorityColorOf, priorityLabel as priorityLabelOf } from '@/constants/issueDict'
 import DataTable, { type TableColumn } from '@/components/common/DataTable.vue'
 import WorkItemTreeTable from '@/components/workitem/WorkItemTreeTable.vue'
+import WorkItemStatsBar, { type WorkItemStat } from '@/components/workitem/WorkItemStatsBar.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
 import PriorityPill from '@/components/common/PriorityPill.vue'
 import UserCell from '@/components/common/UserCell.vue'
@@ -123,6 +124,36 @@ const columns: TableColumn[] = [
   { key: 'dueDate', label: '计划完成', width: '92px', align: 'right' },
   { key: 'updatedAt', label: '更新于', width: '84px', align: 'right' }
 ]
+
+/** 统计条的数据源：树形视图用已全量加载的 allIssues，列表视图单独拉一次全量（分页只有当页） */
+const statsIssues = ref<Issue[]>([])
+
+async function loadStats() {
+  try {
+    const res = await filterIssues(filterParams({ page: 1, size: 1000 }))
+    statsIssues.value = res.list
+  } catch {
+    statsIssues.value = []
+  }
+}
+
+/** 统计条：标签 + 彩色数字 + 图标，语义取自状态字典的 category */
+const statItems = computed<WorkItemStat[]>(() => {
+  const source = view.value === 'tree' ? allIssues.value : statsIssues.value
+  const byCategory: Record<string, number> = {}
+  const categoryOf = (statusId: string) =>
+    statuses.value.find((s) => s.id === statusId)?.category || 'TODO'
+  for (const i of source) {
+    const c = categoryOf(i.statusId)
+    byCategory[c] = (byCategory[c] || 0) + 1
+  }
+  return [
+    { key: 'total', label: `全部${props.noun}`, value: source.length, color: 'var(--primary)' },
+    { key: 'todo', label: '待办', value: byCategory.TODO || 0, color: 'var(--ink-secondary)' },
+    { key: 'inProgress', label: '进行中', value: byCategory.IN_PROGRESS || 0, color: '#e6a23c' },
+    { key: 'done', label: '已完成', value: byCategory.DONE || 0, color: 'var(--success)' }
+  ]
+})
 
 /** 优先级文案：默认值 P2（中）在列表里不显示，避免整列同色块 */
 function priorityText(priority: string) {
@@ -258,9 +289,10 @@ const { dragOverCol, onMove, onEnd } = useBoardDrag({
 function reloadAll() {
   load()
   refreshScopeCounts()
+  loadStats()
 }
 
-function onSearch() { page.value = 1; load() }
+function onSearch() { page.value = 1; load(); loadStats() }
 function onViewChange(v: string) {
   view.value = v as ViewMode
   localStorage.setItem(`kanban:${props.storageKey}:${projectId.value}`, v)
@@ -270,6 +302,7 @@ function onScopeChange(v: string) {
   scope.value = v
   page.value = 1
   load()
+  loadStats()
 }
 
 async function openCreate() {
@@ -288,6 +321,8 @@ onMounted(() => {
   loadMeta().then(() => {
     load()
     refreshScopeCounts()
+    // 统计条依赖状态字典把 statusId 映射到 category，必须等 loadMeta 完成后再拉起
+    loadStats()
   })
 })
 </script>
@@ -325,58 +360,71 @@ onMounted(() => {
         <button class="text-xs text-ink-400 hover:text-brand" @click="clearQueryFilter">清除</button>
       </div>
     </template>
-    <!-- 列表视图：列与树形视图保持一致，视觉收紧见 style.css 的 .wi-table -->
-    <div v-if="view === 'list'" class="wi-table">
-      <DataTable :columns="columns">
-        <tr
-          v-for="i in tableData"
-          :key="i.id"
-          class="data-tr cursor-pointer"
-          @click="detailDrawer?.open(i.id)"
-        >
-          <td class="data-td data-td-first">
-            <div class="flex items-center gap-2">
-              <span
-                v-if="i.priority && i.priority !== 'P2'"
-                class="wi-prio"
-                :style="{ color: priorityColorOf(i.priority) }"
-                :title="`优先级 ${priorityText(i.priority)}`"
-              >
-                <span class="wi-prio-dot" />
-              </span>
-              <span class="wi-title-leaf min-w-0 truncate text-[13px]">{{ i.title }}</span>
-            </div>
-          </td>
-          <td class="data-td"><span class="wi-key">{{ i.issueKey }}</span></td>
-          <td class="data-td">
-            <UserCell
-              v-if="i.assigneeId"
-              :avatar-name="i.assigneeName"
-              :avatar-url="i.assigneeAvatarUrl"
-              :display-name="memberName(i.assigneeId)"
-            />
-            <span v-else class="wi-unassigned">—</span>
-          </td>
-          <td class="data-td">
-            <StatusPill :label="statusName(i.statusId)" :color="statusColor(i.statusId)" />
-          </td>
-          <td class="data-td"><span class="wi-date">{{ shortDate(i.dueDate) }}</span></td>
-          <td class="data-td"><span class="wi-date">{{ shortDate(i.updatedAt) }}</span></td>
-        </tr>
-        <EmptyRow v-if="!loading && !tableData.length" :colspan="columns.length" :text="`暂无${noun}`" />
-      </DataTable>
-    </div>
+    <!-- 列表 / 树形：套上概览页那套「卡片 + 彩色统计 + 统一留白」的外壳 -->
+    <div v-if="view !== 'board'" class="wi-page">
+      <WorkItemStatsBar :items="statItems" />
 
-    <!-- 树形视图：层级 + 展开/收起（此前只渲染根节点，238 条数据只显示 3 条） -->
-    <WorkItemTreeTable
-      v-else-if="view === 'tree'"
-      :nodes="treeData"
-      :status-name="statusName"
-      :status-color="statusColor"
-      :member-name="memberName"
-      :noun="noun"
-      @open="(id: string) => detailDrawer?.open(id)"
-    />
+      <!-- 列表视图：列与树形视图保持一致，视觉收紧见 style.css 的 .wi-table -->
+      <div v-if="view === 'list'" class="wi-card glass-panel">
+        <div class="wi-card-head">
+          <component :is="icon" :size="16" class="text-brand" />
+          <span class="wi-card-title">全部{{ noun }}</span>
+          <span class="count-pill">{{ total }}</span>
+          <span class="ml-auto text-xs text-ink-secondary">按更新时间倒序</span>
+        </div>
+        <div class="wi-card-body wi-table">
+          <DataTable :columns="columns">
+            <tr
+              v-for="i in tableData"
+              :key="i.id"
+              class="data-tr cursor-pointer"
+              @click="detailDrawer?.open(i.id)"
+            >
+              <td class="data-td data-td-first">
+                <div class="flex items-center gap-2">
+                  <span
+                    v-if="i.priority && i.priority !== 'P2'"
+                    class="wi-prio"
+                    :style="{ color: priorityColorOf(i.priority) }"
+                    :title="`优先级 ${priorityText(i.priority)}`"
+                  >
+                    <span class="wi-prio-dot" />
+                  </span>
+                  <span class="wi-title-leaf min-w-0 truncate">{{ i.title }}</span>
+                </div>
+              </td>
+              <td class="data-td"><span class="wi-key">{{ i.issueKey }}</span></td>
+              <td class="data-td">
+                <UserCell
+                  v-if="i.assigneeId"
+                  :avatar-name="i.assigneeName"
+                  :avatar-url="i.assigneeAvatarUrl"
+                  :display-name="memberName(i.assigneeId)"
+                />
+                <span v-else class="wi-unassigned">—</span>
+              </td>
+              <td class="data-td">
+                <StatusPill :label="statusName(i.statusId)" :color="statusColor(i.statusId)" />
+              </td>
+              <td class="data-td"><span class="wi-date">{{ shortDate(i.dueDate) }}</span></td>
+              <td class="data-td"><span class="wi-date">{{ shortDate(i.updatedAt) }}</span></td>
+            </tr>
+            <EmptyRow v-if="!loading && !tableData.length" :colspan="columns.length" :text="`暂无${noun}`" />
+          </DataTable>
+        </div>
+      </div>
+
+      <!-- 树形视图：层级 + 展开/收起（此前只渲染根节点，238 条数据只显示 3 条） -->
+      <WorkItemTreeTable
+        v-else-if="view === 'tree'"
+        :nodes="treeData"
+        :status-name="statusName"
+        :status-color="statusColor"
+        :member-name="memberName"
+        :noun="noun"
+        @open="(id: string) => detailDrawer?.open(id)"
+      />
+    </div>
     <!-- 看板视图 -->
     <div v-else class="kanban-page">
       <div

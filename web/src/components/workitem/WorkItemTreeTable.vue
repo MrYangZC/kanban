@@ -12,7 +12,7 @@
  * · 根节点整行极浅底色，238 行摊平后靠它区分分组。
  */
 import { computed, ref, watch } from 'vue'
-import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-vue-next'
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown, GitBranch } from 'lucide-vue-next'
 import StatusPill from '@/components/common/StatusPill.vue'
 import UserCell from '@/components/common/UserCell.vue'
 import { fmtDateOrDash as fmtDate } from '@/utils/datetime'
@@ -146,13 +146,12 @@ function assigneeName(node: IssueTreeNode) {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col">
-    <div class="mb-1.5 flex items-center justify-between px-1">
-      <div class="flex items-center gap-2 text-xs text-ink-400">
-        <span>共 {{ totalCount }} 条</span>
-        <span class="text-ink-placeholder">·</span>
-        <span>当前显示 {{ visibleCount }} 条</span>
-      </div>
+  <div class="wi-card glass-panel">
+    <div class="wi-card-head">
+      <GitBranch :size="16" class="text-brand" />
+      <span class="wi-card-title">全部{{ noun }}</span>
+      <span class="count-pill">{{ totalCount }}</span>
+      <span class="ml-auto text-xs text-ink-secondary">当前显示 {{ visibleCount }} 条</span>
       <div class="flex items-center gap-0.5">
         <button
           class="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-500 transition hover:bg-surface-muted hover:text-brand disabled:cursor-not-allowed disabled:opacity-40"
@@ -172,8 +171,9 @@ function assigneeName(node: IssueTreeNode) {
       </div>
     </div>
 
-    <div class="wi-table min-h-0 flex-1 overflow-auto">
-      <table class="data-table">
+    <div class="wi-card-body wi-table">
+      <div class="min-h-0 flex-1 overflow-auto">
+        <table class="data-table">
         <thead class="data-thead">
           <tr>
             <th
@@ -243,8 +243,9 @@ function assigneeName(node: IssueTreeNode) {
             <td class="data-td"><span class="wi-date">{{ shortDate(node.updatedAt) }}</span></td>
           </tr>
         </tbody>
-      </table>
-      <div v-if="!rows.length" class="empty-row text-sm">暂无{{ noun }}</div>
+        </table>
+        <div v-if="!rows.length" class="empty-row text-sm">暂无{{ noun }}</div>
+      </div>
     </div>
   </div>
 </template>
