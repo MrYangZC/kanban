@@ -1,5 +1,6 @@
 package com.seven7m.kanban.service.dev;
 
+import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.dto.dev.ExcelRow;
 import com.seven7m.kanban.dto.issue.CreateIssueRequest;
@@ -18,6 +19,7 @@ import com.seven7m.kanban.service.project.ProjectMemberService;
 import com.seven7m.kanban.service.project.ProjectService;
 import com.seven7m.kanban.service.user.UserService;
 import com.seven7m.kanban.service.workitem.TaskService;
+import com.seven7m.kanban.service.workflow.WorkflowService;
 import com.seven7m.kanban.dto.user.CreateUserRequest;
 import com.seven7m.kanban.entity.user.SysUser;
 import com.seven7m.kanban.mapper.user.SysUserMapper;
@@ -63,6 +65,7 @@ public class ExcelImportService {
     private final SysUserMapper sysUserMapper;
     private final ProjectMapper projectMapper;
     private final TransactionTemplate transactionTemplate;
+    private final WorkflowService workflowService;
 
     public ExcelImportService(ProjectService projectService,
                               ProjectMemberService projectMemberService,
@@ -72,7 +75,8 @@ public class ExcelImportService {
                               UserService userService,
                               SysUserMapper sysUserMapper,
                               ProjectMapper projectMapper,
-                              TransactionTemplate transactionTemplate) {
+                              TransactionTemplate transactionTemplate,
+                              WorkflowService workflowService) {
         this.projectService = projectService;
         this.projectMemberService = projectMemberService;
         this.taskService = taskService;
@@ -82,6 +86,7 @@ public class ExcelImportService {
         this.sysUserMapper = sysUserMapper;
         this.projectMapper = projectMapper;
         this.transactionTemplate = transactionTemplate;
+        this.workflowService = workflowService;
     }
 
     public ExcelImportResult run(String filePath) {
@@ -345,20 +350,25 @@ public class ExcelImportService {
         }
     }
 
+    /**
+     * 状态文本 → 状态 id。
+     *
+     * <p>状态表 {@code issue_status} 是**全局共享**的（没有 project_id 列，按 {@code workflow_status}
+     * 关联到各工作流）。此前这里按 {@code project_id} 过滤，列根本不存在，运行期直接抛
+     * {@code PSQLException: column "project_id" does not exist}，每一行都被 catch 记为失败，
+     * 表现为「导入 0 条、失败 N 条」。
+     *
+     * <p>导入统一创建工作项类型 {@code TASK}，因此走 TASK 工作流的状态集合，再按 category 取第一个：
+     * 待办→TASK_TODO、进行中→TASK_IN_PROGRESS、已完成→TASK_DONE。
+     */
     private UUID resolveStatusId(UUID projectId, String statusText) {
         String cat = ImportMapper.mapStatus(statusText);
-        List<IssueStatus> list = issueStatusMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<IssueStatus>()
-                        .eq("project_id", projectId).eq("category", cat));
+        List<IssueStatus> list = workflowService.statusesOf(projectId, ItemCategory.TASK).stream()
+                .filter(s -> cat.equals(s.getCategory()))
+                .toList();
         if (list.isEmpty()) {
-            // 兜底：取该项目第一个状态
-            List<IssueStatus> all = issueStatusMapper.selectList(
-                    new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<IssueStatus>()
-                            .eq("project_id", projectId));
-            if (all.isEmpty()) {
-                throw new com.seven7m.kanban.common.exception.ServiceException("项目无可用状态: " + projectId);
-            }
-            return all.get(0).getId();
+            throw new com.seven7m.kanban.common.exception.ServiceException(
+                    "TASK 工作流缺少 category=" + cat + " 的状态，无法导入");
         }
         return list.get(0).getId();
     }

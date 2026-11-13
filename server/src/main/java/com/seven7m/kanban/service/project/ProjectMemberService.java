@@ -142,7 +142,12 @@ public class ProjectMemberService implements MemberRolePort {
     @Transactional
     public ProjectMemberVO add(UUID projectId, AddMemberRequest req) {
         requireAdmin(projectId);
-        validateRoles(req.getRoles());
+        // roles 为空时兜底为 MEMBER：DTO 按规约不再设默认值，而内部调用方（如 Excel 导入）
+        // 可能只填 userId，这里必须兜住，否则 validateRoles 会对 null 抛 NPE
+        List<String> roles = req.getRoles() == null || req.getRoles().isEmpty()
+                ? List.of(ProjectRole.MEMBER)
+                : req.getRoles();
+        validateRoles(roles);
         if (userMapper.selectById(req.getUserId()) == null) {
             throw new ServiceException(404, "用户不存在");
         }
@@ -156,11 +161,11 @@ public class ProjectMemberService implements MemberRolePort {
         m.setUserId(req.getUserId());
         m.setCreatedAt(LocalDateTime.now());
         projectMemberMapper.insert(m);
-        grantRoles(projectId, req.getUserId(), req.getRoles());
+        grantRoles(projectId, req.getUserId(), roles);
         evictRoleCache(projectId, req.getUserId());
         permissionService.evictUserPermissions(req.getUserId(), projectId);
         log.info("project.member.add projectId={} member={} roles={} operator={}",
-                projectId, req.getUserId(), req.getRoles(), UserContext.getUserId());
+                projectId, req.getUserId(), roles, UserContext.getUserId());
         return toVO(m);
     }
 
