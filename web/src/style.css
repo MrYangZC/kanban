@@ -440,6 +440,10 @@ body {
     backdrop-filter: var(--glass-blur);
     padding-left: 1rem;
     padding-right: 1rem;
+    /* 窄屏时整条工具栏可横向滚动，而不是把按钮裁掉一半 */
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
   }
   .toolbar-back {
     display: flex;
@@ -562,6 +566,13 @@ body {
     width: 100%;
     max-width: 1060px;
     table-layout: fixed;
+  }
+  /* 窄屏时列不能被压成 0 宽（此前 820px 下「任务」列整列消失，只剩编号和负责人）：
+     给表格一个最小宽度，让内容区横向滚动，而不是挤压列 */
+  @media (max-width: 1100px) {
+    .wi-table .data-table {
+      min-width: 780px;
+    }
   }
   .wi-table .data-table .data-th,
   .wi-table .data-table .data-td {
@@ -704,6 +715,7 @@ body {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
+
   /* 表格卡片：与概览页其它区块同样的玻璃卡 + 圆角 + 顶部信息条 */
   .wi-card {
     display: flex;
@@ -1243,3 +1255,71 @@ body {
   outline-offset: -2px;
   cursor: not-allowed;
 }
+
+  /* ------------------------------------------------------------------
+     响应式：1200 / 1100 / 860 三档（必须放在文件末尾：同权重规则靠源顺序覆盖基础样式，放前面会被后面的 .scope-nav 等覆盖）
+     任务页此前在 960~820 宽度下会塌：工具栏按钮被裁、侧栏占 1/4、表格首列被压没。
+     这里按"先收侧栏、再收工具栏、最后让表格横向滚动"的顺序降级。
+     ------------------------------------------------------------------ */
+  @media (max-width: 1200px) {    /* 侧栏收窄：只留图标列，标题/文案/计数隐藏，内容区多出 148px */
+    .scope-nav {
+      width: 52px;
+      padding: 0.5rem 0.25rem;
+    }
+    .scope-nav-title {
+      display: none;
+    }
+    .scope-nav-item {
+      justify-content: center;
+      gap: 0;
+      padding-left: 0;
+      padding-right: 0;
+    }
+    .scope-nav-item > span {
+      display: none;
+    }
+  }
+  @media (max-width: 1100px) {
+    /* 工具栏：搜索框让位（快捷键 Ctrl+K 仍可用），按钮保持完整不被裁 */
+    .search-box {
+      display: none;
+    }
+    .toolbar-title {
+      white-space: nowrap;
+    }
+    .wi-page {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+    .wi-strip {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+  }
+  @media (max-width: 860px) {
+    /* 再窄：主内容区自身也可能横向溢出，交给外层滚动；分页条允许收缩 */
+    .toolbar {
+      gap: 0.5rem;
+    }
+    .wi-card-head {
+      flex-wrap: wrap;
+      row-gap: 4px;
+    }
+  }
+  /* 窄屏列降级：先去掉日期这类次要列，再在更窄时去掉负责人，尽量不触发横向滚动 */
+  @media (max-width: 1100px) {
+    .wi-hide-md {
+      display: none;
+    }
+    .wi-table .data-table {
+      min-width: 620px;
+    }
+  }
+  @media (max-width: 860px) {
+    .wi-hide-sm {
+      display: none;
+    }
+    .wi-table .data-table {
+      min-width: 460px;
+    }
+  }

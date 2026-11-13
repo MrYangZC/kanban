@@ -40,14 +40,23 @@ const emit = defineEmits<{
   (e: 'select', payload: { ids: string[]; checked: boolean }): void
 }>()
 
-const columns = computed(() => {
-  const base = [
+type TreeCol = {
+  key: string
+  label: string
+  width?: string
+  align?: 'left' | 'right' | 'center'
+  /** 窄屏降级用的类名（wi-hide-md / wi-hide-sm），列头与单元格必须同时带，否则会出现表头还在、格子已空 */
+  class?: string
+}
+
+const columns = computed<TreeCol[]>(() => {
+  const base: TreeCol[] = [
     { key: 'title', label: '任务' },
     { key: 'key', label: '编号', width: '110px' },
-    { key: 'assignee', label: '负责人', width: '136px' },
+    { key: 'assignee', label: '负责人', width: '136px', class: 'wi-hide-sm' },
     { key: 'status', label: '状态', width: '96px' },
-    { key: 'dueDate', label: '计划完成', width: '92px', align: 'right' as const },
-    { key: 'updatedAt', label: '更新于', width: '84px', align: 'right' as const }
+    { key: 'dueDate', label: '计划完成', width: '92px', align: 'right', class: 'wi-hide-md' },
+    { key: 'updatedAt', label: '更新于', width: '84px', align: 'right', class: 'wi-hide-md' }
   ]
   return props.selectable ? [{ key: 'select', label: '', width: '38px' }, ...base] : base
 })
@@ -254,7 +263,7 @@ function allIds(list: IssueTreeNode[]): string[] {
               v-for="(col, i) in columns.filter((c) => c.key !== 'select')"
               :key="col.key"
               class="data-th"
-              :class="[i === 0 ? 'data-th-first' : '', col.align === 'right' ? 'text-right' : '']"
+              :class="[i === 0 ? 'data-th-first' : '', col.align === 'right' ? 'text-right' : '', col.class || '']"
               :style="col.width ? { width: col.width } : undefined"
             >
               {{ col.label }}
@@ -310,7 +319,7 @@ function allIds(list: IssueTreeNode[]): string[] {
               </div>
             </td>
             <td class="data-td"><span class="wi-key">{{ node.issueKey }}</span></td>
-            <td class="data-td">
+            <td class="data-td wi-hide-sm">
               <UserCell
                 v-if="node.assigneeId"
                 :avatar-name="node.assigneeName"
@@ -322,8 +331,8 @@ function allIds(list: IssueTreeNode[]): string[] {
             <td class="data-td">
               <StatusPill :label="statusName(node.statusId)" :color="statusColor(node.statusId)" />
             </td>
-            <td class="data-td"><span class="wi-date">{{ shortDate(node.dueDate) }}</span></td>
-            <td class="data-td"><span class="wi-date">{{ shortDate(node.updatedAt) }}</span></td>
+            <td class="data-td wi-hide-md"><span class="wi-date">{{ shortDate(node.dueDate) }}</span></td>
+            <td class="data-td wi-hide-md"><span class="wi-date">{{ shortDate(node.updatedAt) }}</span></td>
           </tr>
         </tbody>
         </table>

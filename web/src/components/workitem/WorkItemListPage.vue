@@ -119,14 +119,14 @@ const viewTabs: ViewTab[] = [
   { key: 'board', label: '看板', icon: LayoutGrid }
 ]
 
-const columns = computed<{ key: string; label: string; width?: string; align?: 'left' | 'right' | 'center' }[]>(() => {
-  const base: { key: string; label: string; width?: string; align?: 'left' | 'right' | 'center' }[] = [
+const columns = computed<{ key: string; label: string; width?: string; align?: 'left' | 'right' | 'center'; class?: string }[]>(() => {
+  const base: { key: string; label: string; width?: string; align?: 'left' | 'right' | 'center'; class?: string }[] = [
     { key: 'title', label: '任务' },
     { key: 'key', label: '编号', width: '110px' },
-    { key: 'assignee', label: '负责人', width: '136px' },
+    { key: 'assignee', label: '负责人', width: '136px', class: 'wi-hide-sm' },
     { key: 'status', label: '状态', width: '96px' },
-    { key: 'dueDate', label: '计划完成', width: '92px', align: 'right' },
-    { key: 'updatedAt', label: '更新于', width: '84px', align: 'right' }
+    { key: 'dueDate', label: '计划完成', width: '92px', align: 'right', class: 'wi-hide-md' },
+    { key: 'updatedAt', label: '更新于', width: '84px', align: 'right', class: 'wi-hide-md' }
   ]
   // 有删除权限才出现勾选列：没权限却给勾选框，勾完点删除才报错，体验更差
   return canDelete.value ? [{ key: 'select', label: '', width: '36px' }, ...base] : base
@@ -511,7 +511,7 @@ onMounted(() => {
                     v-for="(col, i) in columns.filter((c) => c.key !== 'select')"
                     :key="col.key"
                     class="data-th"
-                    :class="[i === 0 ? 'data-th-first' : '', col.align === 'right' ? 'text-right' : '']"
+                    :class="[i === 0 ? 'data-th-first' : '', col.align === 'right' ? 'text-right' : '', col.class || '']"
                     :style="col.width ? { width: col.width } : undefined"
                   >
                     {{ col.label }}
@@ -548,7 +548,7 @@ onMounted(() => {
                     </div>
                   </td>
                   <td class="data-td"><span class="wi-key">{{ i.issueKey }}</span></td>
-                  <td class="data-td">
+                  <td class="data-td wi-hide-sm">
                     <UserCell
                       v-if="i.assigneeId"
                       :avatar-name="i.assigneeName"
@@ -560,8 +560,8 @@ onMounted(() => {
                   <td class="data-td">
                     <StatusPill :label="statusName(i.statusId)" :color="statusColor(i.statusId)" />
                   </td>
-                  <td class="data-td"><span class="wi-date">{{ shortDate(i.dueDate) }}</span></td>
-                  <td class="data-td"><span class="wi-date">{{ shortDate(i.updatedAt) }}</span></td>
+                  <td class="data-td wi-hide-md"><span class="wi-date">{{ shortDate(i.dueDate) }}</span></td>
+                  <td class="data-td wi-hide-md"><span class="wi-date">{{ shortDate(i.updatedAt) }}</span></td>
                 </tr>
               </tbody>
             </table>

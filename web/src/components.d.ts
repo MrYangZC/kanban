@@ -39,7 +39,6 @@ declare module 'vue' {
     IssueBasicFields: typeof import('./components/IssueBasicFields.vue')['default']
     IssueCard: typeof import('./components/IssueCard.vue')['default']
     IssueDetailDrawer: typeof import('./components/IssueDetailDrawer.vue')['default']
-    IssueDetailPanel: typeof import('./components/IssueDetailPanel.vue')['default']
     MemberCard: typeof import('./components/overview/MemberCard.vue')['default']
     MilestoneCard: typeof import('./components/overview/MilestoneCard.vue')['default']
     Pagination: typeof import('./components/project/Pagination.vue')['default']
