@@ -428,6 +428,9 @@ onMounted(() => {
     @export="onExport"
     @create="openCreate"
   >
+    <template #stats>
+      <WorkItemStatsBar v-if="view !== 'board'" :items="statItems" />
+    </template>
     <template #header-extra>
       <div v-if="activeFilterLabel" class="flex items-center gap-1.5">
         <span class="rounded-full bg-brand-light px-2.5 py-1 text-xs text-brand">筛选：{{ activeFilterLabel }}</span>
@@ -436,7 +439,6 @@ onMounted(() => {
     </template>
     <!-- 列表 / 树形：套上概览页那套「卡片 + 彩色统计 + 统一留白」的外壳 -->
     <div v-if="view !== 'board'" class="wi-page">
-      <WorkItemStatsBar :items="statItems" />
 
       <!-- 列表视图：列与树形视图保持一致，视觉收紧见 style.css 的 .wi-table -->
       <div v-if="view === 'list'" class="wi-card glass-panel">

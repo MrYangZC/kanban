@@ -124,6 +124,8 @@ function onSizeChange(v: number) {
 
       <!-- 主内容区 -->
       <main class="flex flex-1 flex-col overflow-hidden">
+        <!-- 页面级摘要条：由页面注入，落在滚动区之外，不随表格一起滚走，也不占表格高度 -->
+        <slot name="stats" />
         <div class="flex-1 overflow-auto">
           <div v-if="loading" class="py-20 text-center text-sm text-ink-placeholder">加载中…</div>
           <div v-else-if="isEmpty" class="py-20 text-center text-sm text-ink-placeholder">{{ emptyText }}</div>

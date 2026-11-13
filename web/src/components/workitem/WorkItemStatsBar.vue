@@ -1,13 +1,11 @@
 <script setup lang="ts">
 /**
- * 工作项统计条：概览页 StatCard 的同族紧凑版。
+ * 页面级工作项摘要条（统计）。
  *
- * <p>列表/树形页原先从「工具栏」直接跳到「一张裸表」，没有汇总、没有配色、没有留白节奏，
- * 与概览页那种"卡片分组 + 彩色 KPI"的层级差得很远。这里补上同一套视觉语法：
- * 每张迷你卡片 = 标签（小字灰）+ 彩色数值（大字）+ 右上角同色图标。
- *
- * <p>相比概览页 StatCard 只缩小了内边距与字号：数据页的主角仍是表格，
- * 统计只负责说明"总量与分布"，不应抢走整屏。
+ * <p>最初是内容区里的 4 张大卡，问题有两个：一是要占掉约 110px 的表格高度，
+ * 二是它在滚动容器里，往下翻表格时统计就滚走了——一个"概览"滚没了就失去意义。
+ * 现在改由 SimpleListView 的 stats 插槽渲染在内容滚动区之外：
+ * 常驻、不滚动、不挤占表格，样式也从卡片降为一条细摘要（标签 + 彩色数值 + 分隔线）。
  */
 import { computed } from 'vue'
 import type { Component } from 'vue'
@@ -37,18 +35,17 @@ const resolved = computed(() =>
 </script>
 
 <template>
-  <div class="wi-stats">
-    <div v-for="item in resolved" :key="item.key" class="wi-stat glass-panel">
-      <div class="flex items-start justify-between gap-2">
-        <span class="wi-stat-label">{{ item.label }}</span>
-        <component
-          :is="item.icon"
-          :size="15"
-          class="wi-stat-icon"
-          :style="{ color: item.color || 'var(--ink-secondary)' }"
-        />
-      </div>
-      <div class="wi-stat-value" :style="{ color: item.color || 'var(--ink)' }">{{ item.value }}</div>
+  <div class="wi-strip">
+    <div v-for="(item, i) in resolved" :key="item.key" class="wi-strip-item">
+      <span v-if="i > 0" class="wi-strip-sep" />
+      <component
+        :is="item.icon"
+        :size="13"
+        class="wi-strip-icon"
+        :style="{ color: item.color || 'var(--ink-secondary)' }"
+      />
+      <span class="wi-strip-label">{{ item.label }}</span>
+      <span class="wi-strip-value" :style="{ color: item.color || 'var(--ink)' }">{{ item.value }}</span>
     </div>
   </div>
 </template>
