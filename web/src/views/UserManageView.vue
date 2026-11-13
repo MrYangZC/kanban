@@ -104,7 +104,9 @@ async function onAvatarChange(e: Event) {
   }
 }
 
-function openEdit(u: UserVO) {
+/** el-table 插槽给的是宽松行类型，入口统一收窄 */
+function openEdit(raw: unknown) {
+  const u = raw as UserVO
   editing.value = u
   form.username = u.username
   form.displayName = u.displayName
@@ -149,12 +151,14 @@ async function save() {
   await load()
 }
 
-async function toggleEnabled(u: UserVO) {
+async function toggleEnabled(raw: unknown) {
+  const u = raw as UserVO
   await updateUser(u.id, { enabled: !u.enabled })
   await load()
 }
 
-async function remove(u: UserVO) {
+async function remove(raw: unknown) {
+  const u = raw as UserVO
   try {
     await confirmDelete(`确认删除用户「${u.displayName}」？`, '删除用户', '删除')
     await deleteUser(u.id)
@@ -186,47 +190,52 @@ onMounted(load)
     </div>
 
     <div class="table-wrapper">
-      <table class="w-full text-sm">
-        <thead class="table-head">
-          <tr>
-            <th>用户</th><th>用户名</th><th>邮箱</th><th>状态</th><th class="text-right">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="u in filteredUsers" :key="u.id" class="table-row">
-            <td class="px-5 py-3">
-              <div class="flex items-center gap-3">
-                <UserAvatar :name="u.displayName" :src="u.avatarUrl" :size="32" />
-                <span class="font-medium text-ink">{{ u.displayName }}</span>
-                <span v-if="u.isAdmin" class="rounded bg-surface-hover px-1.5 py-0.5 text-[11px] text-ink-secondary">系统管理员</span>
-              </div>
-            </td>
-            <td class="px-5 py-3 text-ink-regular">{{ u.username }}</td>
-            <td class="px-5 py-3 text-ink-regular">{{ u.email || '—' }}</td>
-            <td class="px-5 py-3">
-              <button
-                class="tag-status"
-                :class="u.enabled ? 'bg-success-light text-success' : 'bg-surface-hover text-ink-secondary'"
-                @click="toggleEnabled(u)"
-              >
-                <span class="h-1.5 w-1.5 rounded-full" :class="u.enabled ? 'bg-success' : 'bg-ink-placeholder'" />
-                {{ u.enabled ? '启用' : '禁用' }}
-              </button>
-            </td>
-            <td class="px-5 py-3">
-              <div class="flex items-center justify-end gap-1">
-                <button class="rounded-lg p-2 text-ink-secondary transition hover:bg-surface-hover" title="编辑" @click="openEdit(u)"><Pencil :size="15" /></button>
-                <button class="rounded-lg p-2 text-ink-secondary transition hover:bg-danger-light" title="删除" @click="remove(u)"><Trash2 :size="15" /></button>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="!filteredUsers.length">
-            <td colspan="5" class="px-5 py-12 text-center text-sm text-ink-secondary">
-              {{ keyword ? `未找到与「${keyword}」匹配的用户` : (loading ? '加载中…' : '暂无用户') }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="wi-card glass-panel">
+        <div class="wi-card-body wi-table">
+          <el-table
+            :data="filteredUsers"
+            row-key="id"
+            class="wi-el-table"
+            :empty-text="keyword ? `未找到与「${keyword}」匹配的用户` : (loading ? '加载中…' : '暂无用户')"
+          >
+            <el-table-column label="用户" min-width="220">
+              <template #default="{ row }">
+                <div class="flex items-center gap-3">
+                  <UserAvatar :name="row.displayName" :src="row.avatarUrl" :size="32" />
+                  <span class="font-medium text-ink">{{ row.displayName }}</span>
+                  <span v-if="row.isAdmin" class="rounded bg-surface-hover px-1.5 py-0.5 text-[11px] text-ink-secondary">系统管理员</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="用户名" min-width="160">
+              <template #default="{ row }"><span class="text-ink-regular">{{ row.username }}</span></template>
+            </el-table-column>
+            <el-table-column label="邮箱" min-width="200">
+              <template #default="{ row }"><span class="text-ink-regular">{{ row.email || '—' }}</span></template>
+            </el-table-column>
+            <el-table-column label="状态" width="120">
+              <template #default="{ row }">
+                <button
+                  class="tag-status"
+                  :class="row.enabled ? 'bg-success-light text-success' : 'bg-surface-hover text-ink-secondary'"
+                  @click="toggleEnabled(row)"
+                >
+                  <span class="h-1.5 w-1.5 rounded-full" :class="row.enabled ? 'bg-success' : 'bg-ink-placeholder'" />
+                  {{ row.enabled ? '启用' : '禁用' }}
+                </button>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="120" align="right">
+              <template #default="{ row }">
+                <div class="flex items-center justify-end gap-1">
+                  <button class="rounded-lg p-2 text-ink-secondary transition hover:bg-surface-hover" title="编辑" @click="openEdit(row)"><Pencil :size="15" /></button>
+                  <button class="rounded-lg p-2 text-ink-secondary transition hover:bg-danger-light" title="删除" @click="remove(row)"><Trash2 :size="15" /></button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
     </div>
 
     <div class="mt-4 flex justify-end">

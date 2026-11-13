@@ -21,32 +21,35 @@
           </div>
 
           <div class="table-wrapper">
-            <table class="w-full text-sm">
-              <thead class="table-head">
-                <tr>
-                  <th>名称</th><th>编码</th><th>描述</th><th class="text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in roles" :key="row.id" class="table-row">
-                  <td class="px-5 py-3 font-medium text-ink">{{ row.name }}</td>
-                  <td class="px-5 py-3">
+            <div class="wi-table">
+              <el-table
+                :data="roles"
+                row-key="id"
+                class="wi-el-table"
+                :empty-text="roleLoading ? '加载中…' : '暂无角色'"
+              >
+                <el-table-column label="名称" min-width="140">
+                  <template #default="{ row }"><span class="font-medium text-ink">{{ row.name }}</span></template>
+                </el-table-column>
+                <el-table-column label="编码" min-width="140">
+                  <template #default="{ row }">
                     <span class="rounded bg-surface-muted px-2 py-0.5 font-mono text-xs text-ink-600">{{ row.code }}</span>
-                  </td>
-                  <td class="px-5 py-3 text-ink-regular">{{ row.description || '—' }}</td>
-                  <td class="px-5 py-3">
+                  </template>
+                </el-table-column>
+                <el-table-column label="描述" min-width="200">
+                  <template #default="{ row }"><span class="text-ink-regular">{{ row.description || '—' }}</span></template>
+                </el-table-column>
+                <el-table-column label="操作" width="160" align="right">
+                  <template #default="{ row }">
                     <div class="flex items-center justify-end gap-1">
                       <button class="rounded-lg p-2 text-ink-secondary transition hover:bg-surface-hover" title="配置导航菜单" @click="openRoleMenus(row)"><ListTree :size="15" /></button>
                       <button class="rounded-lg p-2 text-ink-secondary transition hover:bg-surface-hover" title="编辑" @click="openRole(row)"><Pencil :size="15" /></button>
                       <button class="rounded-lg p-2 text-ink-secondary transition hover:bg-danger-light" title="删除" @click="delRole(row)"><Trash2 :size="15" /></button>
                     </div>
-                  </td>
-                </tr>
-                <tr v-if="!roles.length">
-                  <td colspan="4" class="px-5 py-12 text-center text-sm text-ink-secondary">{{ roleLoading ? '加载中…' : '暂无角色' }}</td>
-                </tr>
-              </tbody>
-            </table>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
           </div>
         </section>
 
@@ -112,34 +115,33 @@
             </div>
 
             <div class="table-wrapper">
-              <table class="w-full text-sm">
-                <thead class="table-head">
-                  <tr>
-                    <th>成员</th><th>用户名</th><th>角色</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in memberRows" :key="row.userId" class="table-row">
-                    <td class="px-5 py-3">
+              <div class="wi-table">
+                <el-table
+                  :data="memberRows"
+                  row-key="userId"
+                  class="wi-el-table"
+                  :empty-text="userRoleLoading ? '加载中…' : userProjectId ? '该项目暂无成员' : '请先选择项目'"
+                >
+                  <el-table-column label="成员" min-width="180">
+                    <template #default="{ row }">
                       <div class="flex items-center gap-3">
                         <UserAvatar :name="row.displayName" :src="row.avatarUrl" :size="32" />
                         <span class="font-medium text-ink">{{ row.displayName }}</span>
                       </div>
-                    </td>
-                    <td class="px-5 py-3 text-ink-regular">{{ row.username }}</td>
-                    <td class="px-5 py-3">
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="用户名" min-width="140">
+                    <template #default="{ row }"><span class="text-ink-regular">{{ row.username }}</span></template>
+                  </el-table-column>
+                  <el-table-column label="角色" min-width="220">
+                    <template #default="{ row }">
                       <el-select v-model="row.roleIds" multiple size="small" style="width: 100%" @change="saveUserRoles(row)">
                         <el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.id" />
                       </el-select>
-                    </td>
-                  </tr>
-                  <tr v-if="!memberRows.length">
-                    <td colspan="3" class="px-5 py-12 text-center text-sm text-ink-secondary">
-                      {{ userRoleLoading ? '加载中…' : userProjectId ? '该项目暂无成员' : '请先选择项目' }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
             </div>
           </div>
         </section>
@@ -461,7 +463,8 @@ const parentSelectValue = computed<string>({
   set: (v) => { menuForm.value.parentId = !v || v === ROOT_PARENT_KEY ? '' : v }
 })
 
-function openRole(row?: RbacRole) {
+function openRole(raw?: unknown) {
+  const row = raw as RbacRole | undefined
   roleEditing.value = row || null
   roleForm.value = row ? { code: row.code, name: row.name, description: row.description || '', sortOrder: row.sortOrder || 0 }
     : { code: '', name: '', description: '', sortOrder: 0 }
@@ -477,7 +480,8 @@ async function submitRole() {
     await loadRoles()
   } catch (e: unknown) { reportError(e, '保存失败') }
 }
-async function delRole(row: RbacRole) {
+async function delRole(raw: unknown) {
+  const row = raw as RbacRole
   try {
     await confirmRemove(row.name, '角色')
     await deleteRole(row.id)
@@ -512,7 +516,9 @@ async function delMenu(row: RbacMenu) {
   } catch (e: unknown) { if (!isCancel(e)) reportError(e, '删除失败') }
 }
 
-async function openRoleMenus(row: RbacRole) {
+/** el-table 插槽给的是宽松行类型，入口统一收窄 */
+async function openRoleMenus(raw: unknown) {
+  const row = raw as RbacRole
   roleMenuTarget.value = row.id
   roleMenuName.value = row.name
   roleMenuVisible.value = true
@@ -562,7 +568,8 @@ async function loadProjectMembers() {
   }
 }
 
-async function saveUserRoles(row: { userId: string; roleIds: string[] }) {
+async function saveUserRoles(raw: unknown) {
+  const row = raw as { userId: string; roleIds: string[] }
   if (!userProjectId.value) return
   try {
     await assignUserRoles(row.userId, userProjectId.value, row.roleIds)

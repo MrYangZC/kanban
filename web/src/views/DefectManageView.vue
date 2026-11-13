@@ -14,13 +14,10 @@ import type {
 } from '@/api/types'
 import { ElMessage } from 'element-plus'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
-import TreeNode from '@/components/TreeNode.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import SimpleListView from '@/components/SimpleListView.vue'
-import DataTable, { type TableColumn } from '@/components/common/DataTable.vue'
 import PriorityPill from '@/components/common/PriorityPill.vue'
 import UserCell from '@/components/common/UserCell.vue'
-import EmptyRow from '@/components/common/EmptyRow.vue'
 import type { ViewTab } from '@/components/ViewTabs.vue'
 import { PRIORITY_COLOR as priorityColor } from '@/constants/issueDict'
 import { PRIMARY_HEX } from '@/theme/colorMap'
@@ -33,7 +30,7 @@ import { useIssueFilterParams } from '@/composables/useIssueFilterParams'
 import { useBoardDrag } from '@/composables/useBoardDrag'
 import {
   Bug, List, GitBranch, LayoutGrid,
-  AlertTriangle, MoreHorizontal, Inbox, UserCheck, User, Share2, Archive
+  AlertTriangle, Inbox, UserCheck, User, Share2, Archive
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -309,16 +306,6 @@ const viewTabs: ViewTab[] = [
   { key: 'board', label: '看板', icon: LayoutGrid },
 ]
 
-const columns: TableColumn[] = [
-  { key: 'title', label: '标题' },
-  { key: 'status', label: '状态' },
-  { key: 'priority', label: '优先级' },
-  { key: 'labels', label: '标签' },
-  { key: 'assignee', label: '负责人' },
-  { key: 'reporter', label: '创建者' },
-  { key: 'createdAt', label: '创建时间' },
-  { key: 'actions', label: '操作' },
-]
 
 onMounted(() => {
   // 恢复上次使用的视图与左侧范围，避免刷新后丢失页面状态
@@ -378,72 +365,109 @@ onMounted(() => {
     </template>
 
     <!-- 列表视图 -->
-    <DataTable v-if="view === 'list'" :columns="columns">
-      <tr
-        v-for="issue in tableData"
-        :key="issue.id"
-        class="data-tr cursor-pointer"
-        @click="openDetail(issue)"
-      >
-        <td class="data-td data-td-first">
-          <div class="flex items-center gap-2">
-            <AlertTriangle :size="14" class="shrink-0 text-danger" />
-            <span class="cell-key">{{ issue.issueKey }}</span>
-            <span class="cell-title">{{ issue.title }}</span>
-          </div>
-        </td>
-        <td class="data-td" @click.stop>
-          <select
-            :value="issue.statusId"
-            class="status-select"
-            :style="{ background: statusColor(issue.statusId) + '1A', color: statusColor(issue.statusId) }"
-            :disabled="!canWrite"
-            @change="onStatusSelect(issue, $event)"
+    <div v-if="view === 'list'" class="wi-page">
+      <div class="wi-card glass-panel">
+        <div class="wi-card-body wi-table">
+          <el-table
+            :data="tableData"
+            row-key="id"
+            height="100%"
+            class="wi-el-table"
+            empty-text="暂无缺陷"
+            @row-click="(row: unknown) => openDetail(row as Issue)"
           >
-            <option v-for="s in statusOptionsFor(issue.statusId)" :key="s.id" :value="s.id">{{ s.name }}</option>
-          </select>
-        </td>
-        <td class="data-td">
-          <PriorityPill :priority="issue.priority" />
-        </td>
-        <td class="data-td">
-          <div class="flex max-w-[180px] flex-wrap gap-1">
-            <span
-              v-for="t in issue.labels"
-              :key="t.id"
-              class="badge"
-              :style="{ background: (t.color || PRIMARY) + '1A', color: t.color || PRIMARY }"
-            >{{ t.name }}</span>
-            <span v-if="!issue.labels?.length" class="text-xs text-ink-placeholder">—</span>
-          </div>
-        </td>
-        <td class="data-td">
-          <UserCell :avatar-name="issue.assigneeName" :avatar-url="issue.assigneeAvatarUrl" :display-name="memberName(issue.assigneeId)" />
-        </td>
-        <td class="data-td">
-          <UserCell :avatar-name="issue.reporterName" :avatar-url="issue.reporterAvatarUrl" :display-name="userName(issue.reporterId)" />
-        </td>
-        <td class="data-td cell-muted">{{ fmtDate(issue.createdAt) }}</td>
-        <td class="data-td" @click.stop>
-          <button class="text-ink-placeholder transition hover:opacity-70">
-            <MoreHorizontal :size="16" />
-          </button>
-        </td>
-      </tr>
-      <EmptyRow v-if="!loading && !tableData.length" :colspan="columns.length" text="暂无缺陷" />
-    </DataTable>
+            <el-table-column label="缺陷" min-width="260">
+              <template #default="{ row }">
+                <div class="flex items-center gap-2">
+                  <AlertTriangle :size="14" class="shrink-0 text-danger" />
+                  <span class="wi-key">{{ row.issueKey }}</span>
+                  <span class="cell-title">{{ row.title }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="130">
+              <template #default="{ row }">
+                <select
+                  :value="row.statusId"
+                  class="status-select"
+                  :style="{ background: statusColor(row.statusId) + '1A', color: statusColor(row.statusId) }"
+                  :disabled="!canWrite"
+                  @click.stop
+                  @change="onStatusSelect(row as unknown as Issue, $event)"
+                >
+                  <option v-for="s in statusOptionsFor(row.statusId)" :key="s.id" :value="s.id">{{ s.name }}</option>
+                </select>
+              </template>
+            </el-table-column>
+            <el-table-column label="优先级" width="92">
+              <template #default="{ row }"><PriorityPill :priority="row.priority" /></template>
+            </el-table-column>
+            <el-table-column label="标签" min-width="180">
+              <template #default="{ row }">
+                <div class="flex max-w-[180px] flex-wrap gap-1">
+                  <span
+                    v-for="t in row.labels"
+                    :key="t.id"
+                    class="badge"
+                    :style="{ background: (t.color || PRIMARY) + '1A', color: t.color || PRIMARY }"
+                  >{{ t.name }}</span>
+                  <span v-if="!row.labels?.length" class="text-xs text-ink-placeholder">—</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="负责人" width="136">
+              <template #default="{ row }">
+                <UserCell :avatar-name="row.assigneeName" :avatar-url="row.assigneeAvatarUrl" :display-name="memberName(row.assigneeId)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="报告人" width="136">
+              <template #default="{ row }">
+                <UserCell :avatar-name="row.reporterName" :avatar-url="row.reporterAvatarUrl" :display-name="userName(row.reporterId)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="创建时间" width="120">
+              <template #default="{ row }"><span class="cell-muted">{{ fmtDate(row.createdAt) }}</span></template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+    </div>
 
-    <!-- 树形视图 -->
-    <div v-else-if="view === 'tree'" class="tree-page">
-      <div v-if="!treeData.length" class="empty-row text-sm">暂无缺陷</div>
-      <TreeNode
-        v-for="node in treeData"
-        :key="node.id"
-        :node="node"
-        :status-name="statusName"
-        :status-color="statusColor"
-        @open="openDetail"
-      />
+    <!-- 树形视图：改用 el-table 树形数据（旧的递归 TreeNode 已删除） -->
+    <div v-else-if="view === 'tree'" class="wi-page">
+      <div class="wi-card glass-panel">
+        <div class="wi-card-body wi-table">
+          <el-table
+            :data="treeData"
+            row-key="id"
+            :tree-props="{ children: 'children' }"
+            height="100%"
+            class="wi-el-table"
+            default-expand-all
+            empty-text="暂无缺陷"
+            @row-click="(row: unknown) => openDetail(row as Issue)"
+          >
+            <el-table-column min-width="320">
+              <template #header><span>缺陷</span></template>
+              <template #default="{ row }">
+                <div class="flex items-center gap-2">
+                  <AlertTriangle :size="14" class="shrink-0 text-danger" />
+                  <span class="wi-key">{{ row.issueKey }}</span>
+                  <span class="cell-title">{{ row.title }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="120">
+              <template #default="{ row }">
+                <StatusPill :label="statusName(row.statusId)" :color="statusColor(row.statusId)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="优先级" width="92">
+              <template #default="{ row }"><PriorityPill :priority="row.priority" /></template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
     </div>
 
     <!-- 看板视图 -->

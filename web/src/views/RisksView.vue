@@ -13,30 +13,50 @@
     @refresh="load"
     @create="openCreate"
   >
-    <DataTable :columns="columns">
-      <tr v-for="row in filteredRisks" :key="row.id" class="data-tr">
-        <td class="data-td data-td-first font-medium text-ink">{{ row.title }}</td>
-        <td class="data-td max-w-[240px] truncate cell-text" :title="row.description || ''">{{ row.description || '—' }}</td>
-        <td class="data-td">
-          <StatusPill
-            :label="RISK_LEVEL[row.level]?.label || row.level"
-            :color="RISK_LEVEL[row.level]?.color || 'var(--ink-secondary)'"
-          />
-        </td>
-        <td class="data-td">
-          <StatusPill
-            :label="RISK_STATUS[row.status]?.label || row.status"
-            :color="RISK_STATUS[row.status]?.color || 'var(--ink-secondary)'"
-          />
-        </td>
-        <td class="data-td cell-text">{{ row.ownerName || '—' }}</td>
-        <td class="data-td cell-text">{{ row.dueDate || '—' }}</td>
-        <td class="data-td">
-          <RowActions :actions="rowActions(row)" />
-        </td>
-      </tr>
-      <EmptyRow v-if="!loading && !filteredRisks.length" :colspan="columns.length" text="暂无风险" />
-    </DataTable>
+    <div class="wi-page">
+      <div class="wi-card glass-panel">
+        <div class="wi-card-head">
+          <ShieldAlert :size="16" class="text-brand" />
+          <span class="wi-card-title">全部风险</span>
+          <span class="count-pill">{{ filteredRisks.length }}</span>
+        </div>
+        <div class="wi-card-body wi-table">
+          <el-table :data="filteredRisks" row-key="id" height="100%" class="wi-el-table" empty-text="暂无风险">
+            <el-table-column label="风险" min-width="180">
+              <template #default="{ row }"><span class="font-medium text-ink">{{ row.title }}</span></template>
+            </el-table-column>
+            <el-table-column label="描述" min-width="220" show-overflow-tooltip>
+              <template #default="{ row }"><span class="cell-text">{{ row.description || '—' }}</span></template>
+            </el-table-column>
+            <el-table-column label="级别" width="100">
+              <template #default="{ row }">
+                <StatusPill
+                  :label="RISK_LEVEL[row.level]?.label || row.level"
+                  :color="RISK_LEVEL[row.level]?.color || 'var(--ink-secondary)'"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="110">
+              <template #default="{ row }">
+                <StatusPill
+                  :label="RISK_STATUS[row.status]?.label || row.status"
+                  :color="RISK_STATUS[row.status]?.color || 'var(--ink-secondary)'"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="负责人" width="120">
+              <template #default="{ row }"><span class="cell-text">{{ row.ownerName || '—' }}</span></template>
+            </el-table-column>
+            <el-table-column label="截止日" width="120">
+              <template #default="{ row }"><span class="cell-text">{{ row.dueDate || '—' }}</span></template>
+            </el-table-column>
+            <el-table-column label="操作" width="200" align="right">
+              <template #default="{ row }"><RowActions :actions="rowActions(row)" /></template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+    </div>
 
     <template #footer>
       <el-dialog v-model="dialogVisible" :title="editing ? '编辑风险' : '新建风险'" width="520px">
@@ -102,10 +122,8 @@ import {
 import type { RiskVO, ProjectMember } from '@/api/types'
 import SimpleListView from '@/components/SimpleListView.vue'
 import UserSelect from '@/components/common/UserSelect.vue'
-import DataTable, { type TableColumn } from '@/components/common/DataTable.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
 import RowActions, { type RowAction } from '@/components/common/RowActions.vue'
-import EmptyRow from '@/components/common/EmptyRow.vue'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { RISK_LEVEL, RISK_STATUS } from '@/constants/issueDict'
 
@@ -130,17 +148,9 @@ const form = ref<{
 const { hasPermission, refresh } = useProjectPermission(() => projectId.value)
 const canManage = computed(() => hasPermission('risk:manage'))
 
-const columns: TableColumn[] = [
-  { key: 'title', label: '风险' },
-  { key: 'description', label: '描述' },
-  { key: 'level', label: '级别' },
-  { key: 'status', label: '状态' },
-  { key: 'owner', label: '负责人' },
-  { key: 'dueDate', label: '截止日' },
-  { key: 'actions', label: '操作', align: 'right' }
-]
-
-function rowActions(row: RiskVO): RowAction[] {
+/** el-table 插槽给的是宽松行类型，入口处收窄 */
+function rowActions(raw: unknown): RowAction[] {
+  const row = raw as RiskVO
   return [
     { label: '编辑', onClick: () => openEdit(row) },
     { label: '删除', tone: 'danger', disabled: !canManage.value, onClick: () => doDelete(row) }

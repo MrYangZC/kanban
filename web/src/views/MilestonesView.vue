@@ -13,23 +13,39 @@
     @refresh="load"
     @create="openCreate"
   >
-    <DataTable :columns="columns">
-      <tr v-for="row in filteredMilestones" :key="row.id" class="data-tr">
-        <td class="data-td data-td-first font-medium text-ink">{{ row.name }}</td>
-        <td class="data-td max-w-[280px] truncate cell-text" :title="row.description || ''">{{ row.description || '—' }}</td>
-        <td class="data-td cell-text">{{ row.dueDate || '—' }}</td>
-        <td class="data-td">
-          <StatusPill
-            :label="MILESTONE_STATUS[row.status]?.label || row.status"
-            :color="MILESTONE_STATUS[row.status]?.color || 'var(--ink-secondary)'"
-          />
-        </td>
-        <td class="data-td">
-          <RowActions :actions="rowActions(row)" />
-        </td>
-      </tr>
-      <EmptyRow v-if="!loading && !filteredMilestones.length" :colspan="columns.length" text="暂无里程碑" />
-    </DataTable>
+    <div class="wi-page">
+      <div class="wi-card glass-panel">
+        <div class="wi-card-head">
+          <Target :size="16" class="text-brand" />
+          <span class="wi-card-title">全部里程碑</span>
+          <span class="count-pill">{{ filteredMilestones.length }}</span>
+        </div>
+        <div class="wi-card-body wi-table">
+          <el-table :data="filteredMilestones" row-key="id" height="100%" class="wi-el-table" empty-text="暂无里程碑">
+            <el-table-column label="名称" min-width="180">
+              <template #default="{ row }"><span class="font-medium text-ink">{{ row.name }}</span></template>
+            </el-table-column>
+            <el-table-column label="描述" min-width="240" show-overflow-tooltip>
+              <template #default="{ row }"><span class="cell-text">{{ row.description || '—' }}</span></template>
+            </el-table-column>
+            <el-table-column label="截止日期" width="130">
+              <template #default="{ row }"><span class="cell-text">{{ row.dueDate || '—' }}</span></template>
+            </el-table-column>
+            <el-table-column label="状态" width="110">
+              <template #default="{ row }">
+                <StatusPill
+                  :label="MILESTONE_STATUS[row.status]?.label || row.status"
+                  :color="MILESTONE_STATUS[row.status]?.color || 'var(--ink-secondary)'"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="200" align="right">
+              <template #default="{ row }"><RowActions :actions="rowActions(row)" /></template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+    </div>
 
     <template #footer>
       <el-dialog v-model="dialogVisible" :title="editing ? '编辑里程碑' : '新建里程碑'" width="520px">
@@ -66,10 +82,8 @@ import {
 } from '@/api'
 import type { MilestoneVO } from '@/api/types'
 import SimpleListView from '@/components/SimpleListView.vue'
-import DataTable, { type TableColumn } from '@/components/common/DataTable.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
 import RowActions, { type RowAction } from '@/components/common/RowActions.vue'
-import EmptyRow from '@/components/common/EmptyRow.vue'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { MILESTONE_STATUS } from '@/constants/issueDict'
 
@@ -108,15 +122,9 @@ const {
   searchText: (row: MilestoneVO) => [row.name, row.description]
 })
 
-const columns: TableColumn[] = [
-  { key: 'name', label: '名称' },
-  { key: 'description', label: '描述' },
-  { key: 'dueDate', label: '截止日期' },
-  { key: 'status', label: '状态' },
-  { key: 'actions', label: '操作', align: 'right' }
-]
-
-function rowActions(row: MilestoneVO): RowAction[] {
+/** el-table 插槽给的是宽松行类型，入口处收窄 */
+function rowActions(raw: unknown): RowAction[] {
+  const row = raw as MilestoneVO
   return [
     { label: '编辑', onClick: () => openEdit(row) },
     { label: '删除', tone: 'danger', disabled: !canManage.value, onClick: () => doDelete(row) }
