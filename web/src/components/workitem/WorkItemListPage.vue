@@ -7,7 +7,7 @@ import {
 } from '@/api'
 import type { Issue, IssueTreeNode, IssueStatusVO, BoardGroupView, GroupColumnView, WorkflowTransitionVO, WorkItemCategory } from '@/api/types'
 import type { LucideIcon } from 'lucide-vue-next'
-import { List, GitBranch, LayoutGrid, User, UserCheck, Inbox, Archive } from 'lucide-vue-next'
+import { List, GitBranch, LayoutGrid, User, UserCheck, Inbox, Archive, Trash2 } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
 import { useBoardDrag } from '@/composables/useBoardDrag'
 import SimpleListView from '@/components/SimpleListView.vue'
@@ -26,6 +26,7 @@ import UserCell from '@/components/common/UserCell.vue'
 import type { ViewTab } from '@/components/ViewTabs.vue'
 import { fmtDateOrDash as fmtDate } from '@/utils/datetime'
 import { useIssueFilterQuery } from '@/composables/useIssueFilterQuery'
+import { useViewportWidth } from '@/composables/useViewportWidth'
 import { ElMessage } from 'element-plus'
 import { confirmAction } from '@/utils/confirm'
 import { reportError } from '@/utils/error'
@@ -119,18 +120,9 @@ const viewTabs: ViewTab[] = [
   { key: 'board', label: '看板', icon: LayoutGrid }
 ]
 
-const columns = computed<{ key: string; label: string; width?: string; align?: 'left' | 'right' | 'center'; class?: string }[]>(() => {
-  const base: { key: string; label: string; width?: string; align?: 'left' | 'right' | 'center'; class?: string }[] = [
-    { key: 'title', label: '任务' },
-    { key: 'key', label: '编号', width: '110px' },
-    { key: 'assignee', label: '负责人', width: '136px', class: 'wi-hide-sm' },
-    { key: 'status', label: '状态', width: '96px' },
-    { key: 'dueDate', label: '计划完成', width: '92px', align: 'right', class: 'wi-hide-md' },
-    { key: 'updatedAt', label: '更新于', width: '84px', align: 'right', class: 'wi-hide-md' }
-  ]
-  // 有删除权限才出现勾选列：没权限却给勾选框，勾完点删除才报错，体验更差
-  return canDelete.value ? [{ key: 'select', label: '', width: '36px' }, ...base] : base
-})
+
+// 窄屏列降级：从 DOM 移除列，避免 el-table 的 colgroup 留下空白占位
+const { hideMdColumns, hideSmColumns } = useViewportWidth()
 
 // ---- 批量删除：勾选状态由页面持有，列表与树形共用 ----
 const selectedIds = ref<Set<string>>(new Set())
@@ -150,21 +142,26 @@ function setSelected(ids: string[], checked: boolean) {
   selectedIds.value = next
 }
 
-function toggleRow(id: string, checked: boolean) {
-  setSelected([id], checked)
+/** el-table 实例：清空选择要调用它的 clearSelection */
+const listTableRef = ref<{ clearSelection: () => void } | null>(null)
+
+/** 列表行样式：el-table 不提供选中行底色，这里按勾选集合补上 */
+function listRowClass({ row }: { row: Issue }) {
+  return isSelected(row.id) ? 'wi-row-selected' : ''
 }
 
-/** 列表页头部的「全选本页」：只作用于当前页已加载的行 */
-const pageAllSelected = computed(() =>
-  tableData.value.length > 0 && tableData.value.every((i) => selectedIds.value.has(i.id))
-)
-
-function toggleSelectPage() {
-  setSelected(tableData.value.map((i) => i.id), !pageAllSelected.value)
+/**
+ * el-table 的 selection 变化 → 同步到页面持有的勾选集合。
+ * 列表页用它内置的 selection 列（表头自带全选/半选），树形页仍用自定义勾选列
+ * 以保留"父节点半选"和父子联动。
+ */
+function onSelectionChange(rows: Issue[]) {
+  selectedIds.value = new Set(rows.map((r) => r.id))
 }
 
 function clearSelection() {
   selectedIds.value = new Set()
+  listTableRef.value?.clearSelection()
 }
 
 /** 树形勾选：父节点会连带其全部子孙一起勾上 */
@@ -492,81 +489,60 @@ onMounted(() => {
           <span v-else class="ml-auto text-xs text-ink-secondary">按更新时间倒序</span>
         </div>
         <div class="wi-card-body wi-table">
-          <div class="min-h-0 flex-1 overflow-auto">
-            <!-- 直接用 table 而不是 DataTable：表头需要塞「全选本页」勾选框 -->
-            <table class="data-table">
-              <thead class="data-thead">
-                <tr>
-                  <th v-if="canDelete" class="data-th wi-th-select" style="width: 38px">
-                    <input
-                      type="checkbox"
-                      class="wi-check"
-                      :checked="pageAllSelected"
-                      :disabled="!tableData.length"
-                      title="全选本页"
-                      @click.stop="toggleSelectPage"
-                    />
-                  </th>
-                  <th
-                    v-for="(col, i) in columns.filter((c) => c.key !== 'select')"
-                    :key="col.key"
-                    class="data-th"
-                    :class="[i === 0 ? 'data-th-first' : '', col.align === 'right' ? 'text-right' : '', col.class || '']"
-                    :style="col.width ? { width: col.width } : undefined"
+          <!-- 表格交给 el-table：列宽可拖拽、表头 sticky、横向滚动、selection 列自带全选/半选 -->
+          <el-table
+            ref="listTableRef"
+            :data="tableData"
+            row-key="id"
+            height="100%"
+            class="wi-el-table"
+            :row-class-name="listRowClass"
+            @row-click="(row: Issue) => detailDrawer?.open(row.id)"
+            @selection-change="onSelectionChange"
+          >
+            <el-table-column v-if="canDelete" type="selection" width="38" class-name="wi-td-select" label-class-name="wi-th-select" />
+            <el-table-column label="任务" min-width="240" show-overflow-tooltip>
+              <template #default="{ row }">
+                <div class="flex items-center gap-2">
+                  <span
+                    v-if="row.priority && row.priority !== 'P2'"
+                    class="wi-prio"
+                    :style="{ color: priorityColorOf(row.priority) }"
+                    :title="`优先级 ${priorityText(row.priority)}`"
                   >
-                    {{ col.label }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="i in tableData"
-                  :key="i.id"
-                  class="data-tr cursor-pointer"
-                  :class="isSelected(i.id) ? 'wi-row-selected' : ''"
-                  @click="detailDrawer?.open(i.id)"
-                >
-                  <td v-if="canDelete" class="data-td wi-td-select" @click.stop>
-                    <input
-                      type="checkbox"
-                      class="wi-check"
-                      :checked="isSelected(i.id)"
-                      @click.stop="toggleRow(i.id, ($event.target as HTMLInputElement).checked)"
-                    />
-                  </td>
-                  <td class="data-td data-td-first">
-                    <div class="flex items-center gap-2">
-                      <span
-                        v-if="i.priority && i.priority !== 'P2'"
-                        class="wi-prio"
-                        :style="{ color: priorityColorOf(i.priority) }"
-                        :title="`优先级 ${priorityText(i.priority)}`"
-                      >
-                        <span class="wi-prio-dot" />
-                      </span>
-                      <span class="wi-title-leaf min-w-0 truncate">{{ i.title }}</span>
-                    </div>
-                  </td>
-                  <td class="data-td"><span class="wi-key">{{ i.issueKey }}</span></td>
-                  <td class="data-td wi-hide-sm">
-                    <UserCell
-                      v-if="i.assigneeId"
-                      :avatar-name="i.assigneeName"
-                      :avatar-url="i.assigneeAvatarUrl"
-                      :display-name="memberName(i.assigneeId)"
-                    />
-                    <span v-else class="wi-unassigned">—</span>
-                  </td>
-                  <td class="data-td">
-                    <StatusPill :label="statusName(i.statusId)" :color="statusColor(i.statusId)" />
-                  </td>
-                  <td class="data-td wi-hide-md"><span class="wi-date">{{ shortDate(i.dueDate) }}</span></td>
-                  <td class="data-td wi-hide-md"><span class="wi-date">{{ shortDate(i.updatedAt) }}</span></td>
-                </tr>
-              </tbody>
-            </table>
-            <div v-if="!loading && !tableData.length" class="empty-row text-sm">暂无{{ noun }}</div>
-          </div>
+                    <span class="wi-prio-dot" />
+                  </span>
+                  <span class="wi-title-leaf min-w-0 truncate">{{ row.title }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="编号" width="110">
+              <template #default="{ row }"><span class="wi-key">{{ row.issueKey }}</span></template>
+            </el-table-column>
+            <el-table-column v-if="!hideSmColumns" label="负责人" width="136">
+              <template #default="{ row }">
+                <UserCell
+                  v-if="row.assigneeId"
+                  :avatar-name="row.assigneeName"
+                  :avatar-url="row.assigneeAvatarUrl"
+                  :display-name="memberName(row.assigneeId)"
+                />
+                <span v-else class="wi-unassigned">—</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="110">
+              <template #default="{ row }">
+                <StatusPill :label="statusName(row.statusId)" :color="statusColor(row.statusId)" />
+              </template>
+            </el-table-column>
+            <el-table-column v-if="!hideMdColumns" label="计划完成" width="100" align="right">
+              <template #default="{ row }"><span class="wi-date">{{ shortDate(row.dueDate) }}</span></template>
+            </el-table-column>
+            <el-table-column v-if="!hideMdColumns" label="更新于" width="92" align="right">
+              <template #default="{ row }"><span class="wi-date">{{ shortDate(row.updatedAt) }}</span></template>
+            </el-table-column>
+            <template #empty><span class="text-sm text-ink-secondary">暂无{{ noun }}</span></template>
+          </el-table>
         </div>
       </div>
 

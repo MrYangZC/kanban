@@ -1,22 +1,25 @@
 <script setup lang="ts">
 /**
- * 工作项树形表格。
+ * 工作项树形表格（el-table 树形数据版）。
  *
- * <p>之前「树形」视图只渲染根节点（238 条数据只显示 3 条），递归组件 {@code TreeNode.vue}
- * 也没被用上。这里做成真正的树表：层级引导线 + 逐节点展开/收起 + 与列表视图一致的列。
+ * <p>表格渲染交给 el-table（树形缩进、展开箭头、sticky 表头、列宽拖拽、横向滚动），
+ * 只保留两件"必须自己实现"的事：
+ * <ol>
+ *   <li><b>勾选语义</b>：勾父节点连带子孙、可再单独取消某个子孙、父节点显示半选。
+ *       el-table 的 selection 列不支持父行 half-check，也不做父子联动，因此用自定义勾选列；</li>
+ *   <li><b>与业务无关的排版</b>：优先级色点、子任务数量徽标、根节点浅底。</li>
+ * </ol>
  *
- * <p>视觉上刻意压低"噪音"：
- * · 编号/日期弱化并等宽右对齐，日期只显示 MM-DD；
- * · 优先级默认值 P2（中）不占列，只在非默认时于标题前显示一个色点；
- * · 未指派不渲染灰色头像圆点，只留一个淡横线；
- * · 根节点整行极浅底色，238 行摊平后靠它区分分组。
+ * <p>相比改造前，丢了"层级引导竖线"（el-table 的树形只做缩进，无自定义竖线能力），
+ * 换来列宽可拖拽与统一组件行为。
  */
-import { computed, ref, watch } from 'vue'
-import { ChevronRight, ChevronsDownUp, ChevronsUpDown, GitBranch } from 'lucide-vue-next'
+import { computed, nextTick, ref, watch } from 'vue'
+import { ChevronsDownUp, ChevronsUpDown, GitBranch } from 'lucide-vue-next'
 import StatusPill from '@/components/common/StatusPill.vue'
 import UserCell from '@/components/common/UserCell.vue'
 import { fmtDateOrDash as fmtDate } from '@/utils/datetime'
 import { PRIORITY_LABEL, PRIORITY_COLOR } from '@/constants/issueDict'
+import { useViewportWidth } from '@/composables/useViewportWidth'
 import type { IssueTreeNode } from '@/api/types'
 
 const props = withDefaults(defineProps<{
@@ -36,68 +39,18 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'open', id: string): void
-  /** 勾选变化：parent 传 true 表示勾上 node 及其所有子孙（删除父任务必然连子任务一起删） */
+  /** 勾选变化：parent 传 true 表示勾上 node 及其所有子孙 */
   (e: 'select', payload: { ids: string[]; checked: boolean }): void
 }>()
 
-type TreeCol = {
-  key: string
-  label: string
-  width?: string
-  align?: 'left' | 'right' | 'center'
-  /** 窄屏降级用的类名（wi-hide-md / wi-hide-sm），列头与单元格必须同时带，否则会出现表头还在、格子已空 */
-  class?: string
-}
+const { hideMdColumns, hideSmColumns } = useViewportWidth()
 
-const columns = computed<TreeCol[]>(() => {
-  const base: TreeCol[] = [
-    { key: 'title', label: '任务' },
-    { key: 'key', label: '编号', width: '110px' },
-    { key: 'assignee', label: '负责人', width: '136px', class: 'wi-hide-sm' },
-    { key: 'status', label: '状态', width: '96px' },
-    { key: 'dueDate', label: '计划完成', width: '92px', align: 'right', class: 'wi-hide-md' },
-    { key: 'updatedAt', label: '更新于', width: '84px', align: 'right', class: 'wi-hide-md' }
-  ]
-  return props.selectable ? [{ key: 'select', label: '', width: '38px' }, ...base] : base
-})
-
-/** 已展开的节点 id 集合 */
-const expanded = ref<Set<string>>(new Set())
-
-/** 默认展开根节点的直接子级，深一层收起 */
-function defaultExpanded(nodes: IssueTreeNode[]): Set<string> {
-  const set = new Set<string>()
-  for (const n of nodes) {
-    if (n.children?.length) set.add(n.id)
-  }
-  return set
-}
-
-watch(() => props.nodes, (nodes) => {
-  expanded.value = defaultExpanded(nodes)
-}, { immediate: true })
-
-/** 按展开状态摊平成行，depth 决定缩进与引导线数量 */
-const rows = computed(() => {
-  const out: { node: IssueTreeNode; depth: number }[] = []
-  const walk = (list: IssueTreeNode[], depth: number) => {
-    for (const node of list) {
-      out.push({ node, depth })
-      if (node.children?.length && expanded.value.has(node.id)) {
-        walk(node.children, depth + 1)
-      }
-    }
-  }
-  walk(props.nodes, 0)
-  return out
-})
+const tableRef = ref<{ toggleRowExpansion: (row: IssueTreeNode, expanded?: boolean) => void } | null>(null)
 
 const totalCount = computed(() => countAll(props.nodes))
-const visibleCount = computed(() => rows.value.length)
-const allExpanded = computed(() => {
-  const parents = collectParents(props.nodes)
-  return parents.length > 0 && parents.every((id) => expanded.value.has(id))
-})
+/** 当前展开后可见行数（由 el-table 的 expand-change 维护） */
+const visibleCount = ref(0)
+const expandedIds = ref<Set<string>>(new Set())
 
 function countAll(list: IssueTreeNode[]): number {
   let n = 0
@@ -121,28 +74,145 @@ function collectParents(list: IssueTreeNode[]): string[] {
   return out
 }
 
-function isExpanded(id: string) { return expanded.value.has(id) }
-
-function toggle(node: IssueTreeNode) {
-  const next = new Set(expanded.value)
-  if (next.has(node.id)) next.delete(node.id)
-  else next.add(node.id)
-  expanded.value = next
+function subtreeIds(node: IssueTreeNode): string[] {
+  const out: string[] = []
+  const walk = (n: IssueTreeNode) => {
+    out.push(n.id)
+    for (const c of n.children ?? []) walk(c)
+  }
+  walk(node)
+  return out
 }
 
+function allIds(list: IssueTreeNode[]): string[] {
+  return subtreeIds({ id: '', children: list } as unknown as IssueTreeNode)
+}
+
+function isChecked(id: string) {
+  return props.selected?.has(id) ?? false
+}
+
+/** 子树勾选状态：全选 / 部分 / 未选 —— 部分选中必须显示为半选，否则会误导用户 */
+function subtreeState(raw: unknown): 'all' | 'some' | 'none' {
+  const node = raw as IssueTreeNode
+  const ids = subtreeIds(node)
+  const picked = ids.filter((id) => isChecked(id)).length
+  if (picked === 0) return 'none'
+  return picked === ids.length ? 'all' : 'some'
+}
+
+function onToggle(raw: unknown) {
+  const node = raw as IssueTreeNode
+  emit('select', { ids: subtreeIds(node), checked: subtreeState(node) !== 'all' })
+}
+
+const allSelected = computed(() => {
+  const ids = allIds(props.nodes)
+  return ids.length > 0 && ids.every((id) => isChecked(id))
+})
+
+const someSelected = computed(() => {
+  const ids = allIds(props.nodes)
+  const picked = ids.filter((id) => isChecked(id)).length
+  return picked > 0 && picked < ids.length
+})
+
+function toggleSelectAll() {
+  emit('select', { ids: allIds(props.nodes), checked: !allSelected.value })
+}
+
+// ---- 展开/收起 ----
+
+/** 默认只展开根节点（238 条一次铺满没有可读性） */
+function expandRoots() {
+  const set = new Set<string>()
+  for (const node of props.nodes) {
+    if (node.children?.length) set.add(node.id)
+  }
+  expandedIds.value = set
+  nextTick(() => {
+    for (const node of props.nodes) {
+      if (node.children?.length) tableRef.value?.toggleRowExpansion(node, true)
+    }
+    recountVisible()
+  })
+}
+
+watch(() => props.nodes, () => {
+  expandRoots()
+}, { immediate: true })
+
+/**
+ * 展开变化。el-table 对树形表格的 expand-change 有两种重载（布尔 or 展开行数组），
+ * 参数用 unknown 承接再收窄，避免模板里写类型断言。
+ */
+function onExpandChange(rawRow: unknown, arg: unknown) {
+  const row = rawRow as IssueTreeNode
+  const expanded = typeof arg === 'boolean' ? arg : !expandedIds.value.has(row.id)
+  const next = new Set(expandedIds.value)
+  if (expanded) next.add(row.id)
+  else next.delete(row.id)
+  expandedIds.value = next
+  recountVisible()
+}
+
+/** 可见行 = 所有未被折叠节点的行；折叠父节点的子孙都不计入 */
+function recountVisible() {
+  let n = 0
+  const walk = (list: IssueTreeNode[]) => {
+    for (const node of list) {
+      n++
+      if (node.children?.length && expandedIds.value.has(node.id)) walk(node.children)
+    }
+  }
+  walk(props.nodes)
+  visibleCount.value = n
+}
+
+const allExpanded = computed(() => {
+  const parents = collectParents(props.nodes)
+  return parents.length > 0 && parents.every((id) => expandedIds.value.has(id))
+})
+
 function expandAll() {
-  expanded.value = new Set(collectParents(props.nodes))
+  expandedIds.value = new Set(collectParents(props.nodes))
+  nextTick(() => {
+    const walk = (list: IssueTreeNode[]) => {
+      for (const node of list) {
+        if (node.children?.length) {
+          tableRef.value?.toggleRowExpansion(node, true)
+          walk(node.children)
+        }
+      }
+    }
+    walk(props.nodes)
+    recountVisible()
+  })
 }
 
 function collapseAll() {
-  expanded.value = new Set()
+  expandedIds.value = new Set()
+  nextTick(() => {
+    const walk = (list: IssueTreeNode[]) => {
+      for (const node of list) {
+        if (node.children?.length) {
+          tableRef.value?.toggleRowExpansion(node, false)
+          walk(node.children)
+        }
+      }
+    }
+    walk(props.nodes)
+    recountVisible()
+  })
 }
 
-function descendantCount(node: IssueTreeNode): number {
+// ---- 单元格辅助 ----
+
+function descendantCount(raw: unknown): number {
+  const node = raw as IssueTreeNode
   return node.children?.length ? countAll(node.children) : 0
 }
 
-/** 优先级：默认值 P2（中）不显示，避免每行一个相同的标记 */
 function showPriority(priority: string) {
   return !!priority && priority !== 'P2'
 }
@@ -155,65 +225,22 @@ function priorityDotColor(priority: string) {
   return (PRIORITY_COLOR as Record<string, string>)[priority] || 'var(--ink-placeholder)'
 }
 
-/** 短日期：238 行同一天的完整日期是噪音，只留 MM-DD */
 function shortDate(value: string | null | undefined) {
   const full = fmtDate(value)
   return full && full !== '—' ? full.slice(5) : '—'
 }
 
-function assigneeName(node: IssueTreeNode) {
+function assigneeName(raw: unknown) {
+  const node = raw as IssueTreeNode
   return props.memberName ? props.memberName(node.assigneeId) : (node.assigneeName || '')
 }
 
-/** 勾选：勾父节点会连带子孙（方便一次删一大片），但**可以**再单独取消某个子孙 */
-function isChecked(id: string) { return props.selected?.has(id) ?? false }
-
-function subtreeIds(node: IssueTreeNode): string[] {
-  const out: string[] = []
-  const walk = (n: IssueTreeNode) => {
-    out.push(n.id)
-    for (const c of n.children ?? []) walk(c)
-  }
-  walk(node)
-  return out
-}
-
-/**
- * 子树勾选状态：全选 / 部分 / 未选。
- * 部分选中必须显示成 indeterminate——否则"父节点显示打勾、里面还有没勾的子任务"会误导用户。
- */
-function subtreeState(node: IssueTreeNode): 'all' | 'some' | 'none' {
-  const ids = subtreeIds(node)
-  const picked = ids.filter((id) => isChecked(id)).length
-  if (picked === 0) return 'none'
-  return picked === ids.length ? 'all' : 'some'
-}
-
-function onToggle(node: IssueTreeNode) {
-  // 全选 → 全部取消；未选或部分选中 → 补齐整个子树
-  emit('select', { ids: subtreeIds(node), checked: subtreeState(node) !== 'all' })
-}
-
-/** 可见行全选/全不选（含已折叠节点，全部数据都在 nodes 里） */
-const allVisibleSelected = computed(() => {
-  if (!props.selectable || !rows.value.length) return false
-  return rows.value.every((r) => isChecked(r.node.id))
-})
-
-function toggleSelectAll() {
-  emit('select', { ids: allIds(props.nodes), checked: !allVisibleSelected.value })
-}
-
-function allIds(list: IssueTreeNode[]): string[] {
-  const out: string[] = []
-  const walk = (items: IssueTreeNode[]) => {
-    for (const n of items) {
-      out.push(n.id)
-      if (n.children?.length) walk(n.children)
-    }
-  }
-  walk(list)
-  return out
+/** 行样式：根节点浅底 + 选中态（el-table 不提供选中底色） */
+function rowClass({ row }: { row: IssueTreeNode }) {
+  const classes: string[] = []
+  if (!row.parentId) classes.push('wi-row-root')
+  if (isChecked(row.id)) classes.push('wi-row-selected')
+  return classes.join(' ')
 }
 </script>
 
@@ -223,7 +250,6 @@ function allIds(list: IssueTreeNode[]): string[] {
       <GitBranch :size="16" class="text-brand" />
       <span class="wi-card-title">全部{{ noun }}</span>
       <span class="count-pill">{{ totalCount }}</span>
-      <!-- 批量操作由页面注入：勾选状态在页面里统一持有，组件不重复管一份 -->
       <slot name="head-actions" />
       <span class="ml-auto text-xs text-ink-secondary">当前显示 {{ visibleCount }} 条</span>
       <div class="flex items-center gap-0.5">
@@ -246,98 +272,84 @@ function allIds(list: IssueTreeNode[]): string[] {
     </div>
 
     <div class="wi-card-body wi-table">
-      <div class="min-h-0 flex-1 overflow-auto">
-        <table class="data-table">
-        <thead class="data-thead">
-          <tr>
-            <th v-if="selectable" class="data-th wi-th-select" style="width: 38px">
+      <el-table
+        ref="tableRef"
+        :data="nodes"
+        row-key="id"
+        :tree-props="{ children: 'children' }"
+        height="100%"
+        class="wi-el-table"
+        :row-class-name="rowClass"
+        @row-click="(row: unknown) => emit('open', (row as IssueTreeNode).id)"
+        @expand-change="onExpandChange"
+      >
+        <el-table-column min-width="320">
+          <template #header>
+            <div class="flex items-center gap-2">
               <input
+                v-if="selectable"
                 type="checkbox"
                 class="wi-check"
-                :checked="allVisibleSelected"
+                :checked="allSelected"
+                :indeterminate="someSelected"
                 title="全选/全不选"
                 @click.stop="toggleSelectAll"
               />
-            </th>
-            <th
-              v-for="(col, i) in columns.filter((c) => c.key !== 'select')"
-              :key="col.key"
-              class="data-th"
-              :class="[i === 0 ? 'data-th-first' : '', col.align === 'right' ? 'text-right' : '', col.class || '']"
-              :style="col.width ? { width: col.width } : undefined"
-            >
-              {{ col.label }}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="{ node, depth } in rows"
-            :key="node.id"
-            class="data-tr cursor-pointer"
-            :class="[depth === 0 ? 'wi-row-root' : '', isChecked(node.id) ? 'wi-row-selected' : '']"
-            @click="emit('open', node.id)"
-          >
-            <td v-if="selectable" class="data-td wi-td-select" @click.stop>
+              <span>任务</span>
+            </div>
+          </template>
+          <template #default="{ row }">
+            <div class="flex items-center gap-1.5">
               <input
+                v-if="selectable"
                 type="checkbox"
                 class="wi-check"
-                :checked="subtreeState(node) === 'all'"
-                :indeterminate="subtreeState(node) === 'some'"
-                @click.stop="onToggle(node)"
+                :checked="subtreeState(row) === 'all'"
+                :indeterminate="subtreeState(row) === 'some'"
+                @click.stop="onToggle(row)"
               />
-            </td>
-            <!-- 任务：整行贯通的层级引导线 + 展开箭头 + 优先级点 + 标题 + 子任务数 -->
-            <td class="data-td data-td-first wi-tree-cell" :style="{ '--depth': depth }">
-              <span v-if="depth > 0" class="wi-guides" />
-              <div class="flex items-center gap-1" :style="{ paddingLeft: `${depth * 18}px` }">
-                <button
-                  v-if="node.children?.length"
-                  class="wi-caret"
-                  :title="isExpanded(node.id) ? '收起子任务' : '展开子任务'"
-                  @click.stop="toggle(node)"
-                >
-                  <ChevronRight
-                    :size="13"
-                    :class="isExpanded(node.id) ? 'rotate-90 transition-transform' : 'transition-transform'"
-                  />
-                </button>
-                <span v-else class="wi-caret-spacer" />
-                <span
-                  v-if="showPriority(node.priority)"
-                  class="wi-prio"
-                  :style="{ color: priorityDotColor(node.priority) }"
-                  :title="`优先级 ${priorityLabel(node.priority)}`"
-                >
-                  <span class="wi-prio-dot" />
-                </span>
-                <span
-                  class="min-w-0 truncate text-[13px]"
-                  :class="depth === 0 ? 'wi-title-root' : 'wi-title-leaf'"
-                >{{ node.title }}</span>
-                <span v-if="node.children?.length" class="wi-count">{{ descendantCount(node) }}</span>
-              </div>
-            </td>
-            <td class="data-td"><span class="wi-key">{{ node.issueKey }}</span></td>
-            <td class="data-td wi-hide-sm">
-              <UserCell
-                v-if="node.assigneeId"
-                :avatar-name="node.assigneeName"
-                :avatar-url="node.assigneeAvatarUrl"
-                :display-name="assigneeName(node)"
-              />
-              <span v-else class="wi-unassigned">—</span>
-            </td>
-            <td class="data-td">
-              <StatusPill :label="statusName(node.statusId)" :color="statusColor(node.statusId)" />
-            </td>
-            <td class="data-td wi-hide-md"><span class="wi-date">{{ shortDate(node.dueDate) }}</span></td>
-            <td class="data-td wi-hide-md"><span class="wi-date">{{ shortDate(node.updatedAt) }}</span></td>
-          </tr>
-        </tbody>
-        </table>
-        <div v-if="!rows.length" class="empty-row text-sm">暂无{{ noun }}</div>
-      </div>
+              <span
+                v-if="showPriority(row.priority)"
+                class="wi-prio"
+                :style="{ color: priorityDotColor(row.priority) }"
+                :title="`优先级 ${priorityLabel(row.priority)}`"
+              >
+                <span class="wi-prio-dot" />
+              </span>
+              <span class="min-w-0 truncate text-[13px]" :class="row.parentId ? 'wi-title-leaf' : 'wi-title-root'">
+                {{ row.title }}
+              </span>
+              <span v-if="row.children?.length" class="wi-count">{{ descendantCount(row) }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="编号" width="110">
+          <template #default="{ row }"><span class="wi-key">{{ row.issueKey }}</span></template>
+        </el-table-column>
+        <el-table-column v-if="!hideSmColumns" label="负责人" width="136">
+          <template #default="{ row }">
+            <UserCell
+              v-if="row.assigneeId"
+              :avatar-name="row.assigneeName"
+              :avatar-url="row.assigneeAvatarUrl"
+              :display-name="assigneeName(row)"
+            />
+            <span v-else class="wi-unassigned">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="110">
+          <template #default="{ row }">
+            <StatusPill :label="statusName(row.statusId)" :color="statusColor(row.statusId)" />
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!hideMdColumns" label="计划完成" width="100" align="right">
+          <template #default="{ row }"><span class="wi-date">{{ shortDate(row.dueDate) }}</span></template>
+        </el-table-column>
+        <el-table-column v-if="!hideMdColumns" label="更新于" width="92" align="right">
+          <template #default="{ row }"><span class="wi-date">{{ shortDate(row.updatedAt) }}</span></template>
+        </el-table-column>
+        <template #empty><span class="text-sm text-ink-secondary">暂无{{ noun }}</span></template>
+      </el-table>
     </div>
   </div>
 </template>

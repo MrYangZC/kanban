@@ -539,87 +539,7 @@ body {
      默认 .data-* 是通用样式（用户管理、RBAC 等页也在用），这里只在
      .wi-table 容器内做覆盖：行更紧凑、表头更轻、数值列等宽右对齐。
      ------------------------------------------------------------------ */
-  .wi-table .data-th {
-    padding: 0.5rem 0.75rem;
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    color: var(--ink-quiet);
-    text-transform: none;
-    white-space: nowrap;
-  }
-  .wi-table .data-tr {
-    border-bottom: 1px solid rgba(48, 49, 51, 0.045);
-  }
-  .wi-table .data-tr:hover {
-    background-color: rgba(64, 158, 255, 0.05);
-  }
-  .wi-table .data-td {
-    padding: 0.5rem 0.75rem;
-    vertical-align: middle;
-  }
-  .wi-table .data-td-first {
-    padding-left: 0.75rem;
-  }
-  /* 表格不再随窗口无限拉伸：列宽固定后，宽屏下「任务」列会吸走全部空白，
-     标题与「编号」之间拉出一大块空隙。限宽后各列间距才是正常视觉节奏。 */
-  .wi-table .data-table {
-    width: 100%;
-    max-width: 1060px;
-    table-layout: fixed;
-  }
-  /* 窄屏时列不能被压成 0 宽（此前 820px 下「任务」列整列消失，只剩编号和负责人）：
-     给表格一个最小宽度，让内容区横向滚动，而不是挤压列 */
-  @media (max-width: 1100px) {
-    .wi-table .data-table {
-      min-width: 780px;
-    }
-  }
-  .wi-table .data-table .data-th,
-  .wi-table .data-table .data-td {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  /* 层级引导线：整行贯通的竖线（钉钉多维表那种），用渐变画在首个单元格的绝对层里，
-     比逐个 span 画短竖线更连贯——短竖线在行高变化时会断开 */
-  .wi-tree-cell {
-    position: relative;
-  }
-  /* 层级引导线：整行贯通的竖线，位置对准「父节点箭头」的中心。
-     几何关系：单元格 padding-left 12px，每级缩进 18px，箭头宽 18px（中心在 +9px）：
-     第 d 层的箭头中心 = 12 + 18d + 9 = 21 + 18d，故该层的竖线分别落在 21, 39, 57… */
-  .wi-guides {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 21px;
-    width: calc(var(--depth, 0) * 18px);
-    background-image: repeating-linear-gradient(
-      to right,
-      rgba(48, 49, 51, 0.11) 0 1px,
-      transparent 1px 18px
-    );
-    pointer-events: none;
-  }
-  .wi-caret {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    flex: none;
-    border-radius: 4px;
-    color: var(--ink-quiet);
-    transition: background-color 0.15s, color 0.15s;
-  }
-  .wi-caret:hover {
-    background-color: rgba(64, 158, 255, 0.12);
-    color: var(--primary);
-  }
-  .wi-caret-spacer {
-    display: inline-block;
-    width: 18px;
-    flex: none;
-  }
+    .wi-table .data-table .data-th,
   /* 编号列：等宽数字，弱化成"标识"而不是正文 */
   .wi-key {
     font-variant-numeric: tabular-nums;
@@ -634,10 +554,6 @@ body {
     color: var(--ink-secondary);
     text-align: right;
     white-space: nowrap;
-  }
-  .wi-empty {
-    color: var(--ink-secondary);
-    font-size: 12px;
   }
   /* 子任务数量徽标：极轻，不抢标题 */
   .wi-count {    display: inline-flex;
@@ -811,16 +727,6 @@ body {
   /* 树形卡片头：勾选后同样就地出现批量操作 */
   .wi-card-head .wi-sel-pill:first-of-type {
     margin-left: 8px;
-  }
-  /* 行高回到概览页的呼吸感：38px 太挤，44px 与卡片留白更协调 */
-  .wi-table .data-td {
-    padding-top: 0.6875rem;
-    padding-bottom: 0.6875rem;
-  }
-  .wi-table .data-tr .wi-title-leaf,
-  .wi-table .data-tr .wi-title-root {
-    font-size: 13.5px;
-    font-weight: 500;
   }
   /* 根节点整行极浅底色：238 行摊平后靠它区分"分组"，比加粗标题更有效 */
   .wi-table .wi-row-root {
@@ -1307,19 +1213,59 @@ body {
     }
   }
   /* 窄屏列降级：先去掉日期这类次要列，再在更窄时去掉负责人，尽量不触发横向滚动 */
-  @media (max-width: 1100px) {
-    .wi-hide-md {
-      display: none;
-    }
-    .wi-table .data-table {
-      min-width: 620px;
-    }
+      /* ------------------------------------------------------------------
+     工作项表格的 el-table 版（列表 / 树形）
+     全局 .el-table 主题已对齐玻璃质感，这里只补数据页需要的密度与选中态。
+     ------------------------------------------------------------------ */
+  .wi-table .wi-el-table {
+    width: 100%;
+    font-size: 13px;
+    --el-table-border-color: transparent;
   }
-  @media (max-width: 860px) {
-    .wi-hide-sm {
-      display: none;
-    }
-    .wi-table .data-table {
-      min-width: 460px;
-    }
+  .wi-table .wi-el-table .el-table__cell {
+    padding: 10px 0;
+  }
+  .wi-table .wi-el-table th.el-table__cell {
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    font-weight: 500;
+    color: var(--ink-quiet);
+    background-color: var(--glass-strong) !important;
+    padding: 8px 0;
+  }
+  /* el-table 把树形展开箭头渲染为 .cell 的行内兄弟，而插槽内容是块级 div：
+     不改 flex 的话箭头会独占一行、把每行撑高一倍 */
+  .wi-table .wi-el-table .cell {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 12px;
+    line-height: 1.4;
+  }
+  .wi-table .wi-el-table .el-table__cell.is-right .cell {
+    justify-content: flex-end;
+  }
+  .wi-table .wi-el-table .el-table__row {
+    cursor: pointer;
+  }
+  .wi-table .wi-el-table td.el-table__cell {
+    border-bottom: 1px solid rgba(48, 49, 51, 0.045);
+  }
+  /* 选中行底色：el-table 自身不给选中态背景 */
+  .wi-table .wi-el-table .el-table__row.wi-row-selected > td.el-table__cell {
+    background-color: rgba(64, 158, 255, 0.1) !important;
+  }
+  .wi-table .wi-el-table .el-table__row.wi-row-selected:hover > td.el-table__cell {
+    background-color: rgba(64, 158, 255, 0.14) !important;
+  }
+  /* 树形根节点整行浅底，用来区分分组 */
+  .wi-table .wi-el-table .el-table__row.wi-row-root > td.el-table__cell {
+    background-color: rgba(48, 49, 51, 0.018);
+  }
+  /* el-table 的树形缩进由内部 padding 控制，微调让层级更清晰 */
+  .wi-table .wi-el-table .el-table__indent {
+    padding-left: 14px !important;
+  }
+  .wi-table .wi-el-table .el-table__expand-icon {
+    color: var(--ink-quiet);
   }
