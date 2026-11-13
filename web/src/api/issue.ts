@@ -127,6 +127,17 @@ export function deleteComment(issueId: string, commentId: string) {
   return req<void>(http.delete(`/v1/issues/${issueId}/comments/${commentId}`))
 }
 
+/**
+ * 删除工作项。
+ *
+ * <p>后端 {@code DELETE /v1/issues/{id}} 一直存在（会级联删除子任务、评论、附件与标签），
+ * 但前端此前既没有封装也没有入口，导致页面上"找不到删除按钮"。
+ * 权限校验由后端 {@code Permission.ISSUE_DELETE} 负责，前端按同一权限码控制按钮可见性。
+ */
+export function deleteIssue(id: string) {
+  return req<void>(http.delete(`/v1/issues/${id}`))
+}
+
 // ---- 附件 ----
 export function listAttachments(issueId: string) {
   return req<AttachmentVO[]>(http.get(`/v1/issues/${issueId}/attachments`))

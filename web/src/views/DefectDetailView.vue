@@ -3,7 +3,7 @@ import { onMounted, ref, reactive, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   filterIssues, updateIssue, listProjectStatuses, listWorkflowColumns,
-  listProjectTags, listProjectMembers, listUsers, getProject
+  listProjectTags, listProjectMembers, listUsers, getProject, deleteIssue
 } from '@/api'
 import type {
   Issue, LabelVO, ProjectMember, UserOption, IssueStatusVO,
@@ -17,7 +17,7 @@ import { confirmHandoff } from '@/utils/handoff'
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Plus, X,
   Paperclip, Link2, Trash2,
-  AlertTriangle, Send, MoreHorizontal, Search
+  AlertTriangle, Send, Search
 } from 'lucide-vue-next'
 import CommentThread from '@/components/CommentThread.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
@@ -62,6 +62,8 @@ const handoffByStatus = ref<Record<string, WorkflowColumnVO>>({})
 const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => pid.value)
 const canWrite = computed(() => hasPermission('issue:edit'))
 const canComment = computed(() => hasPermission('issue:comment'))
+// 删除是破坏性操作：与后端 Permission.ISSUE_DELETE 同一权限码，无权限时按钮不出现
+const canDelete = computed(() => hasPermission('issue:delete'))
 
 const currentIssue = ref<Issue | null>(null)
 const currentIndex = computed(() =>
@@ -583,6 +585,32 @@ function back() {
 function close() {
   emit('close')
 }
+
+/**
+ * 删除当前工作项。
+ *
+ * 后端会连子任务、评论、附件、标签一起删（BaseWorkItemService#delete），无法恢复，
+ * 所以确认框里把"会一并删除"写清楚，而不是只问"确认删除吗"。
+ */
+async function onDeleteIssue() {
+  const issue = currentIssue.value
+  if (!issue) return
+  const ok = await confirmAction(
+    `删除「${issue.title}」后不可恢复，其子任务、评论与附件会一并删除。`,
+    '删除工作项',
+    '删除'
+  )
+  if (!ok) return
+  try {
+    await deleteIssue(issue.id)
+    ElMessage.success('已删除')
+    // 抽屉里删除后直接关闭；路由模式返回列表，否则详情页会停在一个已不存在的 id 上
+    if (props.embedded) close()
+    else back()
+  } catch {
+    ElMessage.error('删除失败')
+  }
+}
 function goPrev() { if (prevIssue.value) selectIssue(prevIssue.value) }
 function goNext() { if (nextIssue.value) selectIssue(nextIssue.value) }
 
@@ -609,10 +637,13 @@ onMounted(async () => {
       <span
         class="shrink-0 rounded bg-primary px-1.5 py-0.5 font-mono text-xs text-white"
       >{{ currentIssue?.issueKey || '—' }}</span>
+      <!-- 删除入口放在显眼位置：此前只有一个点了没反应的「更多操作」死按钮，用户找不到删除 -->
       <button
-        class="flex h-7 w-7 shrink-0 items-center justify-center rounded text-ink-secondary transition hover:bg-surface-page"
-        title="更多操作"
-      ><MoreHorizontal :size="16" /></button>
+        v-if="canDelete"
+        class="flex h-7 shrink-0 items-center gap-1 rounded px-2 text-xs text-ink-secondary transition hover:bg-danger/10 hover:text-danger"
+        title="删除该工作项"
+        @click="onDeleteIssue"
+      ><Trash2 :size="14" /> 删除</button>
       <div class="ml-auto flex items-center gap-2">
         <button
           class="flex h-7 w-7 items-center justify-center rounded border border-line disabled:opacity-40"
@@ -647,6 +678,12 @@ onMounted(async () => {
       <span class="text-line">|</span>
       <span class="text-sm text-ink-regular">{{ project?.name || '工作项详情' }}</span>
       <div class="ml-auto flex items-center gap-2">
+        <button
+          v-if="canDelete"
+          class="flex h-7 items-center gap-1 rounded px-2 text-xs text-ink-secondary transition hover:bg-danger/10 hover:text-danger"
+          title="删除该工作项"
+          @click="onDeleteIssue"
+        ><Trash2 :size="14" /> 删除</button>
         <button
           class="flex h-7 w-7 items-center justify-center rounded border border-line disabled:opacity-40"
           :disabled="!prevIssue"
