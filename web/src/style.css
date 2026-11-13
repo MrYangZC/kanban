@@ -8,8 +8,14 @@
   --primary-light: #e6f7ff;
   --ink: #303133;
   --ink-regular: #606266;
-  --ink-secondary: #909399;
-  --ink-placeholder: #c0c4cc;
+  /* 次要文字：原 #909399 在浅灰底(#f5f7fa)上只有 2.99:1，远低于 WCAG AA 的 4.5:1，
+     灰底 + 浅灰字在真实屏幕上就是"看不清"。改到 #666c78（对比度 4.7:1）。 */
+  --ink-secondary: #666c78;
+  /* 更弱一档，仅用于 11-12px 的小字（编号、表头、时间）：小字需要更高对比度才可读，
+     在 #f1f3f6 底上为 5.2:1；仍弱于正文，层级关系保留 */
+  --ink-quiet: #5b6270;
+  /* 占位符专用：输入框提示、装饰性短横。不再用于任何需要阅读的内容 */
+  --ink-placeholder: #a8adb6;
   --line: #dcdfe6;
   --line-light: #e4e7ed;
   --surface-page: #f5f7fa;
@@ -499,7 +505,8 @@ body {
     font-size: 0.75rem;
     line-height: 1rem;
     font-weight: 500;
-    color: var(--ink-secondary);
+    /* 表头是可读信息而不是装饰：用 quiet 档保证 12px 小字也达到 4.5:1 */
+    color: var(--ink-quiet);
   }
   .data-th-first {
     padding-left: 1rem;
@@ -532,7 +539,7 @@ body {
     padding: 0.5rem 0.75rem;
     font-size: 11px;
     letter-spacing: 0.04em;
-    color: var(--ink-placeholder);
+    color: var(--ink-quiet);
     text-transform: none;
     white-space: nowrap;
   }
@@ -590,7 +597,7 @@ body {
     height: 18px;
     flex: none;
     border-radius: 4px;
-    color: var(--ink-placeholder);
+    color: var(--ink-quiet);
     transition: background-color 0.15s, color 0.15s;
   }
   .wi-caret:hover {
@@ -606,7 +613,7 @@ body {
   .wi-key {
     font-variant-numeric: tabular-nums;
     font-size: 12px;
-    color: var(--ink-placeholder);
+    color: var(--ink-quiet);
     letter-spacing: 0.01em;
   }
   /* 日期列：右对齐、等宽数字，避免参差不齐 */
@@ -618,7 +625,7 @@ body {
     white-space: nowrap;
   }
   .wi-empty {
-    color: var(--ink-placeholder);
+    color: var(--ink-secondary);
     font-size: 12px;
   }
   /* 子任务数量徽标：极轻，不抢标题 */
@@ -631,7 +638,7 @@ body {
     padding: 0 5px;
     border-radius: 999px;
     background-color: rgba(48, 49, 51, 0.05);
-    color: var(--ink-secondary);
+    color: var(--ink-quiet);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     line-height: 1;
@@ -657,7 +664,7 @@ body {
     gap: 4px;
     flex: none;
     font-size: 11px;
-    color: var(--ink-secondary);
+    color: var(--ink-quiet);
   }
   .wi-prio-dot {
     width: 6px;
@@ -668,14 +675,14 @@ body {
   }
   /* 负责人为空时不要渲染灰色头像圆点 */
   .wi-unassigned {
-    color: var(--ink-placeholder);
+    color: var(--ink-secondary);
     font-size: 12px;
   }
   .empty-row {
     padding-top: 3rem;
     padding-bottom: 3rem;
     text-align: center;
-    color: var(--ink-placeholder);
+    color: var(--ink-secondary);
   }
 
   /* 左侧范围导航：竖向玻璃条，与 .toolbar 同一材质档位 */
@@ -729,7 +736,7 @@ body {
   .scope-nav-count {
     font-size: 0.75rem;
     line-height: 1rem;
-    color: var(--ink-placeholder);
+    color: var(--ink-secondary);
   }
 
   /* 视图切换：外框为浅玻璃槽，选中项用品牌蓝实底压住，保证当前视图最醒目 */
@@ -811,7 +818,8 @@ body {
       'Courier New', monospace;
     font-size: 0.75rem;
     line-height: 1rem;
-    color: var(--ink-placeholder);
+    /* 编号是用户要找的信息（工单号/任务号），不是装饰，不能压成 placeholder 灰 */
+    color: var(--ink-quiet);
   }
   .cell-title {
     overflow: hidden;

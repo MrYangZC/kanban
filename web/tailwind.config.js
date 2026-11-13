@@ -27,11 +27,14 @@ export default {
         ink: {
           DEFAULT: '#303133',
           regular: '#606266',
-          secondary: '#909399',
-          placeholder: '#c0c4cc',
+          /* 次要文字：原 #909399 在 #f5f7fa 上仅 2.99:1，不满足 WCAG AA(4.5:1) */
+          secondary: '#666c78',
+          /* 11-12px 小字专用档，比 secondary 再稍深，保证小字号可读 */
+          quiet: '#5b6270',
+          placeholder: '#a8adb6',
           900: '#303133',
           600: '#606266',
-          400: '#909399'
+          400: '#666c78'
         },
         line: {
           DEFAULT: '#dcdfe6',
