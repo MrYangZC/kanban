@@ -19,6 +19,7 @@ import { useScopeCounts } from '@/composables/useScopeCounts'
 import { useIssueFilterParams } from '@/composables/useIssueFilterParams'
 import { PRIORITY_COLOR as priorityColor } from '@/constants/issueDict'
 import DataTable, { type TableColumn } from '@/components/common/DataTable.vue'
+import WorkItemTreeTable from '@/components/workitem/WorkItemTreeTable.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
 import PriorityPill from '@/components/common/PriorityPill.vue'
 import UserCell from '@/components/common/UserCell.vue'
@@ -297,7 +298,7 @@ onMounted(() => {
     :view="view"
     v-model:page="page"
     v-model:size="size"
-    show-pagination
+    :show-pagination="view === 'list'"
     v-model:keyword="keyword"
     @update:view="onViewChange"
     @update:scope="onScopeChange"
@@ -341,23 +342,16 @@ onMounted(() => {
       <EmptyRow v-if="!loading && !tableData.length" :colspan="columns.length" :text="`暂无${noun}`" />
     </DataTable>
 
-    <!-- 树形视图 -->
-    <div v-else-if="view === 'tree'" class="tree-page">
-      <div v-if="!treeData.length" class="empty-row text-sm">{{ `暂无${noun}` }}</div>
-      <div
-        v-for="node in treeData"
-        :key="node.id"
-        class="tree-node"
-        @click="detailDrawer?.open(node.id)"
-      >
-        <component :is="icon" :size="14" class="shrink-0 text-brand" />
-        <span class="cell-key">{{ node.issueKey }}</span>
-        <span class="flex-1 truncate text-ink">{{ node.title }}</span>
-        <StatusPill :label="statusName(node.statusId)" :color="statusColor(node.statusId)" />
-        <PriorityPill :priority="node.priority" />
-      </div>
-    </div>
-
+    <!-- 树形视图：层级 + 展开/收起（此前只渲染根节点，238 条数据只显示 3 条） -->
+    <WorkItemTreeTable
+      v-else-if="view === 'tree'"
+      :nodes="treeData"
+      :status-name="statusName"
+      :status-color="statusColor"
+      :member-name="memberName"
+      :noun="noun"
+      @open="(id: string) => detailDrawer?.open(id)"
+    />
     <!-- 看板视图 -->
     <div v-else class="kanban-page">
       <div

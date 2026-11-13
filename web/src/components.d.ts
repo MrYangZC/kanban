@@ -71,6 +71,7 @@ declare module 'vue' {
     ViewTabs: typeof import('./components/ViewTabs.vue')['default']
     WorkflowHandoffDialog: typeof import('./components/board/WorkflowHandoffDialog.vue')['default']
     WorkItemListPage: typeof import('./components/workitem/WorkItemListPage.vue')['default']
+    WorkItemTreeTable: typeof import('./components/workitem/WorkItemTreeTable.vue')['default']
   }
   export interface GlobalDirectives {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']

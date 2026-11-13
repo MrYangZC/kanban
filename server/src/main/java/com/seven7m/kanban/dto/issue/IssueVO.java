@@ -13,6 +13,14 @@ public class IssueVO {
 
     private UUID id;
     private UUID projectId;
+    /**
+     * 上级工作项 id（层级树用）。
+     *
+     * <p>此前 VO 里没有这个字段，前端拿到的永远是「扁平列表」：树形视图把所有行当根节点渲染
+     * （238 条数据只显示出 3 条就是这个问题），表格视图也无法缩进。实体上有 parentId，
+     * 这里补上后由 {@code IssueVoAssembler} 的 BeanUtils 拷贝自动带出。
+     */
+    private UUID parentId;
     private String issueNumber;
     private String issueKey;
     private UUID issueTypeId;
