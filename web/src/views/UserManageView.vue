@@ -140,7 +140,7 @@ async function save() {
       isAdmin: form.isAdmin,
       password: form.password || undefined
     })
-    ElMessage.success('已更新')
+    ElMessage.success(`已更新用户「${form.displayName}」`)
   } else {
     await createUser({
       username: form.username,
@@ -167,7 +167,7 @@ async function remove(raw: unknown) {
   try {
     await confirmDelete(`确认删除用户「${u.displayName}」？`, '删除用户', '删除')
     await deleteUser(u.id)
-    ElMessage.success('已删除')
+    ElMessage.success(`已删除用户「${u.displayName}」`)
     await load()
   } catch {
     /* 取消 */

@@ -7,6 +7,7 @@
  */
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { toastUndo } from '@/utils/feedback'
 import {
   Star, Pencil, Users, UserPlus, ListTodo, FolderKanban, ArrowRight, Trash2, Archive, ArchiveRestore
 } from 'lucide-vue-next'
@@ -43,7 +44,12 @@ async function onFavorite(raw: unknown) {
   const wasFavorited = p.favorited || false
   try {
     await store.toggleFavorite(p.id)
-    ElMessage.success(wasFavorited ? '已取消收藏' : '已收藏')
+    toastUndo({
+      message: wasFavorited ? `已取消收藏「${p.name}」` : `已收藏「${p.name}」`,
+      onUndo: async () => {
+        await store.setFavorite(p.id, wasFavorited)
+      }
+    })
   } catch (e: unknown) {
     reportError(e, '操作失败')
   }
@@ -60,7 +66,16 @@ async function onArchive(raw: unknown) {
   const isArchived = p.status === 'ARCHIVED'
   try {
     await store.toggleArchive(p.id)
-    ElMessage.success(isArchived ? '已取消归档' : '已归档')
+    // 归档是可逆的（再调一次即恢复），给出撤销入口；删除是不可逆的，不挂撤销
+    toastUndo({
+      message: isArchived ? `已取消归档「${p.name}」` : `已归档「${p.name}」`,
+      undoLabel: isArchived ? '重新归档' : '撤销',
+      onUndo: async () => {
+        // 归档后项目已不在当前列表，必须显式指定目标态（toggle 会找不到项目而静默失败）
+        await store.setArchived(p.id, isArchived)
+        ElMessage.success(isArchived ? '已重新归档' : '已撤销归档')
+      }
+    })
   } catch (e: unknown) {
     reportError(e, '操作失败')
   }

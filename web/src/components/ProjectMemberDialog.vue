@@ -76,7 +76,7 @@ async function onRemove(m: ProjectMember) {
     return
   }
   await removeProjectMember(props.projectId, m.userId)
-  ElMessage.success('已移除')
+  ElMessage.success(`已移除成员「${m.displayName}」`)
   await load()
   emit('changed')
 }

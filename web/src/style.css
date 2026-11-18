@@ -1389,3 +1389,33 @@ body {
   .el-dialog__footer .el-button + .el-button {
     margin-left: 0;
   }
+
+  /* 带「撤销」按钮的提示条（ElNotification 自定义内容） */
+  .wi-toast-undo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .wi-toast-undo-text {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .wi-toast-undo-btn {
+    flex-shrink: 0;
+    padding: 2px 10px;
+    border: 1px solid var(--line-light);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--primary);
+    transition: all 0.15s;
+  }
+  .wi-toast-undo-btn:hover {
+    border-color: var(--primary);
+    background: var(--primary-50);
+  }
+  .wi-toast-undo-wrap .el-notification__content {
+    margin-top: 0;
+  }

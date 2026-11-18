@@ -603,7 +603,7 @@ async function onDeleteIssue() {
   if (!ok) return
   try {
     await deleteIssue(issue.id)
-    ElMessage.success('已删除')
+    ElMessage.success(`已删除「${issue.issueKey} ${issue.title}」`)
     // 抽屉里删除后直接关闭；路由模式返回列表，否则详情页会停在一个已不存在的 id 上
     if (props.embedded) close()
     else back()

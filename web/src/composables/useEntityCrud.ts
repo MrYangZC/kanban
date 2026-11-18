@@ -91,10 +91,10 @@ export function useEntityCrud<T extends { id: string; name: string }, F extends 
     try {
       if (editing.value) {
         await options.update(projectId(), editing.value.id, { ...form.value })
-        ElMessage.success('已更新')
+        ElMessage.success(`已更新${options.label}「${form.value.name}」`)
       } else {
         await options.create(projectId(), { ...form.value })
-        ElMessage.success('已创建')
+        ElMessage.success(`已创建${options.label}「${form.value.name}」`)
       }
       dialogVisible.value = false
       await load()
@@ -109,7 +109,7 @@ export function useEntityCrud<T extends { id: string; name: string }, F extends 
     try {
       await confirmRemove(row.name, options.label)
       await options.remove(projectId(), row.id)
-      ElMessage.success('已删除')
+      ElMessage.success(`已删除${options.label}「${row.name}」`)
       await load()
     } catch (e: unknown) {
       if (!isCancel(e)) reportError(e, '删除失败')

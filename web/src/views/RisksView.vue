@@ -240,7 +240,7 @@ async function submit() {
       if (!dueDate) clearFields.push('dueDate')
       if (clearFields.length) payload.clearFields = clearFields
       await updateRisk(projectId.value, editing.value.id, payload)
-      ElMessage.success('已更新')
+      ElMessage.success(`已更新风险「${form.value.title}」`)
     } else {
       await createRisk(projectId.value, {
         title: form.value.title,
@@ -250,7 +250,7 @@ async function submit() {
         ...(ownerId ? { ownerId } : {}),
         ...(dueDate ? { dueDate } : {})
       })
-      ElMessage.success('已创建')
+      ElMessage.success(`已创建风险「${form.value.title}」`)
     }
     dialogVisible.value = false
     await load()
@@ -264,7 +264,7 @@ async function doDelete(row: RiskVO) {
   try {
     await confirmRemove(row.title, '风险')
     await deleteRisk(projectId.value, row.id)
-    ElMessage.success('已删除')
+    ElMessage.success(`已删除风险「${row.title}」`)
     await load()
   } catch (e: unknown) {
     if (!isCancel(e)) reportError(e, '删除失败')

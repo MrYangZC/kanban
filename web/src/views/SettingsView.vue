@@ -85,7 +85,7 @@ async function onRemoveMember(m: ProjectMember) {
   }
   try {
     await removeProjectMember(projectId.value, m.userId)
-    ElMessage.success('已移除')
+    ElMessage.success(`已移除成员「${m.displayName}」`)
     if (editingUser.value === m.userId) editingUser.value = ''
     await loadMembers()
   } catch (e: unknown) {

@@ -486,7 +486,7 @@ async function submitRole() {
   try {
     if (roleEditing.value) await updateRole(roleEditing.value.id, { ...roleForm.value })
     else await createRole({ ...roleForm.value })
-    ElMessage.success('已保存')
+    ElMessage.success(`已保存角色「${roleForm.value.name}」`)
     roleVisible.value = false
     await loadRoles()
   } catch (e: unknown) { reportError(e, '保存失败') }
@@ -496,7 +496,7 @@ async function delRole(raw: unknown) {
   try {
     await confirmRemove(row.name, '角色')
     await deleteRole(row.id)
-    ElMessage.success('已删除')
+    ElMessage.success(`已删除角色「${row.name}」`)
     await loadRoles()
   } catch (e: unknown) { if (!isCancel(e)) reportError(e, '删除失败') }
 }
@@ -513,7 +513,7 @@ async function submitMenu() {
   try {
     if (menuEditing.value) await updateMenu(menuEditing.value.id, payload)
     else await createMenu(payload)
-    ElMessage.success('已保存')
+    ElMessage.success(`已保存菜单「${payload.name ?? ''}」`)
     menuVisible.value = false
     await loadMenus()
   } catch (e: unknown) { reportError(e, '保存失败') }
@@ -522,7 +522,7 @@ async function delMenu(row: RbacMenu) {
   try {
     await confirmRemove(row.name)
     await deleteMenu(row.id)
-    ElMessage.success('已删除')
+    ElMessage.success(`已删除菜单「${row.name}」`)
     await loadMenus()
   } catch (e: unknown) { if (!isCancel(e)) reportError(e, '删除失败') }
 }
@@ -541,7 +541,7 @@ async function submitRoleMenus() {
   const checked = menuTreeRef.value?.getCheckedKeys() || []
   try {
     await assignRoleMenus(roleMenuTarget.value, checked)
-    ElMessage.success('已保存')
+    ElMessage.success(`已保存「${roleMenuName.value}」的菜单权限`)
     roleMenuVisible.value = false
   } catch (e: unknown) { reportError(e, '保存失败') }
 }

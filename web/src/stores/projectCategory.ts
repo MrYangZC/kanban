@@ -160,39 +160,60 @@ export const useProjectCategoryStore = defineStore('projectCategory', () => {
     await loadProjects()
   }
 
-  async function toggleFavorite(projectId: string) {
+  /**
+   * 设置收藏状态。
+   *
+   * <p>显式传目标态而不是"切换"：撤销操作可能在列表已经刷新之后触发，
+   * 此时项目不一定还在当前列表里（例如在「已归档」分类下操作），
+   * 依赖"读当前值再取反"会静默变成空操作。</p>
+   */
+  async function setFavorite(projectId: string, favorited: boolean) {
     const project = projects.value.find((p) => p.id === projectId)
-    if (!project) return
-    const wasFavorited = project.favorited || false
-    project.favorited = !wasFavorited
+    const previous = project?.favorited || false
+    if (project) project.favorited = favorited
     try {
-      if (wasFavorited) {
-        await unfavoriteProject(projectId)
-      } else {
+      if (favorited) {
         await favoriteProject(projectId)
+      } else {
+        await unfavoriteProject(projectId)
       }
       await loadCategoryCounts()
-      if (selectedCategory.value === 'favorited' && !wasFavorited) {
+      if (selectedCategory.value === 'favorited') {
         await loadProjects()
       }
     } catch (e: unknown) {
       // 失败回滚乐观更新，由调用方决定提示方式
-      project.favorited = wasFavorited
+      if (project) project.favorited = previous
       throw e
     }
   }
 
-  async function toggleArchive(projectId: string) {
+  /** 切换收藏（界面上的星标按钮用），内部转成 setFavorite */
+  async function toggleFavorite(projectId: string) {
     const project = projects.value.find((p) => p.id === projectId)
     if (!project) return
-    const isArchived = project.status === 'ARCHIVED'
-    if (isArchived) {
-      await unarchiveProject(projectId)
-    } else {
+    await setFavorite(projectId, !(project.favorited || false))
+  }
+
+  /**
+   * 设置归档状态（显式目标态，理由同 setFavorite：
+   * 归档后项目会从当前列表消失，撤销时再"读状态取反"就找不到它了）。
+   */
+  async function setArchived(projectId: string, archived: boolean) {
+    if (archived) {
       await archiveProject(projectId)
+    } else {
+      await unarchiveProject(projectId)
     }
     await loadCategoryCounts()
     await loadProjects()
+  }
+
+  /** 切换归档（行内按钮用），内部转成 setArchived */
+  async function toggleArchive(projectId: string) {
+    const project = projects.value.find((p) => p.id === projectId)
+    if (!project) return
+    await setArchived(projectId, project.status !== 'ARCHIVED')
   }
 
   return {
@@ -216,6 +237,8 @@ export const useProjectCategoryStore = defineStore('projectCategory', () => {
     setPage,
     setPageSize,
     toggleFavorite,
-    toggleArchive
+    setFavorite,
+    toggleArchive,
+    setArchived
   }
 })

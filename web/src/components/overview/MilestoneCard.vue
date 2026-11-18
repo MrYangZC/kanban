@@ -46,7 +46,7 @@ async function submit() {
   submitting.value = true
   try {
     await createMilestone(props.projectId, { ...form.value })
-    ElMessage.success('已创建')
+    ElMessage.success(`已创建里程碑「${form.value.name}」`)
     dialogVisible.value = false
     emit('refresh')
   } catch (e: unknown) {
