@@ -4,6 +4,7 @@ import { listUsersPage, createUser, updateUser, deleteUser, uploadImage } from '
 import type { UserVO } from '@/api/types'
 import { Plus, Search, Trash2, Pencil, X, ImagePlus } from 'lucide-vue-next'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import { useViewportWidth } from '@/composables/useViewportWidth'
 import { AVATAR_ACCEPT, validateAvatarFile } from '@/utils/avatar'
 import { ElMessage } from 'element-plus'
 import { confirmDelete } from '@/utils/confirm'
@@ -13,6 +14,8 @@ const total = ref(0)
 const page = ref(1)
 const size = ref(20)
 const loading = ref(false)
+// 窄屏列降级：从 DOM 移除列，避免 el-table 的 colgroup 留下空白占位
+const { hideSmColumns } = useViewportWidth()
 const dialogOpen = ref(false)
 const editing = ref<UserVO | null>(null)
 const form = reactive({
@@ -210,7 +213,7 @@ onMounted(load)
             <el-table-column label="用户名" min-width="160">
               <template #default="{ row }"><span class="text-ink-regular">{{ row.username }}</span></template>
             </el-table-column>
-            <el-table-column label="邮箱" min-width="200">
+            <el-table-column v-if="!hideSmColumns" label="邮箱" min-width="200">
               <template #default="{ row }"><span class="text-ink-regular">{{ row.email || '—' }}</span></template>
             </el-table-column>
             <el-table-column label="状态" width="120">

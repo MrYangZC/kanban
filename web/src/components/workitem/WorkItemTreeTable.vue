@@ -302,7 +302,7 @@ function rowClass({ row }: { row: IssueTreeNode }) {
         @row-click="(row: unknown) => emit('open', (row as IssueTreeNode).id)"
         @expand-change="onExpandChange"
       >
-        <el-table-column min-width="320">
+        <el-table-column min-width="200">
           <template #header>
             <div class="flex items-center gap-2">
               <input

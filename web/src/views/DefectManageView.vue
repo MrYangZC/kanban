@@ -447,7 +447,7 @@ onMounted(() => {
             empty-text="暂无缺陷"
             @row-click="(row: unknown) => openDetail(row as Issue)"
           >
-            <el-table-column min-width="320">
+            <el-table-column min-width="200">
               <template #header><span>缺陷</span></template>
               <template #default="{ row }">
                 <div class="flex items-center gap-2">

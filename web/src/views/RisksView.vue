@@ -25,7 +25,7 @@
             <el-table-column label="风险" min-width="180">
               <template #default="{ row }"><span class="font-medium text-ink">{{ row.title }}</span></template>
             </el-table-column>
-            <el-table-column label="描述" min-width="220" show-overflow-tooltip>
+            <el-table-column v-if="!hideMdColumns" label="描述" min-width="220" show-overflow-tooltip>
               <template #default="{ row }"><span class="cell-text">{{ row.description || '—' }}</span></template>
             </el-table-column>
             <el-table-column label="级别" width="100">
@@ -44,13 +44,13 @@
                 />
               </template>
             </el-table-column>
-            <el-table-column label="负责人" width="120">
+            <el-table-column v-if="!hideSmColumns" label="负责人" width="120">
               <template #default="{ row }"><span class="cell-text">{{ row.ownerName || '—' }}</span></template>
             </el-table-column>
-            <el-table-column label="截止日" width="120">
+            <el-table-column v-if="!hideLgColumns" label="截止日" width="120">
               <template #default="{ row }"><span class="cell-text">{{ row.dueDate || '—' }}</span></template>
             </el-table-column>
-            <el-table-column label="操作" width="200" align="right">
+            <el-table-column label="操作" :width="hideSmColumns ? 168 : 200" align="right">
               <template #default="{ row }"><RowActions :actions="rowActions(row)" /></template>
             </el-table-column>
           </el-table>
@@ -125,9 +125,12 @@ import UserSelect from '@/components/common/UserSelect.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
 import RowActions, { type RowAction } from '@/components/common/RowActions.vue'
 import { useProjectPermission } from '@/composables/useProjectPermission'
+import { useViewportWidth } from '@/composables/useViewportWidth'
 import { RISK_LEVEL, RISK_STATUS } from '@/constants/issueDict'
 
 const route = useRoute()
+// 窄屏列降级：从 DOM 移除列，避免 el-table 的 colgroup 留下空白占位
+const { hideLgColumns, hideMdColumns, hideSmColumns } = useViewportWidth()
 const projectId = computed(() => route.params.projectId as string)
 
 const risks = ref<RiskVO[]>([])

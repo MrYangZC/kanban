@@ -501,7 +501,7 @@ onMounted(() => {
             @selection-change="onSelectionChange"
           >
             <el-table-column v-if="canDelete" type="selection" width="38" class-name="wi-td-select" label-class-name="wi-th-select" />
-            <el-table-column label="任务" min-width="240" show-overflow-tooltip>
+            <el-table-column label="任务" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">
                 <div class="flex items-center gap-2">
                   <span
