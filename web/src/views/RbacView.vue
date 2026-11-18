@@ -26,7 +26,7 @@
                 :data="roles"
                 row-key="id"
                 class="wi-el-table"
-                :empty-text="roleLoading ? '加载中…' : '暂无角色'"
+                v-loading="roleLoading"
               >
                 <el-table-column label="名称" min-width="140">
                   <template #default="{ row }"><span class="font-medium text-ink">{{ row.name }}</span></template>
@@ -48,6 +48,9 @@
                     </div>
                   </template>
                 </el-table-column>
+                <template #empty>
+                  <TableEmpty :icon="ShieldCheck" title="暂无角色" hint="角色用于控制导航菜单与功能权限" />
+                </template>
               </el-table>
             </div>
           </div>
@@ -120,7 +123,7 @@
                   :data="memberRows"
                   row-key="userId"
                   class="wi-el-table"
-                  :empty-text="userRoleLoading ? '加载中…' : userProjectId ? '该项目暂无成员' : '请先选择项目'"
+                  v-loading="userRoleLoading"
                 >
                   <el-table-column label="成员" min-width="180">
                     <template #default="{ row }">
@@ -140,6 +143,13 @@
                       </el-select>
                     </template>
                   </el-table-column>
+                  <template #empty>
+                    <TableEmpty
+                      :icon="Users"
+                      :title="userProjectId ? '该项目暂无成员' : '请先选择项目'"
+                      :hint="userProjectId ? '在项目设置里添加成员后可分配角色' : '选好项目后再为成员分配角色'"
+                    />
+                  </template>
                 </el-table>
               </div>
             </div>
@@ -309,6 +319,7 @@ import { confirmRemove } from '@/utils/confirm'
 import { isCancel, reportError } from '@/utils/error'
 import { Check, File, Folder, FolderKanban, KeyRound, ListTree, Menu, Pencil, Plus, ShieldCheck, Trash2, Users } from 'lucide-vue-next'
 import ScopeNav, { type ScopeNavGroup } from '@/components/ScopeNav.vue'
+import TableEmpty from '@/components/common/TableEmpty.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import {
   listRoles, createRole, updateRole, deleteRole,

@@ -6,8 +6,7 @@
     create-label="新建里程碑"
     :loading="loading"
     :total="milestones.length"
-    empty-text="暂无里程碑"
-    :can-create="canManage"
+        :can-create="canManage"
     v-model:keyword="keyword"
     @search="load"
     @refresh="load"
@@ -21,7 +20,7 @@
           <span class="count-pill">{{ filteredMilestones.length }}</span>
         </div>
         <div class="wi-card-body wi-table">
-          <el-table :data="filteredMilestones" row-key="id" height="100%" class="wi-el-table" empty-text="暂无里程碑">
+          <el-table v-loading="loading" :data="filteredMilestones" row-key="id" height="100%" class="wi-el-table" >
             <el-table-column label="名称" min-width="180">
               <template #default="{ row }"><span class="font-medium text-ink">{{ row.name }}</span></template>
             </el-table-column>
@@ -42,6 +41,22 @@
             <el-table-column label="操作" :width="hideSmColumns ? 168 : 200" align="right">
               <template #default="{ row }"><RowActions :actions="rowActions(row)" /></template>
             </el-table-column>
+            <template #empty>
+              <TableEmpty
+                v-if="loadError"
+                :icon="AlertCircle"
+                title="加载失败"
+                :hint="loadError"
+                action-label="重试"
+                @action="load"
+              />
+              <TableEmpty
+                v-else
+                :icon="Target"
+                title="暂无里程碑"
+                hint="用里程碑标记关键交付节点，便于对外同步进度"
+              />
+            </template>
           </el-table>
         </div>
       </div>
@@ -73,7 +88,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useEntityCrud } from '@/composables/useEntityCrud'
-import { Target } from 'lucide-vue-next'
+import { Target, AlertCircle } from 'lucide-vue-next'
 import {
   listMilestones,
   createMilestone,
@@ -83,6 +98,7 @@ import {
 import type { MilestoneVO } from '@/api/types'
 import SimpleListView from '@/components/SimpleListView.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
+import TableEmpty from '@/components/common/TableEmpty.vue'
 import RowActions, { type RowAction } from '@/components/common/RowActions.vue'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { useViewportWidth } from '@/composables/useViewportWidth'
@@ -101,6 +117,7 @@ const {
   rows: milestones,
   filtered: filteredMilestones,
   loading,
+  loadError,
   keyword,
   dialogVisible,
   editing,

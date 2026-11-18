@@ -6,8 +6,7 @@
     create-label="新建风险"
     :loading="loading"
     :total="risks.length"
-    empty-text="暂无风险"
-    :can-create="canManage"
+        :can-create="canManage"
     v-model:keyword="keyword"
     @search="load"
     @refresh="load"
@@ -21,7 +20,7 @@
           <span class="count-pill">{{ filteredRisks.length }}</span>
         </div>
         <div class="wi-card-body wi-table">
-          <el-table :data="filteredRisks" row-key="id" height="100%" class="wi-el-table" empty-text="暂无风险">
+          <el-table v-loading="loading" :data="filteredRisks" row-key="id" height="100%" class="wi-el-table" >
             <el-table-column label="风险" min-width="180">
               <template #default="{ row }"><span class="font-medium text-ink">{{ row.title }}</span></template>
             </el-table-column>
@@ -53,6 +52,22 @@
             <el-table-column label="操作" :width="hideSmColumns ? 168 : 200" align="right">
               <template #default="{ row }"><RowActions :actions="rowActions(row)" /></template>
             </el-table-column>
+            <template #empty>
+              <TableEmpty
+                v-if="loadError"
+                :icon="AlertCircle"
+                title="加载失败"
+                :hint="loadError"
+                action-label="重试"
+                @action="load"
+              />
+              <TableEmpty
+                v-else
+                :icon="ShieldAlert"
+                title="暂无风险"
+                hint="登记风险后可跟踪级别、负责人与截止时间"
+              />
+            </template>
           </el-table>
         </div>
       </div>
@@ -110,8 +125,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { confirmRemove } from '@/utils/confirm'
-import { isCancel, reportError } from '@/utils/error'
-import { ShieldAlert } from 'lucide-vue-next'
+import { errorMessage, isCancel, reportError } from '@/utils/error'
+import { ShieldAlert, AlertCircle } from 'lucide-vue-next'
 import {
   listRisks,
   createRisk,
@@ -123,6 +138,7 @@ import type { RiskVO, ProjectMember } from '@/api/types'
 import SimpleListView from '@/components/SimpleListView.vue'
 import UserSelect from '@/components/common/UserSelect.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
+import TableEmpty from '@/components/common/TableEmpty.vue'
 import RowActions, { type RowAction } from '@/components/common/RowActions.vue'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { useViewportWidth } from '@/composables/useViewportWidth'
@@ -136,6 +152,8 @@ const projectId = computed(() => route.params.projectId as string)
 const risks = ref<RiskVO[]>([])
 const members = ref<ProjectMember[]>([])
 const loading = ref(false)
+/** 加载失败原因；非空时表格显示错误态与「重试」，而不是伪装成「暂无数据」 */
+const loadError = ref('')
 const keyword = ref('')
 const dialogVisible = ref(false)
 const editing = ref<RiskVO | null>(null)
@@ -170,9 +188,11 @@ const filteredRisks = computed(() => {
 
 async function load() {
   loading.value = true
+  loadError.value = ''
   try {
     risks.value = await listRisks(projectId.value)
   } catch (e: unknown) {
+    loadError.value = errorMessage(e, '加载风险失败')
     reportError(e, '加载风险失败')
   } finally {
     loading.value = false

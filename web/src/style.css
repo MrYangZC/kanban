@@ -1257,3 +1257,59 @@ body {
     linear-gradient(90deg, transparent 104px, var(--wi-guide) 104px, var(--wi-guide) 105px, transparent 105px),
     linear-gradient(90deg, transparent 118px, var(--wi-guide) 118px, var(--wi-guide) 119px, transparent 119px);
   }
+  /* ------------------------------------------------------------------
+     表格空态
+     统一「图标 + 主文案 + 引导语」，颜色用达标的 --ink-secondary / --ink-quiet。
+     同时兜住 el-table 的默认空文案（13px #909399，白底约 3.0:1，不达标），
+     避免哪张表忘了写 #empty 插槽时又掉回低对比度。
+     ------------------------------------------------------------------ */
+  .wi-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 32px 16px;
+  }
+  .wi-empty-icon {
+    color: var(--ink-placeholder);
+    margin-bottom: 4px;
+  }
+  .wi-empty-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-secondary);
+  }
+  .wi-empty-hint {
+    font-size: 12px;
+    color: var(--ink-quiet);
+    line-height: 1.5;
+  }
+  .el-table__empty-text {
+    color: var(--ink-secondary);
+    font-size: 13px;
+  }
+
+  /* 空态里的动作按钮（如「重试」）：低调的描边按钮，不用主色抢戏 */
+  .wi-empty-action {
+    margin-top: 8px;
+    padding: 4px 14px;
+    border: 1px solid var(--line-light);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.8);
+    font-size: 12px;
+    color: var(--ink-regular);
+    transition: all 0.15s;
+  }
+  .wi-empty-action:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+  /* 兜住没写 #empty 插槽的表格：默认空文案也要达到 4.5:1 */
+  .wi-table .el-table__empty-text {
+    color: var(--ink-secondary);
+  }
+
+  /* 加载遮罩出现时隐藏空态文案：否则半透明遮罩下会同时看到 spinner 和「暂无数据」 */
+  .el-table:has(.el-loading-mask) .wi-empty-state {
+    visibility: hidden;
+  }

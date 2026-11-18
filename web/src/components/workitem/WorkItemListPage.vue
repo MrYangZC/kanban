@@ -11,6 +11,7 @@ import { List, GitBranch, LayoutGrid, User, UserCheck, Inbox, Archive, Trash2 } 
 import draggable from 'vuedraggable'
 import { useBoardDrag } from '@/composables/useBoardDrag'
 import SimpleListView from '@/components/SimpleListView.vue'
+import TableEmpty from '@/components/common/TableEmpty.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
 import { useWorkflowTransition } from '@/composables/useWorkflowTransition'
@@ -541,7 +542,13 @@ onMounted(() => {
             <el-table-column v-if="!hideMdColumns" label="更新于" width="92" align="right">
               <template #default="{ row }"><span class="wi-date">{{ shortDate(row.updatedAt) }}</span></template>
             </el-table-column>
-            <template #empty><span class="text-sm text-ink-secondary">暂无{{ noun }}</span></template>
+            <template #empty>
+              <TableEmpty
+                :icon="icon"
+                :title="`暂无${noun}`"
+                :hint="keyword ? `没有匹配「${keyword}」的${noun}，换个关键字试试` : `点击右上角「新建」创建第一个${noun}`"
+              />
+            </template>
           </el-table>
         </div>
       </div>

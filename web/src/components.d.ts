@@ -59,6 +59,7 @@ declare module 'vue' {
     StatCard: typeof import('./components/overview/StatCard.vue')['default']
     StatusBadge: typeof import('./components/StatusBadge.vue')['default']
     StatusPill: typeof import('./components/common/StatusPill.vue')['default']
+    TableEmpty: typeof import('./components/common/TableEmpty.vue')['default']
     UserAvatar: typeof import('./components/common/UserAvatar.vue')['default']
     UserCell: typeof import('./components/common/UserCell.vue')['default']
     UserSelect: typeof import('./components/common/UserSelect.vue')['default']

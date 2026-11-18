@@ -126,10 +126,18 @@ function onSizeChange(v: number) {
       <main class="flex flex-1 flex-col overflow-hidden">
         <!-- 页面级摘要条：由页面注入，落在滚动区之外，不随表格一起滚走，也不占表格高度 -->
         <slot name="stats" />
+        <!--
+          这里曾经是 v-if="loading" 显示「加载中…」、v-else-if="isEmpty" 显示「暂无数据」，
+          把整个插槽顶替掉——结果是加载/空数据时卡片外壳、表头、分页位置全部消失，
+          页面高度还会跳一下，而且表格自己的 v-loading 与空态根本渲染不出来。
+          现在插槽始终渲染，加载态交给表格的 v-loading、空态交给表格的 #empty 插槽；
+          仅当调用方没有提供插槽内容时，才退回这两行文字兜底。
+        -->
         <div class="flex-1 overflow-auto">
-          <div v-if="loading" class="py-20 text-center text-sm text-ink-placeholder">加载中…</div>
-          <div v-else-if="isEmpty" class="py-20 text-center text-sm text-ink-placeholder">{{ emptyText }}</div>
-          <slot v-else />
+          <slot>
+            <div v-if="loading" class="py-20 text-center text-sm text-ink-quiet">加载中…</div>
+            <div v-else-if="isEmpty" class="py-20 text-center text-sm text-ink-quiet">{{ emptyText }}</div>
+          </slot>
         </div>
 
         <!-- 分页条 -->

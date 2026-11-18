@@ -17,6 +17,7 @@ import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import SimpleListView from '@/components/SimpleListView.vue'
 import PriorityPill from '@/components/common/PriorityPill.vue'
+import TableEmpty from '@/components/common/TableEmpty.vue'
 import UserCell from '@/components/common/UserCell.vue'
 import type { ViewTab } from '@/components/ViewTabs.vue'
 import { PRIORITY_COLOR as priorityColor } from '@/constants/issueDict'
@@ -340,8 +341,7 @@ onMounted(() => {
     :loading="loading"
     :total="total"
     :is-empty="view === 'list' && !tableData.length"
-    empty-text="暂无缺陷"
-    :nav-groups="navGroups"
+        :nav-groups="navGroups"
     :scope="scope"
     :view-tabs="viewTabs"
     :view="view"
@@ -373,7 +373,7 @@ onMounted(() => {
             row-key="id"
             height="100%"
             class="wi-el-table"
-            empty-text="暂无缺陷"
+            v-loading="loading"
             @row-click="(row: unknown) => openDetail(row as Issue)"
           >
             <el-table-column label="缺陷" min-width="260">
@@ -428,6 +428,9 @@ onMounted(() => {
             <el-table-column label="创建时间" width="120">
               <template #default="{ row }"><span class="cell-muted">{{ fmtDate(row.createdAt) }}</span></template>
             </el-table-column>
+            <template #empty>
+              <TableEmpty :icon="AlertTriangle" title="暂无缺陷" hint="提测或上线后发现的缺陷会集中在这里跟踪" />
+            </template>
           </el-table>
         </div>
       </div>
@@ -443,8 +446,8 @@ onMounted(() => {
             :tree-props="{ children: 'children' }"
             height="100%"
             class="wi-el-table"
+            v-loading="loading"
             default-expand-all
-            empty-text="暂无缺陷"
             @row-click="(row: unknown) => openDetail(row as Issue)"
           >
             <el-table-column min-width="200">
@@ -465,6 +468,9 @@ onMounted(() => {
             <el-table-column label="优先级" width="92">
               <template #default="{ row }"><PriorityPill :priority="row.priority" /></template>
             </el-table-column>
+            <template #empty>
+              <TableEmpty :icon="AlertTriangle" title="暂无缺陷" hint="提测或上线后发现的缺陷会集中在这里跟踪" />
+            </template>
           </el-table>
         </div>
       </div>

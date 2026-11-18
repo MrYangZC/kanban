@@ -11,6 +11,7 @@ import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import SimpleListView from '@/components/SimpleListView.vue'
 import UserSelect from '@/components/common/UserSelect.vue'
+import TableEmpty from '@/components/common/TableEmpty.vue'
 import type { ViewTab } from '@/components/ViewTabs.vue'
 import { useBoardFilter } from '@/stores/boardFilter'
 import { ElMessage } from 'element-plus'
@@ -424,6 +425,9 @@ onMounted(() => {
               <span class="text-xs text-ink-400">{{ row.updatedAt?.slice(0, 16)?.replace('T', ' ') || '—' }}</span>
             </template>
           </el-table-column>
+          <template #empty>
+            <TableEmpty :icon="pageIcon" :title="`暂无${itemLabel}`" hint="调整筛选条件，或点击右上角新建" />
+          </template>
         </el-table>
 
       </div>

@@ -16,6 +16,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { ChevronsDownUp, ChevronsUpDown, GitBranch } from 'lucide-vue-next'
 import StatusPill from '@/components/common/StatusPill.vue'
+import TableEmpty from '@/components/common/TableEmpty.vue'
 import UserCell from '@/components/common/UserCell.vue'
 import { fmtDateOrDash as fmtDate } from '@/utils/datetime'
 import { PRIORITY_LABEL, PRIORITY_COLOR } from '@/constants/issueDict'
@@ -367,7 +368,9 @@ function rowClass({ row }: { row: IssueTreeNode }) {
         <el-table-column v-if="!hideMdColumns" label="更新于" width="92" align="right">
           <template #default="{ row }"><span class="wi-date">{{ shortDate(row.updatedAt) }}</span></template>
         </el-table-column>
-        <template #empty><span class="text-sm text-ink-secondary">暂无{{ noun }}</span></template>
+        <template #empty>
+          <TableEmpty :icon="GitBranch" :title="`暂无${noun}`" :hint="`创建${noun}后即可按层级查看`" />
+        </template>
       </el-table>
     </div>
   </div>

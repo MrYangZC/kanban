@@ -1,7 +1,7 @@
 import { computed, ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmRemove } from '@/utils/confirm'
-import { isCancel, reportError } from '@/utils/error'
+import { errorMessage, isCancel, reportError } from '@/utils/error'
 
 /**
  * 「表格 + 编辑弹窗」类配置页的通用骨架：列表加载、关键字过滤、
@@ -39,6 +39,8 @@ export function useEntityCrud<T extends { id: string; name: string }, F extends 
 ) {
   const rows = ref([]) as Ref<T[]>
   const loading = ref(false)
+  /** 加载失败原因；非空时表格显示错误态与「重试」，而不是伪装成「暂无数据」 */
+  const loadError = ref('')
   const keyword = ref('')
   const dialogVisible = ref(false)
   const editing = ref(null) as Ref<T | null>
@@ -54,9 +56,11 @@ export function useEntityCrud<T extends { id: string; name: string }, F extends 
 
   async function load() {
     loading.value = true
+    loadError.value = ''
     try {
       rows.value = await options.fetch(projectId())
     } catch (e: unknown) {
+      loadError.value = errorMessage(e, `加载${options.label}失败`)
       reportError(e, `加载${options.label}失败`)
     } finally {
       loading.value = false
@@ -109,6 +113,7 @@ export function useEntityCrud<T extends { id: string; name: string }, F extends 
   return {
     rows,
     loading,
+    loadError,
     keyword,
     dialogVisible,
     editing,

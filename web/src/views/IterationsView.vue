@@ -6,8 +6,7 @@
     create-label="新建迭代"
     :loading="loading"
     :total="sprints.length"
-    empty-text="暂无迭代"
-    :can-create="canManage"
+        :can-create="canManage"
     v-model:keyword="keyword"
     @search="load"
     @refresh="load"
@@ -21,7 +20,7 @@
           <span class="count-pill">{{ filteredSprints.length }}</span>
         </div>
         <div class="wi-card-body wi-table">
-          <el-table :data="filteredSprints" row-key="id" height="100%" class="wi-el-table" empty-text="暂无迭代">
+          <el-table v-loading="loading" :data="filteredSprints" row-key="id" height="100%" class="wi-el-table" >
             <el-table-column label="名称" min-width="160">
               <template #default="{ row }"><span class="font-medium text-ink">{{ row.name }}</span></template>
             </el-table-column>
@@ -47,6 +46,22 @@
             <el-table-column label="操作" :width="hideSmColumns ? 168 : 200" align="right">
               <template #default="{ row }"><RowActions :actions="rowActions(row)" /></template>
             </el-table-column>
+            <template #empty>
+              <TableEmpty
+                v-if="loadError"
+                :icon="AlertCircle"
+                title="加载失败"
+                :hint="loadError"
+                action-label="重试"
+                @action="load"
+              />
+              <TableEmpty
+                v-else
+                :icon="Repeat"
+                title="暂无迭代"
+                hint="点击右上角「新建迭代」开始一个 Sprint"
+              />
+            </template>
           </el-table>
         </div>
       </div>
@@ -83,7 +98,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { reportError } from '@/utils/error'
 import { useEntityCrud } from '@/composables/useEntityCrud'
-import { Repeat } from 'lucide-vue-next'
+import { Repeat, AlertCircle } from 'lucide-vue-next'
 import {
   listSprints,
   createSprint,
@@ -95,6 +110,7 @@ import {
 import type { SprintVO } from '@/api/types'
 import SimpleListView from '@/components/SimpleListView.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
+import TableEmpty from '@/components/common/TableEmpty.vue'
 import RowActions, { type RowAction } from '@/components/common/RowActions.vue'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { useViewportWidth } from '@/composables/useViewportWidth'
@@ -113,6 +129,7 @@ const {
   rows: sprints,
   filtered: filteredSprints,
   loading,
+  loadError,
   keyword,
   dialogVisible,
   editing,

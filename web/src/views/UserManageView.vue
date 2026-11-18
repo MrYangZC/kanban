@@ -2,8 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, reactive, watch } from 'vue'
 import { listUsersPage, createUser, updateUser, deleteUser, uploadImage } from '@/api'
 import type { UserVO } from '@/api/types'
-import { Plus, Search, Trash2, Pencil, X, ImagePlus } from 'lucide-vue-next'
+import { Plus, Search, Trash2, Pencil, X, ImagePlus, Users } from 'lucide-vue-next'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import TableEmpty from '@/components/common/TableEmpty.vue'
 import { useViewportWidth } from '@/composables/useViewportWidth'
 import { AVATAR_ACCEPT, validateAvatarFile } from '@/utils/avatar'
 import { ElMessage } from 'element-plus'
@@ -199,7 +200,7 @@ onMounted(load)
             :data="filteredUsers"
             row-key="id"
             class="wi-el-table"
-            :empty-text="keyword ? `未找到与「${keyword}」匹配的用户` : (loading ? '加载中…' : '暂无用户')"
+            v-loading="loading"
           >
             <el-table-column label="用户" min-width="220">
               <template #default="{ row }">
@@ -236,6 +237,13 @@ onMounted(load)
                 </div>
               </template>
             </el-table-column>
+            <template #empty>
+              <TableEmpty
+                :icon="Users"
+                :title="keyword ? '未找到匹配的用户' : '暂无用户'"
+                :hint="keyword ? `没有匹配「${keyword}」的用户，换个关键字试试` : '点击右上角「新建用户」添加成员'"
+              />
+            </template>
           </el-table>
         </div>
       </div>
