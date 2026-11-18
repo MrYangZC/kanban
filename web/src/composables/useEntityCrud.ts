@@ -43,6 +43,8 @@ export function useEntityCrud<T extends { id: string; name: string }, F extends 
   const loadError = ref('')
   const keyword = ref('')
   const dialogVisible = ref(false)
+  /** 提交中：用于禁用按钮，防止连点造成重复创建 */
+  const submitting = ref(false)
   const editing = ref(null) as Ref<T | null>
   const form = ref(options.emptyForm()) as Ref<F>
 
@@ -80,10 +82,12 @@ export function useEntityCrud<T extends { id: string; name: string }, F extends 
   }
 
   async function submit() {
+    if (submitting.value) return
     if (!form.value.name.trim()) {
       ElMessage.warning(`请输入${options.label}名称`)
       return
     }
+    submitting.value = true
     try {
       if (editing.value) {
         await options.update(projectId(), editing.value.id, { ...form.value })
@@ -96,6 +100,8 @@ export function useEntityCrud<T extends { id: string; name: string }, F extends 
       await load()
     } catch (e: unknown) {
       reportError(e, '保存失败')
+    } finally {
+      submitting.value = false
     }
   }
 
@@ -116,6 +122,7 @@ export function useEntityCrud<T extends { id: string; name: string }, F extends 
     loadError,
     keyword,
     dialogVisible,
+    submitting,
     editing,
     form,
     filtered,

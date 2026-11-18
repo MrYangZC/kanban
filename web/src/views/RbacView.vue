@@ -26,8 +26,7 @@
                 :data="roles"
                 row-key="id"
                 class="wi-el-table"
-                v-loading="roleLoading"
-              >
+                              >
                 <el-table-column label="名称" min-width="140">
                   <template #default="{ row }"><span class="font-medium text-ink">{{ row.name }}</span></template>
                 </el-table-column>
@@ -49,7 +48,8 @@
                   </template>
                 </el-table-column>
                 <template #empty>
-                  <TableEmpty :icon="ShieldCheck" title="暂无角色" hint="角色用于控制导航菜单与功能权限" />
+                  <TableSkeleton v-if="roleLoading" :rows="6" :cols="4" />
+              <TableEmpty :icon="ShieldCheck" title="暂无角色" hint="角色用于控制导航菜单与功能权限" />
                 </template>
               </el-table>
             </div>
@@ -123,8 +123,7 @@
                   :data="memberRows"
                   row-key="userId"
                   class="wi-el-table"
-                  v-loading="userRoleLoading"
-                >
+                                  >
                   <el-table-column label="成员" min-width="180">
                     <template #default="{ row }">
                       <div class="flex items-center gap-3">
@@ -319,6 +318,7 @@ import { confirmRemove } from '@/utils/confirm'
 import { isCancel, reportError } from '@/utils/error'
 import { Check, File, Folder, FolderKanban, KeyRound, ListTree, Menu, Pencil, Plus, ShieldCheck, Trash2, Users } from 'lucide-vue-next'
 import ScopeNav, { type ScopeNavGroup } from '@/components/ScopeNav.vue'
+import TableSkeleton from '@/components/common/TableSkeleton.vue'
 import TableEmpty from '@/components/common/TableEmpty.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import {

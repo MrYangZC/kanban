@@ -156,7 +156,7 @@ watch(addDialogVisible, (v) => {
 </script>
 
 <template>
-  <el-dialog v-model="visible" title="项目成员" width="560px">
+  <el-dialog v-model="visible" title="项目成员" width="640px" :close-on-click-modal="false">
     <div v-loading="loading">
       <div v-if="canManageResolved" class="mb-3 flex justify-end">
         <el-button type="primary" size="small" :icon="UserPlus" @click="openAddFromList">

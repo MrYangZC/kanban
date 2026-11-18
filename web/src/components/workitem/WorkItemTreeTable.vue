@@ -16,6 +16,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { ChevronsDownUp, ChevronsUpDown, GitBranch } from 'lucide-vue-next'
 import StatusPill from '@/components/common/StatusPill.vue'
+import TableSkeleton from '@/components/common/TableSkeleton.vue'
 import TableEmpty from '@/components/common/TableEmpty.vue'
 import UserCell from '@/components/common/UserCell.vue'
 import { fmtDateOrDash as fmtDate } from '@/utils/datetime'
@@ -33,9 +34,12 @@ const props = withDefaults(defineProps<{
   selected?: Set<string>
   /** 没有批量删除权限时传 false，勾选框不渲染 */
   selectable?: boolean
+  /** 首屏加载中：显示骨架而不是空白 */
+  loading?: boolean
 }>(), {
   noun: '工作项',
-  selectable: false
+  selectable: false,
+  loading: false
 })
 
 const emit = defineEmits<{
@@ -369,7 +373,8 @@ function rowClass({ row }: { row: IssueTreeNode }) {
           <template #default="{ row }"><span class="wi-date">{{ shortDate(row.updatedAt) }}</span></template>
         </el-table-column>
         <template #empty>
-          <TableEmpty :icon="GitBranch" :title="`暂无${noun}`" :hint="`创建${noun}后即可按层级查看`" />
+          <TableSkeleton v-if="loading" :rows="6" :cols="4" />
+          <TableEmpty v-else :icon="GitBranch" :title="`暂无${noun}`" :hint="`创建${noun}后即可按层级查看`" />
         </template>
       </el-table>
     </div>

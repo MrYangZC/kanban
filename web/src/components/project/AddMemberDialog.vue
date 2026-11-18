@@ -69,7 +69,7 @@ async function onAdd(u: MemberCandidate) {
 </script>
 
 <template>
-  <el-dialog v-model="visible" title="添加成员" width="520px" append-to-body>
+  <el-dialog v-model="visible" title="添加成员" width="520px" append-to-body :close-on-click-modal="false">
     <div class="space-y-3">
       <el-input
         v-model="keyword"

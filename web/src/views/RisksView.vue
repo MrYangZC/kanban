@@ -20,7 +20,7 @@
           <span class="count-pill">{{ filteredRisks.length }}</span>
         </div>
         <div class="wi-card-body wi-table">
-          <el-table v-loading="loading" :data="filteredRisks" row-key="id" height="100%" class="wi-el-table" >
+          <el-table :data="filteredRisks" row-key="id" height="100%" class="wi-el-table" >
             <el-table-column label="风险" min-width="180">
               <template #default="{ row }"><span class="font-medium text-ink">{{ row.title }}</span></template>
             </el-table-column>
@@ -53,8 +53,9 @@
               <template #default="{ row }"><RowActions :actions="rowActions(row)" /></template>
             </el-table-column>
             <template #empty>
+              <TableSkeleton v-if="loading" :rows="6" :cols="4" />
               <TableEmpty
-                v-if="loadError"
+                v-else-if="loadError"
                 :icon="AlertCircle"
                 title="加载失败"
                 :hint="loadError"
@@ -74,7 +75,7 @@
     </div>
 
     <template #footer>
-      <el-dialog v-model="dialogVisible" :title="editing ? '编辑风险' : '新建风险'" width="520px">
+      <el-dialog v-model="dialogVisible" :title="editing ? '编辑风险' : '新建风险'" width="520px" :close-on-click-modal="false">
         <el-form :model="form" label-width="80px">
           <el-form-item label="标题" required>
             <el-input v-model="form.title" />
@@ -112,8 +113,8 @@
           </el-form-item>
         </el-form>
         <template #footer>
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submit">确定</el-button>
+          <el-button :disabled="submitting" @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="submitting" :disabled="submitting" @click="submit">确定</el-button>
         </template>
       </el-dialog>
     </template>
@@ -136,6 +137,7 @@ import {
 } from '@/api'
 import type { RiskVO, ProjectMember } from '@/api/types'
 import SimpleListView from '@/components/SimpleListView.vue'
+import TableSkeleton from '@/components/common/TableSkeleton.vue'
 import UserSelect from '@/components/common/UserSelect.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
 import TableEmpty from '@/components/common/TableEmpty.vue'
@@ -156,6 +158,8 @@ const loading = ref(false)
 const loadError = ref('')
 const keyword = ref('')
 const dialogVisible = ref(false)
+/** 提交中：禁用按钮，防止连点重复创建 */
+const submitting = ref(false)
 const editing = ref<RiskVO | null>(null)
 const form = ref<{
   title: string
@@ -217,10 +221,12 @@ function openEdit(row: RiskVO) {
   dialogVisible.value = true
 }
 async function submit() {
+  if (submitting.value) return
   if (!form.value.title.trim()) {
     ElMessage.warning('请输入风险标题')
     return
   }
+  submitting.value = true
   try {
     // 负责人/截止日被清空时不能只传空值：后端把 null 视为「不修改」，
     // 必须显式列进 clearFields 才会真正置空（与工作项更新同一套语义）
@@ -250,7 +256,9 @@ async function submit() {
     await load()
   } catch (e: unknown) {
     reportError(e, '保存失败')
-  }
+    } finally {
+    submitting.value = false
+}
 }
 async function doDelete(row: RiskVO) {
   try {

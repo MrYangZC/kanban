@@ -4,6 +4,7 @@ import { listUsersPage, createUser, updateUser, deleteUser, uploadImage } from '
 import type { UserVO } from '@/api/types'
 import { Plus, Search, Trash2, Pencil, X, ImagePlus, Users } from 'lucide-vue-next'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import TableSkeleton from '@/components/common/TableSkeleton.vue'
 import TableEmpty from '@/components/common/TableEmpty.vue'
 import { useViewportWidth } from '@/composables/useViewportWidth'
 import { AVATAR_ACCEPT, validateAvatarFile } from '@/utils/avatar'
@@ -200,8 +201,7 @@ onMounted(load)
             :data="filteredUsers"
             row-key="id"
             class="wi-el-table"
-            v-loading="loading"
-          >
+                      >
             <el-table-column label="用户" min-width="220">
               <template #default="{ row }">
                 <div class="flex items-center gap-3">
@@ -238,7 +238,9 @@ onMounted(load)
               </template>
             </el-table-column>
             <template #empty>
+              <TableSkeleton v-if="loading" :rows="6" :cols="4" />
               <TableEmpty
+                v-else
                 :icon="Users"
                 :title="keyword ? '未找到匹配的用户' : '暂无用户'"
                 :hint="keyword ? `没有匹配「${keyword}」的用户，换个关键字试试` : '点击右上角「新建用户」添加成员'"

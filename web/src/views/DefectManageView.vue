@@ -14,6 +14,7 @@ import type {
 } from '@/api/types'
 import { ElMessage } from 'element-plus'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
+import TableSkeleton from '@/components/common/TableSkeleton.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import SimpleListView from '@/components/SimpleListView.vue'
 import PriorityPill from '@/components/common/PriorityPill.vue'
@@ -174,6 +175,10 @@ const { statusCategoryFilter, overdueFilter, activeFilterLabel, clearQueryFilter
   })
 
 /** 列表/树/看板共用的筛选参数，保证三个视图口径一致 */
+/** 服务端排序（缺陷列表）：el-table 的表头点击写入，随筛选参数一起下发 */
+const defectSortField = ref('')
+const defectSortOrder = ref('')
+
 const filterParams = useIssueFilterParams({
   projectId: () => projectId.value,
   typeCodes: () => DEFECT_TYPE_CODES,
@@ -183,10 +188,24 @@ const filterParams = useIssueFilterParams({
   overdue: () => overdueFilter.value
 })
 
+function onDefectSortChange({ prop, order }: { prop: string | null; order: string | null }) {
+  defectSortField.value = order && prop ? prop : ''
+  defectSortOrder.value = order === 'ascending' ? 'asc' : order === 'descending' ? 'desc' : ''
+  page.value = 1
+  loadList()
+}
+
 async function loadList() {
   loading.value = true
   try {
-    const res = await filterIssues(filterParams({ page: page.value, size: size.value }))
+    const res = await filterIssues(
+      filterParams({
+        page: page.value,
+        size: size.value,
+        sortField: defectSortField.value || undefined,
+        sortOrder: defectSortOrder.value || undefined
+      })
+    )
     tableData.value = res.list
     total.value = res.total
   } finally {
@@ -373,10 +392,10 @@ onMounted(() => {
             row-key="id"
             height="100%"
             class="wi-el-table"
-            v-loading="loading"
-            @row-click="(row: unknown) => openDetail(row as Issue)"
+                        @row-click="(row: unknown) => openDetail(row as Issue)"
+            @sort-change="onDefectSortChange"
           >
-            <el-table-column label="缺陷" min-width="260">
+            <el-table-column prop="issueKey" label="缺陷" min-width="260" sortable="custom">
               <template #default="{ row }">
                 <div class="flex items-center gap-2">
                   <AlertTriangle :size="14" class="shrink-0 text-danger" />
@@ -425,10 +444,11 @@ onMounted(() => {
                 <UserCell :avatar-name="row.reporterName" :avatar-url="row.reporterAvatarUrl" :display-name="userName(row.reporterId)" />
               </template>
             </el-table-column>
-            <el-table-column label="创建时间" width="120">
+            <el-table-column prop="createdAt" label="创建时间" width="120" sortable="custom">
               <template #default="{ row }"><span class="cell-muted">{{ fmtDate(row.createdAt) }}</span></template>
             </el-table-column>
             <template #empty>
+              <TableSkeleton v-if="loading" :rows="6" :cols="4" />
               <TableEmpty :icon="AlertTriangle" title="暂无缺陷" hint="提测或上线后发现的缺陷会集中在这里跟踪" />
             </template>
           </el-table>
@@ -446,7 +466,6 @@ onMounted(() => {
             :tree-props="{ children: 'children' }"
             height="100%"
             class="wi-el-table"
-            v-loading="loading"
             default-expand-all
             @row-click="(row: unknown) => openDetail(row as Issue)"
           >

@@ -20,7 +20,7 @@
           <span class="count-pill">{{ filteredMilestones.length }}</span>
         </div>
         <div class="wi-card-body wi-table">
-          <el-table v-loading="loading" :data="filteredMilestones" row-key="id" height="100%" class="wi-el-table" >
+          <el-table :data="filteredMilestones" row-key="id" height="100%" class="wi-el-table" >
             <el-table-column label="名称" min-width="180">
               <template #default="{ row }"><span class="font-medium text-ink">{{ row.name }}</span></template>
             </el-table-column>
@@ -42,8 +42,9 @@
               <template #default="{ row }"><RowActions :actions="rowActions(row)" /></template>
             </el-table-column>
             <template #empty>
+              <TableSkeleton v-if="loading" :rows="6" :cols="4" />
               <TableEmpty
-                v-if="loadError"
+                v-else-if="loadError"
                 :icon="AlertCircle"
                 title="加载失败"
                 :hint="loadError"
@@ -63,7 +64,7 @@
     </div>
 
     <template #footer>
-      <el-dialog v-model="dialogVisible" :title="editing ? '编辑里程碑' : '新建里程碑'" width="520px">
+      <el-dialog v-model="dialogVisible" :title="editing ? '编辑里程碑' : '新建里程碑'" width="520px" :close-on-click-modal="false">
         <el-form :model="form" label-width="80px">
           <el-form-item label="名称" required>
             <el-input v-model="form.name" />
@@ -76,8 +77,8 @@
           </el-form-item>
         </el-form>
         <template #footer>
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submit">确定</el-button>
+          <el-button :disabled="submitting" @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="submitting" :disabled="submitting" @click="submit">确定</el-button>
         </template>
       </el-dialog>
     </template>
@@ -97,6 +98,7 @@ import {
 } from '@/api'
 import type { MilestoneVO } from '@/api/types'
 import SimpleListView from '@/components/SimpleListView.vue'
+import TableSkeleton from '@/components/common/TableSkeleton.vue'
 import StatusPill from '@/components/common/StatusPill.vue'
 import TableEmpty from '@/components/common/TableEmpty.vue'
 import RowActions, { type RowAction } from '@/components/common/RowActions.vue'
@@ -120,6 +122,7 @@ const {
   loadError,
   keyword,
   dialogVisible,
+  submitting,
   editing,
   form,
   load,

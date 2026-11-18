@@ -11,6 +11,7 @@ import { List, GitBranch, LayoutGrid, User, UserCheck, Inbox, Archive, Trash2 } 
 import draggable from 'vuedraggable'
 import { useBoardDrag } from '@/composables/useBoardDrag'
 import SimpleListView from '@/components/SimpleListView.vue'
+import TableSkeleton from '@/components/common/TableSkeleton.vue'
 import TableEmpty from '@/components/common/TableEmpty.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
@@ -324,6 +325,10 @@ const { statusCategoryFilter, overdueFilter, activeFilterLabel, clearQueryFilter
   })
 
 // 列表/树/看板共用的筛选参数：字段定义收敛在 useIssueFilterParams，避免各视图各拼一份
+/** 服务端排序状态：el-table 的 sort-change 写入，随筛选参数一起下发 */
+const sortField = ref('')
+const sortOrder = ref('')
+
 const filterParams = useIssueFilterParams({
   projectId: () => projectId.value,
   typeCodes: () => props.typeCodes,
@@ -336,7 +341,14 @@ const filterParams = useIssueFilterParams({
 async function loadList() {
   loading.value = true
   try {
-    const res = await filterIssues(filterParams({ page: page.value, size: size.value }))
+    const res = await filterIssues(
+      filterParams({
+        page: page.value,
+        size: size.value,
+        sortField: sortField.value || undefined,
+        sortOrder: sortOrder.value || undefined
+      })
+    )
     tableData.value = res.list
     total.value = res.total
   } catch {
@@ -377,6 +389,17 @@ async function loadBoard() {
   } finally {
     loading.value = false
   }
+}
+
+/**
+ * 表头排序。el-table 的 prop 用后端认的字段名（issueKey / updatedAt / createdAt …），
+ * order 为 ascending / descending / null（取消排序时回落到默认排序）。
+ */
+function onSortChange({ prop, order }: { prop: string | null; order: string | null }) {
+  sortField.value = order && prop ? prop : ''
+  sortOrder.value = order === 'ascending' ? 'asc' : order === 'descending' ? 'desc' : ''
+  page.value = 1
+  load()
 }
 
 async function load() {
@@ -500,6 +523,7 @@ onMounted(() => {
             :row-class-name="listRowClass"
             @row-click="(row: Issue) => detailDrawer?.open(row.id)"
             @selection-change="onSelectionChange"
+            @sort-change="onSortChange"
           >
             <el-table-column v-if="canDelete" type="selection" width="38" class-name="wi-td-select" label-class-name="wi-th-select" />
             <el-table-column label="任务" min-width="200" show-overflow-tooltip>
@@ -517,7 +541,7 @@ onMounted(() => {
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="编号" width="110">
+            <el-table-column prop="issueKey" label="编号" width="110" sortable="custom">
               <template #default="{ row }"><span class="wi-key">{{ row.issueKey }}</span></template>
             </el-table-column>
             <el-table-column v-if="!hideSmColumns" label="负责人" width="136">
@@ -539,10 +563,11 @@ onMounted(() => {
             <el-table-column v-if="!hideMdColumns" label="计划完成" width="100" align="right">
               <template #default="{ row }"><span class="wi-date">{{ shortDate(row.dueDate) }}</span></template>
             </el-table-column>
-            <el-table-column v-if="!hideMdColumns" label="更新于" width="92" align="right">
+            <el-table-column v-if="!hideMdColumns" prop="updatedAt" label="更新于" width="92" align="right" sortable="custom">
               <template #default="{ row }"><span class="wi-date">{{ shortDate(row.updatedAt) }}</span></template>
             </el-table-column>
             <template #empty>
+              <TableSkeleton v-if="loading" :rows="6" :cols="4" />
               <TableEmpty
                 :icon="icon"
                 :title="`暂无${noun}`"
@@ -563,6 +588,7 @@ onMounted(() => {
         :noun="noun"
         :selected="selectedIds"
         :selectable="canDelete"
+        :loading="loading"
         @select="onTreeSelect"
         @open="(id: string) => detailDrawer?.open(id)"
       >

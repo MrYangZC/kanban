@@ -1313,3 +1313,79 @@ body {
   .el-table:has(.el-loading-mask) .wi-empty-state {
     visibility: hidden;
   }
+
+  /* ------------------------------------------------------------------
+     表格加载骨架
+     行高与真实行一致（44px），列宽节奏也接近，避免加载完成时页面整体跳动。
+     ------------------------------------------------------------------ */
+  .wi-skeleton {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 4px 0;
+  }
+  /* el-table 的空态容器默认居中：骨架需要铺满整行，空态文案仍需居中 */
+  .el-table__empty-block:has(.wi-skeleton) {
+    display: block;
+  }
+  .wi-skeleton-row {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    height: 44px;
+    padding: 0 12px;
+  }
+  .wi-skeleton-bar {
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(90deg, rgba(48, 49, 51, 0.06) 25%, rgba(48, 49, 51, 0.11) 37%, rgba(48, 49, 51, 0.06) 63%);
+    background-size: 400% 100%;
+    animation: wi-skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+  @keyframes wi-skeleton-shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+  }
+  /* 骨架已经表达了加载中，不再叠 spinner 遮罩 */
+  .wi-table .el-loading-mask {
+    display: none;
+  }
+
+  /* ------------------------------------------------------------------
+     对话框统一内边距与底部按钮间距
+     此前 10 个 el-dialog 各自依赖默认间距，标题/内容/按钮的呼吸感不一致；
+     宽度分档统一为 460（小）/ 520（标准表单）/ 640（复杂表单）。
+     ------------------------------------------------------------------ */
+  .el-dialog {
+    /* Element 在组件加载时才注入自身样式，晚于本文件；同时给变量和属性，避免被其默认值盖回 4px */
+    --el-dialog-border-radius: 16px;
+    border-radius: 16px !important;
+    padding: 0;
+    overflow: hidden;
+  }
+  .el-dialog__header {
+    padding: 20px 24px 4px;
+    margin-right: 0;
+  }
+  .el-dialog__title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .el-dialog__headerbtn {
+    top: 16px;
+    right: 16px;
+  }
+  .el-dialog__body {
+    padding: 12px 24px 4px;
+  }
+  .el-dialog__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 24px 20px;
+  }
+  /* Element 默认给相邻按钮加 margin-left，改用 gap 后要清掉，否则右侧多一格空白 */
+  .el-dialog__footer .el-button + .el-button {
+    margin-left: 0;
+  }
