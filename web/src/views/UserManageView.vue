@@ -8,6 +8,7 @@ import TableSkeleton from '@/components/common/TableSkeleton.vue'
 import TableEmpty from '@/components/common/TableEmpty.vue'
 import { useViewportWidth } from '@/composables/useViewportWidth'
 import { AVATAR_ACCEPT, validateAvatarFile } from '@/utils/avatar'
+import { required, maxLen, minLen, email, codePattern } from '@/utils/formRules'
 import { ElMessage } from 'element-plus'
 import { confirmDelete } from '@/utils/confirm'
 
@@ -120,6 +121,22 @@ function openEdit(raw: unknown) {
   form.password = ''
   form.isAdmin = !!u.isAdmin
   dialogOpen.value = true
+}
+
+/** 表单校验：新建时密码必填，编辑时留空表示不修改 */
+const userFormRef = ref<{ validate: () => Promise<boolean>; clearValidate: () => void } | null>(null)
+
+const userRules = computed(() => ({
+  username: editing.value ? [] : [required('用户名'), minLen(3, '用户名'), codePattern()],
+  displayName: [required('显示名'), maxLen(30, '显示名')],
+  email: [email()],
+  password: editing.value ? [minLen(6, '密码')] : [required('初始密码'), minLen(6, '密码')]
+}))
+
+async function onSubmitUser() {
+  const valid = await userFormRef.value?.validate().then(() => true).catch(() => false)
+  if (!valid) return
+  await save()
 }
 
 async function save() {
@@ -266,21 +283,17 @@ onMounted(load)
       <div class="absolute inset-0 bg-black/30" @click="dialogOpen = false" />
       <div class="glass-pop relative z-50 w-[420px] rounded-lg p-6">
         <h3 class="mb-4 text-base font-semibold text-ink">{{ editing ? '编辑用户' : '新建用户' }}</h3>
-        <div class="space-y-3">
-          <div>
-            <label class="label-base">用户名</label>
-            <input v-model="form.username" :disabled="!!editing" placeholder="登录账号，如 zhangsan" class="input-base disabled:bg-surface-hover" />
-          </div>
-          <div>
-            <label class="label-base">显示名</label>
-            <input v-model="form.displayName" placeholder="如 张三" class="input-base" />
-          </div>
-          <div>
-            <label class="label-base">邮箱</label>
-            <input v-model="form.email" placeholder="如 zhangsan@kanban.dev" class="input-base" />
-          </div>
-          <div>
-            <label class="label-base">头像</label>
+        <el-form ref="userFormRef" :model="form" :rules="userRules" label-width="88px" label-position="top">
+          <el-form-item label="用户名" prop="username">
+            <el-input v-model="form.username" :disabled="!!editing" placeholder="登录账号，如 zhangsan" />
+          </el-form-item>
+          <el-form-item label="显示名" prop="displayName">
+            <el-input v-model="form.displayName" placeholder="如 张三" />
+          </el-form-item>
+          <el-form-item label="邮箱" prop="email">
+            <el-input v-model="form.email" placeholder="如 zhangsan@kanban.dev" />
+          </el-form-item>
+          <el-form-item label="头像">
             <div class="flex items-center gap-3">
               <UserAvatar :name="form.displayName" :src="form.avatarUrl" :size="44" />
               <div class="flex items-center gap-2">
@@ -311,22 +324,20 @@ onMounted(load)
               />
             </div>
             <p class="mt-1.5 text-xs text-ink-secondary">支持 jpg / png / gif / webp，不超过 5MB</p>
-          </div>
-          <div>
-            <label class="label-base">系统管理员</label>
+          </el-form-item>
+          <el-form-item label="系统管理员">
             <label class="flex items-center gap-2 text-sm text-ink-regular">
               <input v-model="form.isAdmin" type="checkbox" />
               <span>可进入用户管理 / RBAC，并对全部项目拥有管理权</span>
             </label>
-          </div>
-          <div>
-            <label class="label-base">{{ editing ? '重置密码（留空不改）' : '初始密码（必填，至少 6 位）' }}</label>
-            <input v-model="form.password" type="password" :placeholder="editing ? '留空则不修改密码' : '请输入初始密码'" class="input-base" />
-          </div>
-        </div>
+          </el-form-item>
+          <el-form-item :label="editing ? '重置密码（留空不改）' : '初始密码（必填，至少 6 位）'" prop="password">
+            <el-input v-model="form.password" type="password" show-password :placeholder="editing ? '留空则不修改密码' : '请输入初始密码'" />
+          </el-form-item>
+        </el-form>
         <div class="mt-6 flex justify-end gap-2">
           <button class="rounded px-3.5 py-2 text-sm text-ink-secondary transition hover:bg-surface-hover" @click="dialogOpen = false">取消</button>
-          <button class="btn-primary" @click="save">保存</button>
+          <button class="btn-primary" @click="onSubmitUser">保存</button>
         </div>
       </div>
     </div>

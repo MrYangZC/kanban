@@ -78,6 +78,7 @@ const continueNext = ref(false)
 const submitting = ref(false)
 
 function reset() {
+  titleError.value = ''
   form.title = ''
   form.description = ''
   form.priority = 'P2'
@@ -114,11 +115,25 @@ watch(visible, (v) => {
   }
 })
 
-async function submit() {
-  if (!form.title.trim()) {
-    ElMessage.warning('请输入标题')
-    return
+/** 标题校验：字段级提示（失焦即时反馈，提交前再拦一次） */
+const titleError = ref('')
+
+function validateTitle(): boolean {
+  const value = form.title.trim()
+  if (!value) {
+    titleError.value = '请输入标题'
+    return false
   }
+  if (value.length > 120) {
+    titleError.value = '标题不能超过 120 个字符'
+    return false
+  }
+  titleError.value = ''
+  return true
+}
+
+async function submit() {
+  if (!validateTitle()) return
   submitting.value = true
   try {
     const issue = await createIssue({
@@ -181,9 +196,12 @@ function removeTagFromFields(id: string) {
           v-model="form.title"
           placeholder="请输入标题"
           maxlength="120"
-          class="w-full rounded border border-line px-3 py-2 text-sm outline-none focus:border-primary"
+          class="w-full rounded border px-3 py-2 text-sm outline-none focus:border-primary"
+          :class="titleError ? 'border-danger' : 'border-line'"
+          @blur="validateTitle"
           @keyup.ctrl.enter="submit"
         />
+        <p v-if="titleError" class="-mt-2 text-xs text-danger">{{ titleError }}</p>
         <div class="flex flex-1 flex-col">
           <label class="mb-1.5 text-xs text-ink-secondary">描述</label>
           <RichTextEditor

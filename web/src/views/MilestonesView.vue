@@ -65,20 +65,20 @@
 
     <template #footer>
       <el-dialog v-model="dialogVisible" :title="editing ? '编辑里程碑' : '新建里程碑'" width="520px" :close-on-click-modal="false">
-        <el-form :model="form" label-width="80px">
-          <el-form-item label="名称" required>
+        <el-form ref="editFormRef" :model="form" :rules="rules" label-width="80px">
+          <el-form-item label="名称" prop="name">
             <el-input v-model="form.name" />
           </el-form-item>
-          <el-form-item label="描述">
+          <el-form-item label="描述" prop="description">
             <el-input v-model="form.description" type="textarea" :rows="3" />
           </el-form-item>
-          <el-form-item label="截止日期">
+          <el-form-item label="截止日期" prop="dueDate">
             <el-date-picker v-model="form.dueDate" type="date" value-format="YYYY-MM-DD" />
           </el-form-item>
         </el-form>
         <template #footer>
           <el-button :disabled="submitting" @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="submitting" :disabled="submitting" @click="submit">确定</el-button>
+          <el-button type="primary" :loading="submitting" :disabled="submitting" @click="onSubmit">确定</el-button>
         </template>
       </el-dialog>
     </template>
@@ -86,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useEntityCrud } from '@/composables/useEntityCrud'
 import { Target, AlertCircle } from 'lucide-vue-next'
@@ -104,6 +104,7 @@ import TableEmpty from '@/components/common/TableEmpty.vue'
 import RowActions, { type RowAction } from '@/components/common/RowActions.vue'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { useViewportWidth } from '@/composables/useViewportWidth'
+import { required, maxLen } from '@/utils/formRules'
 import { MILESTONE_STATUS } from '@/constants/issueDict'
 
 const route = useRoute()
@@ -146,6 +147,20 @@ const {
 })
 
 /** el-table 插槽给的是宽松行类型，入口处收窄 */
+/** 表单校验：校验不通过时 Element 会把错误显示在对应输入框下方 */
+const editFormRef = ref<{ validate: () => Promise<boolean>; clearValidate: () => void } | null>(null)
+
+const rules = {
+  name: [required('名称'), maxLen(60, '名称')],
+  description: [maxLen(200, '描述')]
+}
+
+async function onSubmit() {
+  const valid = await editFormRef.value?.validate().then(() => true).catch(() => false)
+  if (!valid) return
+  await submit()
+}
+
 function rowActions(raw: unknown): RowAction[] {
   const row = raw as MilestoneVO
   return [

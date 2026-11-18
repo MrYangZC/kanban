@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import type { AnnouncementVO } from '@/api/types'
 import { createAnnouncement } from '@/api'
 import { reportError } from '@/utils/error'
+import { required, maxLen } from '@/utils/formRules'
 
 interface Props {
   announcements?: AnnouncementVO[]
@@ -27,6 +28,20 @@ function onAdd() {
   if (!props.projectId) return
   form.value = { title: '', content: '' }
   dialogVisible.value = true
+}
+
+/** 表单校验 */
+const annFormRef = ref<{ validate: () => Promise<boolean> } | null>(null)
+
+const rules = {
+  title: [required('标题'), maxLen(80, '标题')],
+  content: [maxLen(1000, '正文')]
+}
+
+async function onSubmit() {
+  const valid = await annFormRef.value?.validate().then(() => true).catch(() => false)
+  if (!valid) return
+  await submit()
 }
 
 async function submit() {
@@ -75,17 +90,17 @@ async function submit() {
     <!-- append-to-body 必须加：本卡片是 .glass-panel（backdrop-filter），
          它会成为 fixed 定位的包含块，弹窗不挂到 body 就会被裁在这张卡片里 -->
     <el-dialog v-model="dialogVisible" title="发布公告" width="520px" append-to-body>
-      <el-form :model="form" label-width="80px">
-        <el-form-item label="标题" required>
+      <el-form ref="annFormRef" :model="form" :rules="rules" label-width="80px">
+        <el-form-item label="标题" prop="title">
           <el-input v-model="form.title" placeholder="请输入公告标题" />
         </el-form-item>
-        <el-form-item label="正文">
+        <el-form-item label="正文" prop="content">
           <el-input v-model="form.content" type="textarea" :rows="4" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="submit">确定</el-button>
+        <el-button type="primary" :loading="submitting" @click="onSubmit">确定</el-button>
       </template>
     </el-dialog>
   </div>

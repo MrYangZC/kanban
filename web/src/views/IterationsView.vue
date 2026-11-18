@@ -70,23 +70,23 @@
 
     <template #footer>
       <el-dialog v-model="dialogVisible" :title="editing ? '编辑迭代' : '新建迭代'" width="520px" :close-on-click-modal="false">
-        <el-form :model="form" label-width="80px">
-          <el-form-item label="名称" required>
+        <el-form ref="editFormRef" :model="form" :rules="rules" label-width="80px">
+          <el-form-item label="名称" prop="name">
             <el-input v-model="form.name" placeholder="如 Sprint 1" />
           </el-form-item>
-          <el-form-item label="目标">
+          <el-form-item label="目标" prop="goal">
             <el-input v-model="form.goal" type="textarea" :rows="3" />
           </el-form-item>
-          <el-form-item label="开始日期">
+          <el-form-item label="开始日期" prop="startDate">
             <el-date-picker v-model="form.startDate" type="date" value-format="YYYY-MM-DD" />
           </el-form-item>
-          <el-form-item label="结束日期">
+          <el-form-item label="结束日期" prop="endDate">
             <el-date-picker v-model="form.endDate" type="date" value-format="YYYY-MM-DD" />
           </el-form-item>
         </el-form>
         <template #footer>
           <el-button :disabled="submitting" @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="submitting" :disabled="submitting" @click="submit">确定</el-button>
+          <el-button type="primary" :loading="submitting" :disabled="submitting" @click="onSubmit">确定</el-button>
         </template>
       </el-dialog>
     </template>
@@ -94,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { reportError } from '@/utils/error'
@@ -116,6 +116,7 @@ import TableEmpty from '@/components/common/TableEmpty.vue'
 import RowActions, { type RowAction } from '@/components/common/RowActions.vue'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { useViewportWidth } from '@/composables/useViewportWidth'
+import { required, maxLen, endNotBeforeStart } from '@/utils/formRules'
 import { SPRINT_STATUS } from '@/constants/issueDict'
 
 const route = useRoute()
@@ -159,6 +160,21 @@ const {
 })
 
 /** el-table 插槽给的是宽松行类型，入口处收窄，避免模板里写断言 */
+/** 表单校验：校验不通过时 Element 会把错误显示在对应输入框下方 */
+const editFormRef = ref<{ validate: () => Promise<boolean>; clearValidate: () => void } | null>(null)
+
+const rules = {
+  name: [required('名称'), maxLen(60, '名称')],
+  goal: [maxLen(200, '目标')],
+  endDate: [endNotBeforeStart(() => form.value)]
+}
+
+async function onSubmit() {
+  const valid = await editFormRef.value?.validate().then(() => true).catch(() => false)
+  if (!valid) return
+  await submit()
+}
+
 function rowActions(raw: unknown): RowAction[] {
   const row = raw as SprintVO
   return [

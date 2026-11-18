@@ -76,14 +76,14 @@
 
     <template #footer>
       <el-dialog v-model="dialogVisible" :title="editing ? '编辑风险' : '新建风险'" width="520px" :close-on-click-modal="false">
-        <el-form :model="form" label-width="80px">
-          <el-form-item label="标题" required>
+        <el-form ref="editFormRef" :model="form" :rules="rules" label-width="80px">
+          <el-form-item label="标题" prop="title">
             <el-input v-model="form.title" />
           </el-form-item>
-          <el-form-item label="描述">
+          <el-form-item label="描述" prop="description">
             <el-input v-model="form.description" type="textarea" :rows="3" />
           </el-form-item>
-          <el-form-item label="级别">
+          <el-form-item label="级别" prop="level">
             <el-select v-model="form.level">
               <el-option label="低" value="LOW" />
               <el-option label="中" value="MEDIUM" />
@@ -91,7 +91,7 @@
               <el-option label="严重" value="CRITICAL" />
             </el-select>
           </el-form-item>
-          <el-form-item label="状态">
+          <el-form-item label="状态" prop="status">
             <el-select v-model="form.status">
               <el-option label="待处理" value="OPEN" />
               <el-option label="缓解中" value="MITIGATING" />
@@ -108,13 +108,13 @@
               width-class="w-full"
             />
           </el-form-item>
-          <el-form-item label="截止日">
+          <el-form-item label="截止日" prop="dueDate">
             <el-date-picker v-model="form.dueDate" type="date" value-format="YYYY-MM-DD" />
           </el-form-item>
         </el-form>
         <template #footer>
           <el-button :disabled="submitting" @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="submitting" :disabled="submitting" @click="submit">确定</el-button>
+          <el-button type="primary" :loading="submitting" :disabled="submitting" @click="onSubmit">确定</el-button>
         </template>
       </el-dialog>
     </template>
@@ -144,6 +144,7 @@ import TableEmpty from '@/components/common/TableEmpty.vue'
 import RowActions, { type RowAction } from '@/components/common/RowActions.vue'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { useViewportWidth } from '@/composables/useViewportWidth'
+import { required, requiredSelect, maxLen } from '@/utils/formRules'
 import { RISK_LEVEL, RISK_STATUS } from '@/constants/issueDict'
 
 const route = useRoute()
@@ -180,6 +181,22 @@ function rowActions(raw: unknown): RowAction[] {
     { label: '编辑', onClick: () => openEdit(row) },
     { label: '删除', tone: 'danger', disabled: !canManage.value, onClick: () => doDelete(row) }
   ]
+}
+
+/** 表单校验：校验不通过时 Element 会把错误显示在对应输入框下方 */
+const editFormRef = ref<{ validate: () => Promise<boolean>; clearValidate: () => void } | null>(null)
+
+const rules = {
+  title: [required('风险标题'), maxLen(80, '风险标题')],
+  description: [maxLen(300, '描述')],
+  level: [requiredSelect('级别')],
+  status: [requiredSelect('状态')]
+}
+
+async function onSubmit() {
+  const valid = await editFormRef.value?.validate().then(() => true).catch(() => false)
+  if (!valid) return
+  await submit()
 }
 
 const filteredRisks = computed(() => {

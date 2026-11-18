@@ -21,6 +21,8 @@
   --surface-page: #f5f7fa;
   --success: #52c41a;
   --danger: #f56c6c;
+  /* 错误文案用更深一档的红：小字用 #f56c6c 在白底只有约 3.3:1，达不到 4.5:1 */
+  --danger-text: #c92a2a;
 
   /* ------------------------------------------------------------------
      Liquid Glass 材质令牌
@@ -1418,4 +1420,18 @@ body {
   }
   .wi-toast-undo-wrap .el-notification__content {
     margin-top: 0;
+  }
+
+  /* 表单校验错误文案：Element 默认 #f56c6c 对比度不足，改用 --danger-text */
+  .el-form-item__error {
+    /* Element 的样式在组件加载时注入、晚于本文件；同时改变量并加 !important 才稳定生效 */
+    --el-color-danger: var(--danger-text);
+    color: var(--danger-text) !important;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  /* 校验失败时输入框的描边也统一用这个红 */
+  .el-form-item.is-error .el-input__wrapper,
+  .el-form-item.is-error .el-textarea__inner {
+    box-shadow: 0 0 0 1px var(--danger-text) inset;
   }

@@ -224,27 +224,23 @@
       <div class="absolute inset-0 bg-black/30" @click="roleVisible = false" />
       <div class="glass-pop relative z-50 w-[460px] rounded-lg p-6">
         <h3 class="mb-4 text-base font-semibold text-ink">{{ roleEditing ? '编辑角色' : '新建角色' }}</h3>
-        <div class="space-y-3">
-          <div>
-            <label class="label-base">编码</label>
-            <input v-model="roleForm.code" placeholder="如 PROJECT_ADMIN" class="input-base" />
-          </div>
-          <div>
-            <label class="label-base">名称</label>
-            <input v-model="roleForm.name" placeholder="如 项目管理员" class="input-base" />
-          </div>
-          <div>
-            <label class="label-base">描述</label>
-            <textarea v-model="roleForm.description" rows="2" placeholder="可选" class="input-base resize-none"></textarea>
-          </div>
-          <div>
-            <label class="label-base">排序</label>
-            <input v-model.number="roleForm.sortOrder" type="number" min="0" class="input-base" />
-          </div>
-        </div>
+        <el-form ref="roleFormRef" :model="roleForm" :rules="roleRules" label-width="64px" label-position="top">
+          <el-form-item label="编码" prop="code">
+            <el-input v-model="roleForm.code" placeholder="如 PROJECT_ADMIN" />
+          </el-form-item>
+          <el-form-item label="名称" prop="name">
+            <el-input v-model="roleForm.name" placeholder="如 项目管理员" />
+          </el-form-item>
+          <el-form-item label="描述" prop="description">
+            <el-input v-model="roleForm.description" type="textarea" :rows="2" placeholder="可选" />
+          </el-form-item>
+          <el-form-item label="排序" prop="sortOrder">
+            <el-input v-model.number="roleForm.sortOrder" type="number" min="0" />
+          </el-form-item>
+        </el-form>
         <div class="mt-6 flex justify-end gap-2">
           <button class="rounded px-3.5 py-2 text-sm text-ink-secondary transition hover:bg-surface-hover" @click="roleVisible = false">取消</button>
-          <button class="btn-primary" @click="submitRole">确定</button>
+          <button class="btn-primary" @click="onSubmitRole">确定</button>
         </div>
       </div>
     </div>
@@ -254,17 +250,14 @@
       <div class="absolute inset-0 bg-black/30" @click="menuVisible = false" />
       <div class="glass-pop relative z-50 w-[460px] rounded-lg p-6">
         <h3 class="mb-4 text-base font-semibold text-ink">{{ menuEditing ? '编辑菜单' : '新建菜单' }}</h3>
-        <div class="space-y-3">
-          <div>
-            <label class="label-base">编码</label>
-            <input v-model="menuForm.code" placeholder="如 nav.tasks" class="input-base" />
-          </div>
-          <div>
-            <label class="label-base">名称</label>
-            <input v-model="menuForm.name" placeholder="如 任务" class="input-base" />
-          </div>
-          <div>
-            <label class="label-base">父级</label>
+        <el-form ref="menuFormRef" :model="menuForm" :rules="menuRules" label-width="64px" label-position="top">
+          <el-form-item label="编码" prop="code">
+            <el-input v-model="menuForm.code" placeholder="如 nav.tasks" />
+          </el-form-item>
+          <el-form-item label="名称" prop="name">
+            <el-input v-model="menuForm.name" placeholder="如 任务" />
+          </el-form-item>
+          <el-form-item label="父级">
             <el-tree-select
               v-model="parentSelectValue"
               :data="parentTreeOptions"
@@ -275,16 +268,15 @@
               :expand-on-click-node="false"
               class="w-full"
             />
-            <p class="mt-1 text-xs text-ink-placeholder">缩进即层级；父级不可选自身及其下级</p>
-          </div>
-          <div>
-            <label class="label-base">排序</label>
-            <input v-model.number="menuForm.sortOrder" type="number" min="0" class="input-base" />
-          </div>
-        </div>
+            <p class="mt-1 text-xs text-ink-quiet">缩进即层级；父级不可选自身及其下级</p>
+          </el-form-item>
+          <el-form-item label="排序" prop="sortOrder">
+            <el-input v-model.number="menuForm.sortOrder" type="number" min="0" />
+          </el-form-item>
+        </el-form>
         <div class="mt-6 flex justify-end gap-2">
           <button class="rounded px-3.5 py-2 text-sm text-ink-secondary transition hover:bg-surface-hover" @click="menuVisible = false">取消</button>
-          <button class="btn-primary" @click="submitMenu">确定</button>
+          <button class="btn-primary" @click="onSubmitMenu">确定</button>
         </div>
       </div>
     </div>
@@ -315,6 +307,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmRemove } from '@/utils/confirm'
+import { required, maxLen, codePattern } from '@/utils/formRules'
 import { isCancel, reportError } from '@/utils/error'
 import { Check, File, Folder, FolderKanban, KeyRound, ListTree, Menu, Pencil, Plus, ShieldCheck, Trash2, Users } from 'lucide-vue-next'
 import ScopeNav, { type ScopeNavGroup } from '@/components/ScopeNav.vue'
@@ -481,6 +474,33 @@ function openRole(raw?: unknown) {
     : { code: '', name: '', description: '', sortOrder: 0 }
   roleVisible.value = true
 }
+/** 角色/菜单表单校验 */
+const roleFormRef = ref<{ validate: () => Promise<boolean> } | null>(null)
+const menuFormRef = ref<{ validate: () => Promise<boolean> } | null>(null)
+
+const roleRules = {
+  code: [required('编码'), maxLen(40, '编码'), codePattern()],
+  name: [required('名称'), maxLen(40, '名称')],
+  description: [maxLen(200, '描述')]
+}
+
+const menuRules = {
+  code: [required('编码'), maxLen(60, '编码')],
+  name: [required('名称'), maxLen(40, '名称')]
+}
+
+async function onSubmitRole() {
+  const valid = await roleFormRef.value?.validate().then(() => true).catch(() => false)
+  if (!valid) return
+  await submitRole()
+}
+
+async function onSubmitMenu() {
+  const valid = await menuFormRef.value?.validate().then(() => true).catch(() => false)
+  if (!valid) return
+  await submitMenu()
+}
+
 async function submitRole() {
   if (!roleForm.value.code.trim() || !roleForm.value.name.trim()) { ElMessage.warning('编码和名称必填'); return }
   try {

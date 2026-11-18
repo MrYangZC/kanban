@@ -17,6 +17,7 @@ import ProjectMemberDialog from '@/components/ProjectMemberDialog.vue'
 import { Plus, Menu, Sparkles } from 'lucide-vue-next'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { reportError } from '@/utils/error'
+import { required, maxLen } from '@/utils/formRules'
 
 const router = useRouter()
 const store = useProjectCategoryStore()
@@ -87,6 +88,20 @@ function openEdit(p: Project) {
   }
   editForm.value = { id: p.id, name: p.name, description: p.description }
   editDialogVisible.value = true
+}
+
+/** 表单校验：错误显示在对应字段下方，而不是提交后弹一句 toast */
+const editFormRef = ref<{ validate: () => Promise<boolean>; clearValidate: () => void } | null>(null)
+
+const editRules = {
+  name: [required('项目名称'), maxLen(60, '项目名称')],
+  description: [maxLen(200, '项目描述')]
+}
+
+async function onSubmitEdit() {
+  const valid = await editFormRef.value?.validate().then(() => true).catch(() => false)
+  if (!valid) return
+  await submitEdit()
 }
 
 async function submitEdit() {
@@ -238,21 +253,17 @@ onMounted(async () => {
 
 
         <el-dialog v-model="editDialogVisible" title="编辑项目" width="460px">
-          <div class="space-y-4">
-            <div>
-              <label class="label-base">项目名称</label>
-              <input v-model="editForm.name" class="input-base" placeholder="项目名称" />
-            </div>
-            <div>
-              <label class="label-base">项目描述</label>
-              <textarea v-model="editForm.description" rows="3" class="input-base resize-none" placeholder="项目描述（可选）"></textarea>
-            </div>
-          </div>
+          <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="80px">
+            <el-form-item label="项目名称" prop="name">
+              <el-input v-model="editForm.name" placeholder="项目名称" />
+            </el-form-item>
+            <el-form-item label="项目描述" prop="description">
+              <el-input v-model="editForm.description" type="textarea" :rows="3" placeholder="项目描述（可选）" />
+            </el-form-item>
+          </el-form>
           <template #footer>
-            <div class="flex justify-end gap-2">
-              <button class="btn-default" @click="editDialogVisible = false">取消</button>
-              <button class="btn-primary disabled:opacity-50" :disabled="editing" @click="submitEdit">{{ editing ? '保存中…' : '保存' }}</button>
-            </div>
+            <el-button :disabled="editing" @click="editDialogVisible = false">取消</el-button>
+            <el-button type="primary" :loading="editing" :disabled="editing" @click="onSubmitEdit">保存</el-button>
           </template>
         </el-dialog>
 
