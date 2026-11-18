@@ -10,8 +10,8 @@
  *   <li><b>与业务无关的排版</b>：优先级色点、子任务数量徽标、根节点浅底。</li>
  * </ol>
  *
- * <p>相比改造前，丢了"层级引导竖线"（el-table 的树形只做缩进，无自定义竖线能力），
- * 换来列宽可拖拽与统一组件行为。
+ * <p>层级引导竖线由 style.css 在首列 td 上按 wi-depth-N 绘制（行上带层级类），
+ * 因此迁移到 el-table 后仍保留了"这行属于谁"的可视引导。
  */
 import { computed, nextTick, ref, watch } from 'vue'
 import { ChevronsDownUp, ChevronsUpDown, GitBranch } from 'lucide-vue-next'
@@ -238,7 +238,7 @@ function assigneeName(raw: unknown) {
 /**
  * 每个节点在树中的层级。
  * el-table 的树形只做缩进、不画层级引导线，而 238 条摊平后很难看出「这行属于谁」，
- * 所以在行上带一个 wi-depth-N 类，由 style.css 在首列画竖线（深度改为 1-6 级全覆盖）。
+ * 所以在行上带一个 wi-depth-N 类，由 style.css 在首列画竖线（深度 1-8 级全覆盖）。
  */
 const depthMap = computed(() => {
   const map = new Map<string, number>()
