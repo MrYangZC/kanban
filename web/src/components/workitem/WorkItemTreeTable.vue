@@ -235,11 +235,30 @@ function assigneeName(raw: unknown) {
   return props.memberName ? props.memberName(node.assigneeId) : (node.assigneeName || '')
 }
 
-/** 行样式：根节点浅底 + 选中态（el-table 不提供选中底色） */
+/**
+ * 每个节点在树中的层级。
+ * el-table 的树形只做缩进、不画层级引导线，而 238 条摊平后很难看出「这行属于谁」，
+ * 所以在行上带一个 wi-depth-N 类，由 style.css 在首列画竖线（深度改为 1-6 级全覆盖）。
+ */
+const depthMap = computed(() => {
+  const map = new Map<string, number>()
+  const walk = (list: IssueTreeNode[], depth: number) => {
+    for (const node of list) {
+      map.set(node.id, depth)
+      if (node.children?.length) walk(node.children, depth + 1)
+    }
+  }
+  walk(props.nodes, 0)
+  return map
+})
+
+/** 行样式：根节点浅底 + 选中态（el-table 不提供选中底色）+ 层级（用于画引导线） */
 function rowClass({ row }: { row: IssueTreeNode }) {
   const classes: string[] = []
   if (!row.parentId) classes.push('wi-row-root')
   if (isChecked(row.id)) classes.push('wi-row-selected')
+  const depth = depthMap.value.get(row.id)
+  if (depth) classes.push(`wi-depth-${depth}`)
   return classes.join(' ')
 }
 </script>
