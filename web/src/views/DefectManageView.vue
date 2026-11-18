@@ -14,6 +14,8 @@ import type {
 } from '@/api/types'
 import { ElMessage } from 'element-plus'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
+import WorkItemStatsBar from '@/components/workitem/WorkItemStatsBar.vue'
+import type { WorkItemStat } from '@/components/workitem/WorkItemStatsBar.vue'
 import TableSkeleton from '@/components/common/TableSkeleton.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import SimpleListView from '@/components/SimpleListView.vue'
@@ -70,6 +72,28 @@ const tableData = ref<Issue[]>([])
 const allIssues = ref<Issue[]>([])
 
 const board = ref<BoardGroupView | null>(null)
+/** 统计条：与需求/任务页同一套语义（按状态 category 汇总） */
+const statItems = computed<WorkItemStat[]>(() => {
+  const source =
+    view.value === 'board' && board.value
+      ? board.value.groups.flatMap((g) => g.columns.flatMap((c) => c.issues))
+      : view.value === 'tree'
+        ? allIssues.value
+        : tableData.value
+  const byCategory: Record<string, number> = {}
+  const categoryOf = (statusId: string) => statuses.value.find((st) => st.id === statusId)?.category || 'TODO'
+  for (const i of source) {
+    const c = categoryOf(i.statusId)
+    byCategory[c] = (byCategory[c] || 0) + 1
+  }
+  return [
+    { key: 'total', label: '全部缺陷', value: source.length, color: 'var(--primary)' },
+    { key: 'todo', label: '待处理', value: byCategory.TODO || 0, color: 'var(--ink-secondary)' },
+    { key: 'inProgress', label: '处理中', value: byCategory.IN_PROGRESS || 0, color: '#e6a23c' },
+    { key: 'done', label: '已修复', value: byCategory.DONE || 0, color: 'var(--success)' }
+  ]
+})
+
 const filteredIds = ref<Set<string>>(new Set())
 
 // 工作流流转规则：from statusId → 允许的 to statusId 集合
@@ -376,6 +400,9 @@ onMounted(() => {
     @create="onNewIssue"
     @back="back"
   >
+    <template #stats>
+      <WorkItemStatsBar :items="statItems" />
+    </template>
     <template #header-extra>
       <div v-if="activeFilterLabel" class="flex items-center gap-1.5">
         <span class="rounded-full bg-brand-light px-2.5 py-1 text-xs text-brand">筛选：{{ activeFilterLabel }}</span>
@@ -496,9 +523,18 @@ onMounted(() => {
     </div>
 
     <!-- 看板视图 -->
-    <div v-else class="kanban-page">
-      <div v-for="g in renderGroups" :key="g.groupKey" class="kanban-group h-full">
-        <div class="kanban-group-head">
+    <!-- 看板视图：与列表/树形共用同一套页面外壳（.wi-page + .wi-card + 卡片头） -->
+    <div v-else class="wi-page">
+      <div class="wi-card glass-panel">
+        <div class="wi-card-head">
+          <Bug :size="16" class="text-brand" />
+          <span class="wi-card-title">全部缺陷</span>
+          <span class="count-pill">{{ total }}</span>
+          <span class="ml-auto text-xs text-ink-secondary">按状态分列，拖拽卡片可改状态</span>
+        </div>
+        <div class="kanban-page">
+          <div v-for="g in renderGroups" :key="g.groupKey" class="kanban-group h-full">
+        <div v-if="renderGroups.length > 1" class="kanban-group-head">
           <span class="text-sm font-semibold text-ink">{{ g.groupName }}</span>
           <span class="count-pill">{{ g.issueCount }}</span>
         </div>
@@ -562,6 +598,8 @@ onMounted(() => {
                 </div>
               </template>
             </draggable>
+          </div>
+        </div>
           </div>
         </div>
       </div>

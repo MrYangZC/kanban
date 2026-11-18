@@ -247,7 +247,13 @@ async function loadStats() {
 
 /** 统计条：标签 + 彩色数字 + 图标，语义取自状态字典的 category */
 const statItems = computed<WorkItemStat[]>(() => {
-  const source = view.value === 'tree' ? allIssues.value : statsIssues.value
+  // 看板的行数据在 renderGroups 里（按状态分列），不能用分页的 statsIssues，否则统计会是 0
+  const source =
+    view.value === 'board' && board.value
+      ? board.value.groups.flatMap((g) => g.columns.flatMap((c) => c.issues))
+      : view.value === 'tree'
+        ? allIssues.value
+        : statsIssues.value
   const byCategory: Record<string, number> = {}
   const categoryOf = (statusId: string) =>
     statuses.value.find((s) => s.id === statusId)?.category || 'TODO'
@@ -485,7 +491,7 @@ onMounted(() => {
     @create="openCreate"
   >
     <template #stats>
-      <WorkItemStatsBar v-if="view !== 'board'" :items="statItems" />
+      <WorkItemStatsBar :items="statItems" />
     </template>
     <template #header-extra>
       <div v-if="activeFilterLabel" class="flex items-center gap-1.5">
@@ -603,14 +609,22 @@ onMounted(() => {
         </template>
       </WorkItemTreeTable>
     </div>
-    <!-- 看板视图 -->
-    <div v-else class="kanban-page">
-      <div
-        v-for="g in renderGroups"
-        :key="g.groupKey"
-        class="kanban-group h-full"
-      >
-        <div class="kanban-group-head">
+    <!-- 看板视图：与列表/树形共用同一套页面外壳（.wi-page + .wi-card + 卡片头） -->
+    <div v-else class="wi-page">
+      <div class="wi-card glass-panel">
+        <div class="wi-card-head">
+          <component :is="icon" :size="16" class="text-brand" />
+          <span class="wi-card-title">全部{{ noun }}</span>
+          <span class="count-pill">{{ total }}</span>
+          <span class="ml-auto text-xs text-ink-secondary">按状态分列，拖拽卡片可改状态</span>
+        </div>
+        <div class="kanban-page">
+          <div
+            v-for="g in renderGroups"
+            :key="g.groupKey"
+            class="kanban-group h-full"
+          >
+        <div v-if="renderGroups.length > 1" class="kanban-group-head">
           <span class="text-sm font-semibold text-ink">{{ g.groupName }}</span>
           <span class="count-pill">{{ g.issueCount }}</span>
         </div>
@@ -666,6 +680,8 @@ onMounted(() => {
                 </div>
               </template>
             </draggable>
+          </div>
+        </div>
           </div>
         </div>
       </div>
