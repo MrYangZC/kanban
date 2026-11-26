@@ -10,10 +10,10 @@ import {
 import { useProjectStore } from '@/stores/project'
 import { useUserStore } from '@/stores/user'
 import type { ProjectMember } from '@/api/types'
-import { Settings, Users, UserPlus, Trash2, Crown, CalendarClock, KeyRound, Hash } from 'lucide-vue-next'
+import { Settings, Users, UserPlus, Trash2, Crown, KeyRound, Info } from 'lucide-vue-next'
+import ProjectInfoCard from '@/components/overview/ProjectInfoCard.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import AddMemberDialog from '@/components/project/AddMemberDialog.vue'
-import { projectStatusBadge } from '@/constants/issueDict'
 import { ElMessage } from 'element-plus'
 import { confirmDelete } from '@/utils/confirm'
 import { reportError } from '@/utils/error'
@@ -80,14 +80,18 @@ const canManage = computed(() => {
 
 /** 右侧信息卡的数据：全部来自 project store，不额外请求 */
 const current = computed(() => projectStore.current)
-const statusBadge = computed(() => projectStatusBadge(form.value.status))
-const createdAt = computed(() => current.value?.createdAt?.slice(0, 10) || '—')
 
 /**
  * 是否有未保存的改动。
  * 表单原先无论改没改都能点保存，点了还会提示"设置已保存"，
  * 让人以为改了东西；这里按值与当前项目比对，没改动时按钮置灰。
  */
+/** 项目负责人：取成员里带 OWNER 角色的人，供顶部项目信息卡展示 */
+const leadName = computed(() => {
+  const owner = members.value.find((m) => m.roles.includes('OWNER'))
+  return owner?.displayName || ''
+})
+
 const dirty = computed(() => {
   const p = current.value
   if (!p) return false
@@ -227,30 +231,24 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-full overflow-auto">
-    <div class="mx-auto w-full max-w-[1180px] px-6 py-6">
-      <!-- 页头：标题 + 归属项目，明确"这一页改的是哪个项目" -->
-      <header class="mb-5 flex items-start gap-3">
-        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
-          <Settings :size="18" />
-        </div>
-        <div class="min-w-0">
-          <h1 class="text-lg font-semibold text-ink">项目设置</h1>
-          <p class="mt-0.5 truncate text-xs text-ink-secondary">
-            {{ current?.name || '—' }} · {{ current?.projectKey || '—' }} · 管理基本信息与成员权限
-          </p>
-        </div>
-      </header>
+  <!-- 与概览页同一套页面骨架：p-6 全宽 + space-y-4 纵向堆叠 + 卡片 gap-4 -->
+  <div class="h-full overflow-auto p-6">
+    <div class="space-y-4">
+      <!-- 顶部直接复用概览页的项目信息卡：同一个组件，改设置时看到的项目抬头与概览页完全一致 -->
+      <ProjectInfoCard v-if="current" :project="current" :lead-name="leadName" />
 
-      <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <!-- 基本信息：占两栏，字段两列排布，描述整行 -->
-        <section class="glass-panel overflow-hidden rounded-xl lg:col-span-2">
-          <div class="flex items-center gap-2 border-b border-line-lighter px-5 py-3">
-            <span class="wi-card-title">基本信息</span>
-            <span v-if="dirty" class="rounded-full bg-warning-bg px-2 py-0.5 text-[11px] text-warning">未保存</span>
+      <!-- 基本信息 -->
+      <section class="glass-panel rounded-lg">
+        <div class="flex items-center justify-between border-b border-line-light px-4 py-3">
+          <div class="flex items-center gap-2 text-sm font-medium text-ink-900">
+            <Settings :size="16" class="text-brand" /> 基本信息
+            <span v-if="dirty" class="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">未保存</span>
           </div>
-          <el-form label-position="top" class="p-5" @submit.prevent>
-            <div class="grid grid-cols-1 gap-x-5 sm:grid-cols-2">
+          <span class="text-xs text-ink-400">修改后点「保存」生效</span>
+        </div>
+        <div class="p-4">
+          <el-form label-position="top" @submit.prevent>
+            <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
               <el-form-item label="项目名称" required>
                 <el-input v-model="form.name" maxlength="60" show-word-limit placeholder="请输入项目名称" />
               </el-form-item>
@@ -272,159 +270,125 @@ onMounted(async () => {
               />
             </el-form-item>
             <el-form-item label="项目 Key">
-              <el-input :model-value="current?.projectKey || ''" disabled>
-                <template #prefix><KeyRound :size="13" /></template>
-              </el-input>
-              <div class="mt-1 text-xs text-ink-secondary">创建后不可修改，用于工作项编号前缀（如 P161-3189）</div>
+              <!-- el-form-item 的 content 是 flex 容器，不包一层的话说明文字会被挤到输入框右侧 -->
+              <div class="w-full">
+                <el-input :model-value="current?.projectKey || ''" disabled class="sm:max-w-xs">
+                  <template #prefix><KeyRound :size="13" /></template>
+                </el-input>
+                <div class="mt-1 text-xs text-ink-400">创建后不可修改，用于工作项编号前缀（如 P161-3189）</div>
+              </div>
             </el-form-item>
-            <div class="mt-1 flex items-center justify-end gap-2">
-              <span v-if="dirty" class="text-xs text-ink-secondary">有未保存的修改</span>
+            <div class="flex items-center justify-end gap-2 border-t border-line-light pt-4">
+              <span v-if="dirty" class="mr-auto text-xs text-ink-400">有未保存的修改</span>
               <el-button :disabled="saving || !dirty" @click="resetForm">重置</el-button>
-              <el-button type="primary" :loading="saving" :disabled="saving || !dirty" @click="onSave">
-                保存
-              </el-button>
+              <el-button type="primary" :loading="saving" :disabled="saving || !dirty" @click="onSave">保存</el-button>
             </div>
           </el-form>
-        </section>
+        </div>
+      </section>
 
-        <!-- 项目信息：只读摘要，把"值"从表单里拆出来，避免表单字段又当展示又当编辑 -->
-        <section class="glass-panel h-fit overflow-hidden rounded-xl">
-          <div class="border-b border-line-lighter px-5 py-3">
-            <span class="wi-card-title">项目信息</span>
+      <!-- 成员管理 -->
+      <section class="glass-panel overflow-hidden rounded-lg">
+        <div class="flex items-center justify-between border-b border-line-light px-4 py-3">
+          <div class="flex items-center gap-2 text-sm font-medium text-ink-900">
+            <Users :size="16" class="text-brand" /> 成员管理
+            <span class="text-xs font-normal text-ink-400">共 {{ members.length }} 人</span>
           </div>
-          <dl class="divide-y divide-line-lighter">
-            <div class="flex items-center justify-between gap-3 px-5 py-3">
-              <dt class="flex items-center gap-1.5 text-xs text-ink-secondary"><Hash :size="13" />项目 Key</dt>
-              <dd><span class="project-key">{{ current?.projectKey || '—' }}</span></dd>
-            </div>
-            <div class="flex items-center justify-between gap-3 px-5 py-3">
-              <dt class="text-xs text-ink-secondary">当前状态</dt>
-              <dd>
-                <span class="project-badge" :class="statusBadge.cls">
-                  <span class="h-1.5 w-1.5 rounded-full" :class="statusBadge.dot"></span>
-                  {{ statusBadge.label }}
-                </span>
-              </dd>
-            </div>
-            <div class="flex items-center justify-between gap-3 px-5 py-3">
-              <dt class="flex items-center gap-1.5 text-xs text-ink-secondary"><Users :size="13" />成员</dt>
-              <dd class="text-sm font-medium text-ink">{{ members.length }} 人</dd>
-            </div>
-            <div class="flex items-center justify-between gap-3 px-5 py-3">
-              <dt class="flex items-center gap-1.5 text-xs text-ink-secondary"><CalendarClock :size="13" />创建于</dt>
-              <dd class="text-sm text-ink-secondary">{{ createdAt }}</dd>
-            </div>
-          </dl>
-        </section>
+          <el-button v-if="canManage" type="primary" size="small" :icon="UserPlus" @click="addDialogVisible = true">
+            添加成员
+          </el-button>
+          <span v-else class="text-xs text-ink-400">仅所有者/管理员/项目经理可调整成员</span>
+        </div>
 
-        <!-- 成员管理：卡片头 + 表格，行内展开改角色 -->
-        <section class="glass-panel overflow-hidden rounded-xl lg:col-span-3">
-          <div class="flex items-center gap-2 border-b border-line-lighter px-5 py-3">
-            <Users :size="15" class="text-primary-600" />
-            <span class="wi-card-title">成员管理</span>
-            <span class="count-pill">{{ members.length }}</span>
-            <div class="ml-auto flex items-center gap-2">
-              <span v-if="!canManage" class="text-xs text-ink-secondary">仅所有者/管理员/项目经理可调整成员</span>
-              <el-button v-else type="primary" size="small" :icon="UserPlus" @click="addDialogVisible = true">
-                添加成员
-              </el-button>
-            </div>
-          </div>
-
-          <div class="wi-table project-table border-t border-line-lighter">
-          <el-table
-            v-loading="loadingMembers"
-            :data="members"
-            row-key="userId"
-            class="wi-el-table"
-            :expand-row-keys="expandedKeys"
-            @expand-change="onExpandChange"
-          >
-            <el-table-column type="expand" width="40">
-              <template #default="{ row }">
-                <div class="bg-surface-page/60 px-5 py-4">
-                  <div class="mb-2 text-xs text-ink-secondary">
-                    调整「{{ row.displayName }}」在当前项目中的角色（可多选）
-                  </div>
-                  <el-checkbox-group v-model="editingRoles">
-                    <el-checkbox v-for="o in ROLE_OPTIONS" :key="o.value" :value="o.value" class="mr-4">
-                      {{ o.label }}
-                    </el-checkbox>
-                  </el-checkbox-group>
-                  <div class="mt-3 flex justify-end gap-2">
-                    <el-button size="small" @click="cancelEditRoles">取消</el-button>
-                    <el-button
-                      size="small"
-                      type="primary"
-                      :loading="savingRoles === row.userId"
-                      :disabled="!editingRoles.length"
-                      @click="saveRoles(asMember(row))"
-                    >
-                      保存角色
-                    </el-button>
-                  </div>
+        <el-table
+          v-loading="loadingMembers"
+          :data="members"
+          row-key="userId"
+          class="wi-el-table"
+          :expand-row-keys="expandedKeys"
+          @expand-change="onExpandChange"
+        >
+          <el-table-column type="expand" width="40">
+            <template #default="{ row }">
+              <div class="bg-surface-page/60 px-5 py-4">
+                <div class="mb-2 flex items-center gap-1.5 text-xs text-ink-400">
+                  <Info :size="13" /> 调整「{{ asMember(row).displayName }}」在当前项目中的角色（可多选）
                 </div>
-              </template>
-            </el-table-column>
-
-            <el-table-column label="成员" min-width="200">
-              <template #default="{ row }">
-                <div class="flex items-center gap-2.5">
-                  <UserAvatar :name="row.displayName" :src="row.avatarUrl" :size="28" />
-                  <div class="min-w-0">
-                    <div class="truncate text-[13px] font-medium text-ink">{{ row.displayName }}</div>
-                    <div class="truncate text-[11px] text-ink-secondary">@{{ row.username }}</div>
-                  </div>
-                </div>
-              </template>
-            </el-table-column>
-
-            <el-table-column label="角色" min-width="220">
-              <template #default="{ row }">
-                <div class="flex flex-wrap gap-1">
-                  <span
-                    v-for="r in row.roles"
-                    :key="r"
-                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
-                    :class="roleClass(r)"
+                <el-checkbox-group v-model="editingRoles">
+                  <el-checkbox v-for="o in ROLE_OPTIONS" :key="o.value" :value="o.value" class="mr-4">
+                    {{ o.label }}
+                  </el-checkbox>
+                </el-checkbox-group>
+                <div class="mt-3 flex justify-end gap-2">
+                  <el-button size="small" @click="cancelEditRoles">取消</el-button>
+                  <el-button
+                    size="small"
+                    type="primary"
+                    :loading="savingRoles === asMember(row).userId"
+                    :disabled="!editingRoles.length"
+                    @click="saveRoles(asMember(row))"
                   >
-                    <Crown v-if="r === 'OWNER'" :size="10" class="mr-0.5" />{{ roleLabel(r) }}
-                  </span>
+                    保存角色
+                  </el-button>
                 </div>
-              </template>
-            </el-table-column>
-
-            <el-table-column label="加入时间" width="120">
-              <template #default="{ row }">
-                <span class="project-date">{{ asMember(row).createdAt?.slice(0, 10) || '—' }}</span>
-              </template>
-            </el-table-column>
-
-            <el-table-column v-if="canManage" label="操作" width="150" align="right">
-              <template #default="{ row }">
-                <div class="flex items-center justify-end gap-1">
-                  <button class="project-icon-btn" title="编辑角色" @click.stop="toggleRoles(asMember(row))">
-                    <Crown :size="14" />
-                  </button>
-                  <button class="project-icon-btn hover:!text-danger" title="移除成员" @click.stop="onRemoveMember(asMember(row))">
-                    <Trash2 :size="14" />
-                  </button>
-                  <button class="project-enter" @click.stop="toggleRoles(asMember(row))">
-                    角色
-                  </button>
-                </div>
-              </template>
-            </el-table-column>
-
-            <template #empty>
-              <div class="py-10 text-center text-sm text-ink-secondary">暂无成员</div>
+              </div>
             </template>
-          </el-table>
-          </div>
-        </section>
-      </div>
+          </el-table-column>
 
-      <AddMemberDialog v-model:visible="addDialogVisible" :project-id="projectId" @added="reloadMembers" />
+          <el-table-column label="成员" min-width="220">
+            <template #default="{ row }">
+              <div class="flex items-center gap-2.5">
+                <UserAvatar :name="asMember(row).displayName" :src="asMember(row).avatarUrl" :size="28" />
+                <div class="min-w-0">
+                  <div class="truncate text-[13px] font-medium text-ink">{{ asMember(row).displayName }}</div>
+                  <div class="truncate text-[11px] text-ink-400">@{{ asMember(row).username }}</div>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="角色" min-width="220">
+            <template #default="{ row }">
+              <div class="flex flex-wrap gap-1">
+                <span
+                  v-for="r in asMember(row).roles"
+                  :key="r"
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
+                  :class="roleClass(r)"
+                >
+                  <Crown v-if="r === 'OWNER'" :size="10" class="mr-0.5" />{{ roleLabel(r) }}
+                </span>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="加入时间" width="120">
+            <template #default="{ row }">
+              <span class="project-date">{{ asMember(row).createdAt?.slice(0, 10) || '—' }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column v-if="canManage" label="操作" width="150" align="right">
+            <template #default="{ row }">
+              <div class="flex items-center justify-end gap-1">
+                <button class="project-icon-btn" title="编辑角色" @click.stop="toggleRoles(asMember(row))">
+                  <Crown :size="14" />
+                </button>
+                <button class="project-icon-btn hover:!text-danger" title="移除成员" @click.stop="onRemoveMember(asMember(row))">
+                  <Trash2 :size="14" />
+                </button>
+                <button class="project-enter" @click.stop="toggleRoles(asMember(row))">角色</button>
+              </div>
+            </template>
+          </el-table-column>
+
+          <template #empty>
+            <div class="py-10 text-center text-sm text-ink-400">暂无成员</div>
+          </template>
+        </el-table>
+      </section>
     </div>
+
+    <AddMemberDialog v-model:visible="addDialogVisible" :project-id="projectId" @added="reloadMembers" />
   </div>
 </template>
