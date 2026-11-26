@@ -14,7 +14,7 @@ import EmptyState from '@/components/project/EmptyState.vue'
 import ErrorRetry from '@/components/project/ErrorRetry.vue'
 import Pagination from '@/components/project/Pagination.vue'
 import ProjectMemberDialog from '@/components/ProjectMemberDialog.vue'
-import { Plus, Menu, Sparkles, FolderKanban } from 'lucide-vue-next'
+import { Plus, Menu, Sparkles, FolderKanban, ArrowRight } from 'lucide-vue-next'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { reportError } from '@/utils/error'
 import { required, maxLen } from '@/utils/formRules'
@@ -24,6 +24,8 @@ const store = useProjectCategoryStore()
 const { projects, total, totalPages, currentPage, pageSize, loading, error, viewMode, selectedCategory, categories } = storeToRefs(store)
 
 const sidebarOpen = ref(false)
+/** 桌面端侧栏折叠（与项目内导航同一套交互：展开 256px / 收起 56px），移动端仍走抽屉 */
+const collapsed = ref(false)
 
 const memberDialogVisible = ref(false)
 const memberProjectId = ref<string>('')
@@ -202,15 +204,20 @@ onMounted(async () => {
     />
 
     <aside
-      class="flex shrink-0 flex-col border-r border-line-light bg-gradient-sidebar w-64 transition-all duration-300 ease-out-expo"
-      :class="sidebarOpen
-        ? 'fixed inset-y-0 left-0 z-40 shadow-xl md:static md:translate-x-0 md:shadow-none'
-        : 'fixed inset-y-0 left-0 z-40 -translate-x-full md:static md:translate-x-0 md:shadow-none'"
+      class="flex shrink-0 flex-col border-r border-line-light bg-gradient-sidebar transition-all duration-300 ease-out-expo"
+      :class="[
+        collapsed ? 'md:w-14' : 'md:w-64',
+        'w-64',
+        sidebarOpen
+          ? 'fixed inset-y-0 left-0 z-40 shadow-xl md:static md:translate-x-0 md:shadow-none'
+          : 'fixed inset-y-0 left-0 z-40 -translate-x-full md:static md:translate-x-0 md:shadow-none'
+      ]"
     >
 
 
-      <ProjectCategorySidebar />
-      <div class="border-t border-line-light px-5 py-4">
+      <ProjectCategorySidebar :collapsed="collapsed" />
+      <!-- 收起后只留图标栏，快速入门卡没有空间，直接隐藏 -->
+      <div v-if="!collapsed" class="border-t border-line-light px-5 py-4">
         <div class="flex items-center gap-2 rounded-lg bg-primary-50/60 px-3 py-2.5">
           <Sparkles :size="16" class="text-primary-500" />
           <div class="flex-1">
@@ -219,6 +226,14 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+      <!-- 折叠按钮：与项目内导航一致，只在桌面端显示（移动端用抽屉开关） -->
+      <button
+        class="hidden items-center justify-center border-t border-line-light py-2.5 text-ink-secondary transition hover:bg-surface-hover hover:text-ink md:flex"
+        :title="collapsed ? '展开侧栏' : '收起侧栏'"
+        @click="collapsed = !collapsed"
+      >
+        <ArrowRight :size="16" :class="collapsed ? '' : 'rotate-180'" />
+      </button>
     </aside>
 
     <main class="flex flex-1 flex-col overflow-hidden bg-gradient-page">

@@ -7,6 +7,8 @@ import type { Component } from 'vue'
 import type { ProjectCategoryKey } from '@/api/types'
 import SideNavList, { type SideNavItem } from '@/components/common/SideNavList.vue'
 
+withDefaults(defineProps<{ collapsed?: boolean }>(), { collapsed: false })
+
 const store = useProjectCategoryStore()
 const { categories, selectedCategory } = storeToRefs(store)
 
@@ -33,5 +35,5 @@ function onSelect(key: string) {
 </script>
 
 <template>
-  <SideNavList :items="items" :active="selectedCategory" @select="onSelect" />
+  <SideNavList :items="items" :active="selectedCategory" :collapsed="collapsed" @select="onSelect" />
 </template>
