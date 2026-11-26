@@ -7,11 +7,24 @@ package com.seven7m.kanban.common.util;
  * 直接拼进 {@code "%" + kw + "%"} 会让「搜 _ 」变成「匹配全部」、「搜 100%」变成前缀匹配。
  * 三个 Service 曾经各写一份同样的 replace 链（其中一处还是内联的），这里统一。</p>
  *
- * <p>用法必须与 SQL 里的 {@code ESCAPE '\'} 配对出现，否则反斜杠会被当成普通字符：</p>
+ * <p><b>与数据库转义符的约定</b>：本类的产物是「反斜杠已转义」的模式串，因此调用方的 LIKE
+ * 必须把反斜杠当转义符。两条等价写法：</p>
+ * <ol>
+ *   <li>条件构造器（推荐，PostgreSQL 的 LIKE 默认转义符就是反斜杠）：
  * <pre>
- * String pattern = "%" + LikeEscaper.escape(keyword) + "%";
- * wrapper.apply("name LIKE {0} ESCAPE '\\'", pattern);
+ * String pattern = LikeEscaper.contains(keyword);   // 已含两侧 %
+ * wrapper.like(Entity::getName, pattern);           // 生成 name LIKE '%...%'
  * </pre>
+ *   </li>
+ *   <li>必须手写 SQL 时显式声明：
+ * <pre>
+ * wrapper.apply("name LIKE {0} ESCAPE '\\'", LikeEscaper.contains(keyword));
+ * </pre>
+ *   </li>
+ * </ol>
+ *
+ * <p>换数据库方言（MySQL 默认同样以反斜杠转义，但 {@code NO_BACKSLASH_ESCAPES} 模式例外）时，
+ * 请重新确认第 1 种写法的语义，或统一改用第 2 种。</p>
  */
 public final class LikeEscaper {
 

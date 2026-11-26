@@ -1,5 +1,6 @@
 package com.seven7m.kanban.service.workitem;
 
+import com.seven7m.kanban.dto.issue.IssueExportFile;
 import com.seven7m.kanban.dto.issue.IssueFilterRequest;
 
 import java.util.UUID;
@@ -18,11 +19,7 @@ public interface IssueExportService {
      * @param projectId 项目 id（以路径参数为准，忽略筛选条件里的同名参数，避免越权）
      * @param types     类型编码，逗号分隔；为空表示不按类型过滤
      * @param filter    列表页当前筛选条件（可为 null，等价于不筛）
-     * @return 文件名 + UTF-8(带 BOM) 的 CSV 字节 + 是否截断 + 总命中数 + 实际行数
+     * @return 文件名 + UTF-8(带 BOM) 的 CSV 字节 + 是否截断 + 总命中数 + 实际行数；结构见 {@link IssueExportFile}
      */
-    ExportFile export(UUID projectId, String types, IssueFilterRequest filter);
-
-    /** 导出结果：文件名 + 内容 + 是否被截断 + 总命中数 + 本次实际行数 */
-    record ExportFile(String filename, byte[] content, boolean truncated, long total, int rows) {
-    }
+    IssueExportFile export(UUID projectId, String types, IssueFilterRequest filter);
 }

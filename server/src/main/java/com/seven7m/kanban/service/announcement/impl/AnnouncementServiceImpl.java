@@ -32,6 +32,14 @@ import java.util.stream.Collectors;
 public class AnnouncementServiceImpl extends ServiceImpl<AnnouncementMapper, Announcement>
         implements AnnouncementService {
 
+    /**
+     * 公告标题上限。
+     *
+     * <p>与库表 {@code announcement.title varchar(200)} 对齐：服务层不提前拦，超长标题会以
+     * PG 的「value too long」500 暴露，前端拿不到"是哪个字段超了多少"。
+     */
+    private static final int ANNOUNCEMENT_TITLE_MAX = 200;
+
     private final SysUserMapper userMapper;
 
     @Override
@@ -53,6 +61,7 @@ public class AnnouncementServiceImpl extends ServiceImpl<AnnouncementMapper, Ann
     @Override
     @Transactional
     public AnnouncementVO create(UUID projectId, CreateAnnouncementRequest req) {
+        validateTitle(req.getTitle());
         Announcement a = new Announcement();
         a.setId(UUID.randomUUID());
         a.setProjectId(projectId);
@@ -67,7 +76,11 @@ public class AnnouncementServiceImpl extends ServiceImpl<AnnouncementMapper, Ann
     @Transactional
     public AnnouncementVO update(UUID projectId, UUID id, UpdateAnnouncementRequest req) {
         Announcement a = requireAnnouncement(projectId, id);
-        if (req.getTitle() != null) a.setTitle(req.getTitle());
+        // 非空才更新：长度也只校验本次实际要写的值
+        if (req.getTitle() != null) {
+            validateTitle(req.getTitle());
+            a.setTitle(req.getTitle());
+        }
         if (req.getContent() != null) a.setContent(req.getContent());
         if (req.getPinned() != null) a.setPinned(req.getPinned());
         updateById(a);
@@ -79,6 +92,13 @@ public class AnnouncementServiceImpl extends ServiceImpl<AnnouncementMapper, Ann
     public void delete(UUID projectId, UUID id) {
         requireAnnouncement(projectId, id);
         removeById(id);
+    }
+
+    /** 公告标题长度校验：直接量本次要写入的原始值（与写入口径一致，不做 trim） */
+    private void validateTitle(String title) {
+        if (title != null && title.length() > ANNOUNCEMENT_TITLE_MAX) {
+            throw new ServiceException(ErrorCode.FIELD_TOO_LONG, "公告标题", ANNOUNCEMENT_TITLE_MAX);
+        }
     }
 
     /** 按 id 取公告并校验归属项目；不存在与不属于该项目统一按 404 处理 */

@@ -43,7 +43,8 @@ class WorkItemSortKeyServiceTest {
         when(mapper.selectById(before.getId())).thenReturn(before);
         when(mapper.selectById(after.getId())).thenReturn(after);
 
-        String key = service.computeSortKey(mapper, new WorkItemSortKeyService.SortKeyRequest(projectId, statusId, before.getId(), after.getId()));
+        String key = service.computeSortKey(mapper, new WorkItemSortKeyService.SortKeyRequest(projectId, statusId, before.getId(), after.getId()),
+                (p, s) -> null);
 
         assertThat(key).isBetween("a", "c");
     }
@@ -54,8 +55,10 @@ class WorkItemSortKeyServiceTest {
         TaskMapper mapper = mock(TaskMapper.class);
         when(mapper.selectOne(any())).thenReturn(null);
 
-        String first = service.computeSortKey(mapper, WorkItemSortKeyService.SortKeyRequest.appendTo(UUID.randomUUID(), UUID.randomUUID()));
-        String second = service.computeSortKey(mapper, WorkItemSortKeyService.SortKeyRequest.appendTo(UUID.randomUUID(), UUID.randomUUID()));
+        String first = service.computeSortKey(mapper, WorkItemSortKeyService.SortKeyRequest.appendTo(UUID.randomUUID(), UUID.randomUUID()),
+                (p, s) -> null);
+        String second = service.computeSortKey(mapper, WorkItemSortKeyService.SortKeyRequest.appendTo(UUID.randomUUID(), UUID.randomUUID()),
+                (p, s) -> null);
 
         assertThat(first).isNotBlank().isEqualTo(second); // 空列每次都从头开始，值相同但都可用
     }
@@ -68,7 +71,8 @@ class WorkItemSortKeyServiceTest {
         Task otherColumn = task(UUID.randomUUID(), "a");
         when(mapper.selectById(otherColumn.getId())).thenReturn(otherColumn);
 
-        assertThatThrownBy(() -> service.computeSortKey(mapper, new WorkItemSortKeyService.SortKeyRequest(UUID.randomUUID(), statusId, otherColumn.getId(), null)))
+        assertThatThrownBy(() -> service.computeSortKey(mapper, new WorkItemSortKeyService.SortKeyRequest(UUID.randomUUID(), statusId, otherColumn.getId(), null),
+                        (p, s) -> null))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("相邻卡片不属于目标状态列");
     }
@@ -80,7 +84,8 @@ class WorkItemSortKeyServiceTest {
         UUID missing = UUID.randomUUID();
         when(mapper.selectById(any())).thenReturn(null);
 
-        assertThatThrownBy(() -> service.computeSortKey(mapper, new WorkItemSortKeyService.SortKeyRequest(UUID.randomUUID(), UUID.randomUUID(), missing, null)))
+        assertThatThrownBy(() -> service.computeSortKey(mapper, new WorkItemSortKeyService.SortKeyRequest(UUID.randomUUID(), UUID.randomUUID(), missing, null),
+                        (p, s) -> null))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("相邻卡片不存在");
     }

@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -121,14 +122,18 @@ public class DashboardServiceImpl implements DashboardService {
         long cumCreated = dashboardMapper.countCreatedBefore(projectId, windowStart);
         long cumDone = dashboardMapper.countDoneBefore(projectId, windowStart);
 
-        List<DailyPoint> createdByDate = createdByDate(dashboardMapper.dailyCreated(projectId, windowStart));
-        List<DailyPoint> completedByDate = completedByDate(dashboardMapper.dailyCompleted(projectId, windowStart));
+        // 每日增量建成日期索引（局部变量）：燃尽图要按 14 天逐日取值，
+        // 原来按日期线性扫描列表，最多做 28×14 次字符串比较
+        Map<String, Long> createdDaily = new HashMap<>();
+        Map<String, Long> completedDaily = new HashMap<>();
+        fillIndex(createdByDate(dashboardMapper.dailyCreated(projectId, windowStart)), createdDaily);
+        fillIndex(completedByDate(dashboardMapper.dailyCompleted(projectId, windowStart)), completedDaily);
 
         List<DashboardVO.BurndownPoint> points = new ArrayList<>();
         for (int d = 0; d < BURNDOWN_WINDOW_DAYS; d++) {
             String key = startDate.plusDays(d).toString();
-            cumCreated += valueOf(createdByDate, key);
-            cumDone += valueOf(completedByDate, key);
+            cumCreated += createdDaily.getOrDefault(key, 0L);
+            cumDone += completedDaily.getOrDefault(key, 0L);
             DashboardVO.BurndownPoint p = new DashboardVO.BurndownPoint();
             p.setDate(key);
             p.setRemaining(Math.max(0, cumCreated - cumDone));
@@ -141,8 +146,8 @@ public class DashboardServiceImpl implements DashboardService {
     /**
      * 按日期汇总每日新建数。
      *
-     * <p>返回 {@code List<DailyPoint>} 而不是 {@code Map<String, Long>}：
-     * 方法签名不返回裸容器，调用方只需要「按日期取增量」这一种语义，见 {@link #valueOf}。
+     * <p>返回 {@code List<DailyPoint>} 而不是 {@code Map<String, Long>}：方法签名不返回裸容器。
+     * 调用方需要的是「按日期取增量」这一种语义，索引交给 {@link #fillIndex} 填进局部变量。
      */
     private List<DailyPoint> createdByDate(List<DailyCreatedRow> rows) {
         Map<String, Long> daily = new LinkedHashMap<>();
@@ -168,14 +173,18 @@ public class DashboardServiceImpl implements DashboardService {
         return points;
     }
 
-    /** 取某一天的增量；SQL 只返回有数据的日期，缺失按 0 处理 */
-    private long valueOf(List<DailyPoint> points, String date) {
+    /**
+     * 把增量点列表累加进调用方提供的局部索引（同日多条按 {@code Long::sum} 合并）。
+     *
+     * <p>索引只作为 {@link #buildBurndown} 内的局部变量存在，方法签名不返回 Map；
+     * 每日增量对外仍以 {@link DailyPoint} 列表呈现。此前按日期取增量是线性扫描列表
+     * （{@code valueOf}，最多 28×14 次字符串比较），建一次索引后逐日取值是 O(1)，
+     * 缺失日期由 {@code getOrDefault(..., 0L)} 兜成 0，口径与原实现完全一致。
+     */
+    private void fillIndex(List<DailyPoint> points, Map<String, Long> target) {
         for (DailyPoint point : points) {
-            if (point.date().equals(date)) {
-                return point.value();
-            }
+            target.merge(point.date(), point.value(), Long::sum);
         }
-        return 0L;
     }
 
     /** 打包方法：SQL 侧的 COUNT/AVG 理论上不会为 null，但显式兜底避免拆箱 NPE */

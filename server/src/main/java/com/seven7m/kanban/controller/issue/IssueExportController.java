@@ -3,6 +3,7 @@ package com.seven7m.kanban.controller.issue;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
+import com.seven7m.kanban.dto.issue.IssueExportFile;
 import com.seven7m.kanban.dto.issue.IssueFilterRequest;
 import com.seven7m.kanban.service.workitem.IssueExportService;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +48,7 @@ public class IssueExportController {
     public ResponseEntity<byte[]> export(@PathVariable UUID projectId,
                                          @RequestParam(required = false) String types,
                                          @ModelAttribute IssueFilterRequest filter) {
-        IssueExportService.ExportFile file = issueExportService.export(projectId, types, filter);
+        IssueExportFile file = issueExportService.export(projectId, types, filter);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(new MediaType("text", "csv", StandardCharsets.UTF_8));
         headers.setContentDisposition(ContentDisposition.attachment()

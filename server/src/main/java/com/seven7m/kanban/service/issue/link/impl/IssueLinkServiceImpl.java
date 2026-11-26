@@ -47,18 +47,33 @@ public class IssueLinkServiceImpl extends ServiceImpl<IssueLinkMapper, IssueLink
 
     @Override
     public List<LinkVO> list(UUID issueId) {
-        return list(Wrappers.<IssueLink>lambdaQuery()
-                        .eq(IssueLink::getIssueId, issueId)
-                        .orderByDesc(IssueLink::getCreatedAt))
-                .stream().map(l -> {
-                    LinkVO vo = new LinkVO();
-                    BeanUtils.copyProperties(l, vo);
-                    IssueVO target = workItemRouter.getBriefById(l.getTargetIssueId());
-                    if (target != null) {
-                        fillTarget(vo, target);
-                    }
-                    return vo;
-                }).collect(Collectors.toList());
+        return baseMapper.selectByIssueBothDirections(issueId).stream()
+                // 库里的 category 只对发起侧有意义；这里统一按"当前工作项视角"改写方向与对端
+                .map(l -> toVO(issueId, l))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 把一条存储行翻译成「当前工作项视角」的 VO。
+     *
+     * <p>库里只存 source → target 一行；对方发起的关联在列表里也要能看到，
+     * 因此这里把对端换成"另一端"：outbound 表示方向，target* 始终指向另一端。
+     */
+    private LinkVO toVO(UUID viewingIssueId, IssueLink link) {
+        boolean outbound = viewingIssueId.equals(link.getIssueId());
+        UUID counterpartId = outbound ? link.getTargetIssueId() : link.getIssueId();
+        LinkVO vo = new LinkVO();
+        vo.setId(link.getId());
+        vo.setIssueId(viewingIssueId);
+        vo.setTargetIssueId(counterpartId);
+        vo.setRelationType(link.getRelationType());
+        vo.setOutbound(outbound);
+        vo.setCreatedAt(link.getCreatedAt());
+        IssueVO counterpart = workItemRouter.getBriefById(counterpartId);
+        if (counterpart != null) {
+            fillTarget(vo, counterpart);
+        }
+        return vo;
     }
 
     @Override
@@ -81,10 +96,8 @@ public class IssueLinkServiceImpl extends ServiceImpl<IssueLinkMapper, IssueLink
         if (!source.getProjectId().equals(target.getProjectId())) {
             throw new ServiceException(ErrorCode.LINK_CROSS_PROJECT);
         }
-        long dup = count(Wrappers.<IssueLink>lambdaQuery()
-                .eq(IssueLink::getIssueId, issueId)
-                .eq(IssueLink::getTargetIssueId, targetIssueId)
-                .eq(IssueLink::getRelationType, relationType));
+        // 双向判定：A→B 已存在时，从 B 再建 B→A 属于同一条关系，不能重复落库
+        long dup = baseMapper.countBetween(issueId, targetIssueId, relationType);
         if (dup > 0) {
             throw new ServiceException(ErrorCode.LINK_ALREADY_EXISTS);
         }
@@ -98,9 +111,10 @@ public class IssueLinkServiceImpl extends ServiceImpl<IssueLinkMapper, IssueLink
         l.setCreatedAt(LocalDateTime.now());
         save(l);
 
-        LinkVO vo = new LinkVO();
-        BeanUtils.copyProperties(l, vo);
-        fillTarget(vo, target);
+        LinkVO vo = toVO(issueId, l);
+        if (vo.getTargetTitle() == null) {
+            fillTarget(vo, target);
+        }
         return vo;
     }
 
@@ -114,7 +128,12 @@ public class IssueLinkServiceImpl extends ServiceImpl<IssueLinkMapper, IssueLink
     @Transactional
     public void delete(UUID issueId, UUID linkId) {
         IssueLink l = getById(linkId);
-        if (l == null || !l.getIssueId().equals(issueId)) {
+        // 关联在列表里是双向可见的，所以任一端都可以解除它；两端都不是当前工作项时按"不属于该工作项"忽略
+        if (l == null) {
+            return;
+        }
+        boolean involvesIssue = issueId.equals(l.getIssueId()) || issueId.equals(l.getTargetIssueId());
+        if (!involvesIssue) {
             return;
         }
         removeById(linkId);

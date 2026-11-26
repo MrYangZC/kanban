@@ -6,6 +6,7 @@ import com.seven7m.kanban.entity.project.Project;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.SelectProvider;
 
 import java.util.List;
 import java.util.UUID;
@@ -63,55 +64,30 @@ public interface ProjectMapper extends BaseMapper<Project> {
             """)
     List<ProjectStats> selectStatsByProjectIds(@Param("ids") List<UUID> ids);
 
-    /**
-     * 当前用户在项目成员名册（project_member）中的项目 id 集合。
-     *
-     * <p>此前这段子查询以 {@code apply("id IN (SELECT project_id FROM project_member ...)")}
-     * 的形式写在 {@code ProjectQueryScope} 与 {@code ProjectService#getCategoryCounts} 里：
-     * SQL 文本散落在 Java 业务代码里，改口径要去两处找字符串，也没法单独 review/加索引。
-     * 现在 SQL 只在这里出现一次，服务层只做 {@code in(Project::getId, ids)}。
-     *
-     * <p>返回值可能为空集合：调用方必须先判空再拼 {@code IN}（PostgreSQL 的 {@code IN ()} 是语法错误）。
-     */
-    @Select("""
-            SELECT DISTINCT pm.project_id
-            FROM project_member pm
-            WHERE pm.user_id = #{userId}
-            """)
-    List<UUID> selectMemberProjectIds(@Param("userId") UUID userId);
+    // ==================== 可见性（EXISTS 半连接，一条 SQL 出结果） ====================
 
     /**
-     * 当前用户在指定项目中持有 {@code codes} 之一角色码的项目 id 集合（"我管理的"分类）。
+     * 当前用户在某分类下可见的项目（不分页）。
      *
-     * <p>角色码由调用方以 {@link com.seven7m.kanban.entity.project.ProjectRole} 常量清单传入，
-     * <b>刻意不把 'OWNER','ADMIN','PM' 写死在注解里</b>：哪些角色算"可管理"是业务口径，
-     * 写死进 SQL 后改口径要回到注解字符串里翻，且容易与接口注解上的 project:member 漂移。
+     * <p>可见性条件（成员 / 角色 / 收藏 / 关键词）由 {@link ProjectVisibilitySqlProvider} 用 EXISTS 表达：
+     * 早先的实现要么把 {@code IN (SELECT ...)} 写在条件构造器里（SQL 落回服务层），
+     * 要么先把项目 id 全捞回 JVM 再拼 {@code IN}（行数多时逼近驱动参数上限）。
      *
-     * <p>{@code codes} 不能为空（空清单会拼出 {@code IN ()}）。
+     * <p>排序：{@code sortField} 白名单（createdAt/updatedAt/name/projectKey），未知值回落创建时间；
+     * {@code sortOrder} 仅 {@code asc} 为升序，其余按"最新在前"。
      */
-    @Select("""
-            <script>
-            SELECT DISTINCT ur.project_id
-            FROM user_role ur
-            JOIN role r ON r.id = ur.role_id
-            WHERE ur.user_id = #{userId}
-              AND r.code IN
-              <foreach collection="codes" item="code" open="(" separator="," close=")">
-                  #{code}
-              </foreach>
-            </script>
-            """)
-    List<UUID> selectManagedProjectIds(@Param("userId") UUID userId, @Param("codes") List<String> codes);
+    @SelectProvider(type = ProjectVisibilitySqlProvider.class, method = "selectVisible")
+    List<Project> selectVisible(@Param("q") ProjectVisibilityQuery query);
 
     /**
-     * 当前用户收藏（project_favorite）的项目 id 集合。
-     *
-     * <p>同 {@link #selectMemberProjectIds}：原先是 {@code ProjectQueryScope} 里的子查询字符串。
+     * 同上，分页版：MyBatis-Plus 见到 {@link com.baomidou.mybatisplus.core.metadata.IPage} 参数才会追加
+     * LIMIT/OFFSET，所以本方法与 {@link #selectVisible} 共用同一段 SQL。
      */
-    @Select("""
-            SELECT DISTINCT pf.project_id
-            FROM project_favorite pf
-            WHERE pf.user_id = #{userId}
-            """)
-    List<UUID> selectFavoritedProjectIds(@Param("userId") UUID userId);
+    @SelectProvider(type = ProjectVisibilitySqlProvider.class, method = "selectVisible")
+    List<Project> selectVisiblePage(com.baomidou.mybatisplus.core.metadata.IPage<Project> page,
+                                    @Param("q") ProjectVisibilityQuery query);
+
+    /** 可见性计数（分类计数与分页 total 用），SQL 与 {@link #selectVisible} 的 where 完全同源 */
+    @SelectProvider(type = ProjectVisibilitySqlProvider.class, method = "countVisible")
+    long countVisible(@Param("q") ProjectVisibilityQuery query);
 }

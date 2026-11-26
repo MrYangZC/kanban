@@ -17,7 +17,8 @@ import java.util.UUID;
 /**
  * 工作项双向关联（blocks / relates / duplicates 等关系类型）。
  *
- * <p>写要求 issue:edit；关联是双向的，服务层会同时维护正反两条记录。
+ * <p>写要求 issue:edit。注意：关联记录是<b>单向</b>写入（只记 source→target），
+ * 反查不会出现在目标工作项的关联列表里；删除工作项时正反两个方向都会被清理。
  */
 @RestController
 @RequestMapping("/issues")

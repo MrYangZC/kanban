@@ -57,6 +57,14 @@ public class RiskServiceImpl extends ServiceImpl<RiskMapper, Risk> implements Ri
     /** risk.due_date 列名（置空时需要列名而非 lambda） */
     private static final String COL_DUE_DATE = "due_date";
 
+    /**
+     * 风险标题上限。
+     *
+     * <p>与库表 {@code risk.title varchar(200)} 对齐：服务层不提前拦，超长标题会以
+     * PG 的「value too long」500 暴露，前端拿不到"是哪个字段超了多少"。
+     */
+    private static final int RISK_TITLE_MAX = 200;
+
     private final SysUserMapper userMapper;
 
     @Override
@@ -77,6 +85,7 @@ public class RiskServiceImpl extends ServiceImpl<RiskMapper, Risk> implements Ri
     @Override
     @Transactional
     public RiskVO create(UUID projectId, CreateRiskRequest req) {
+        validateTitle(req.getTitle());
         Risk risk = new Risk();
         risk.setId(UUID.randomUUID());
         risk.setProjectId(projectId);
@@ -96,7 +105,11 @@ public class RiskServiceImpl extends ServiceImpl<RiskMapper, Risk> implements Ri
     @Transactional
     public RiskVO update(UUID projectId, UUID id, UpdateRiskRequest req) {
         Risk risk = requireRisk(projectId, id);
-        if (req.getTitle() != null) risk.setTitle(req.getTitle());
+        // 非空才更新：长度也只校验本次实际要写的值
+        if (req.getTitle() != null) {
+            validateTitle(req.getTitle());
+            risk.setTitle(req.getTitle());
+        }
         if (req.getDescription() != null) risk.setDescription(req.getDescription());
         if (req.getLevel() != null) risk.setLevel(req.getLevel());
         if (req.getStatus() != null) risk.setStatus(req.getStatus());
@@ -104,7 +117,8 @@ public class RiskServiceImpl extends ServiceImpl<RiskMapper, Risk> implements Ri
         if (req.getDueDate() != null) risk.setDueDate(req.getDueDate());
         // updateById 会跳过 null 字段，所以要置空的列必须用 UpdateWrapper 显式 set，
         // 与工作项更新（AbstractWorkItemService）保持同一套 clearFields 语义。
-        // 置空写字面量 NULL 交给 UpdateWrappers.clearToNull：PG 无法从 #{null} 推断参数类型
+        // 置空写字面量 NULL 交给 UpdateWrappers.clearToNull：不依赖驱动对无类型 null 参数的推断，
+        // 也与工作项那边保持同一套写法（列名用常量，setSql 不拼用户输入）
         UpdateWrapper<Risk> uw = Wrappers.<Risk>update().eq(COL_ID, id);
         if (req.getClearFields() != null) {
             for (String field : req.getClearFields()) {
@@ -136,6 +150,13 @@ public class RiskServiceImpl extends ServiceImpl<RiskMapper, Risk> implements Ri
     public void remove(UUID projectId, UUID id) {
         requireRisk(projectId, id);
         removeById(id);
+    }
+
+    /** 风险标题长度校验：直接量本次要写入的原始值（与写入口径一致，不做 trim） */
+    private void validateTitle(String title) {
+        if (title != null && title.length() > RISK_TITLE_MAX) {
+            throw new ServiceException(ErrorCode.FIELD_TOO_LONG, "风险标题", RISK_TITLE_MAX);
+        }
     }
 
     /** 按 id 取风险并校验归属项目；不存在与不属于该项目统一按 404 处理 */

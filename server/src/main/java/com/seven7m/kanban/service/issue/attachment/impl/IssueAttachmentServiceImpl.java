@@ -2,6 +2,7 @@ package com.seven7m.kanban.service.issue.attachment.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.seven7m.kanban.common.constant.DisplayNames;
 import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.PermissionService;
@@ -55,7 +56,6 @@ public class IssueAttachmentServiceImpl extends ServiceImpl<IssueAttachmentMappe
         implements IssueAttachmentService {
 
     /** 上传人已不存在（或未记录）时列表里的展示名，与前端"未知用户"的口径保持一致 */
-    private static final String UNKNOWN_UPLOADER_NAME = "未知";
 
     /**
      * 旧客户端只登记元信息（{@link #add}）时的占位 storage_key 前缀。
@@ -242,6 +242,11 @@ public class IssueAttachmentServiceImpl extends ServiceImpl<IssueAttachmentMappe
         return toVO(a);
     }
 
+    /**
+     * 删除附件。
+     *
+     * <p>归档项目只读，删除同样被拦（与被拦的新建/编辑路径一致）。
+     */
     @Override
     @Transactional
     public void delete(UUID issueId, UUID attachmentId) {
@@ -249,6 +254,8 @@ public class IssueAttachmentServiceImpl extends ServiceImpl<IssueAttachmentMappe
         if (a == null || !a.getIssueId().equals(issueId)) {
             return;
         }
+        // 归档项目只读：删附件同样属于修改工作项，与上传路径（upload/add）同一套拦截
+        projectWriteGuard.requireWritable(workItemRouter.getProjectId(issueId));
         // 只能删自己上传的附件；系统管理员可代为清理（此前任何有编辑权限的人都能删别人的附件，且无审计）
         UUID currentUser = UserContext.getUserId();
         boolean isUploader = a.getUploadedBy() != null && a.getUploadedBy().equals(currentUser);
@@ -283,7 +290,7 @@ public class IssueAttachmentServiceImpl extends ServiceImpl<IssueAttachmentMappe
         AttachmentVO vo = new AttachmentVO();
         BeanUtils.copyProperties(a, vo);
         SysUser u = a.getUploadedBy() == null ? null : userMap.get(a.getUploadedBy());
-        vo.setUploaderName(u == null ? UNKNOWN_UPLOADER_NAME : u.getDisplayName());
+        vo.setUploaderName(u == null ? DisplayNames.UNKNOWN_USER : u.getDisplayName());
         return vo;
     }
 }

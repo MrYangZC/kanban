@@ -1,6 +1,5 @@
 package com.seven7m.kanban.service.notification;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.dto.notification.NotificationVO;
 import com.seven7m.kanban.entity.notification.Notification;
@@ -10,12 +9,15 @@ import java.util.UUID;
 /**
  * 站内通知。当前只有交接（HANDOFF）一种来源。
  *
- * <p>继承 {@link IService} 复用 MyBatis-Plus 的单表通用能力（保存、计数、分页、按条件取列表）；
+ * <p>实现类继承 {@code ServiceImpl} 复用 MyBatis-Plus 的单表通用能力（保存、计数、分页、按条件取列表）；
  * 实现里不再出现 {@code notificationMapper.xxx} 的样板，也不再拼 {@code last("LIMIT 1")} 这类 SQL 片段。
  *
  * <p>实现见 {@link com.seven7m.kanban.service.notification.impl.NotificationServiceImpl}。
+ *
+ * <p>接口<b>不</b>外露 {@code IService} 的通用写方法（{@code save/updateById/removeById}
+ * 会绕过本域的权限与副作用校验），外部只能调用下面的领域方法。
  */
-public interface NotificationService extends IService<Notification> {
+public interface NotificationService {
 
     /**
      * 交接通知，接收人即新的负责人。

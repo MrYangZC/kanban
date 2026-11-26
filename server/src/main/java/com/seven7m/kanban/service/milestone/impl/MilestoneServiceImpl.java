@@ -37,6 +37,14 @@ public class MilestoneServiceImpl extends ServiceImpl<MilestoneMapper, Milestone
     /** 新建里程碑的初始完成度（百分比 0-100） */
     private static final int DEFAULT_PROGRESS = 0;
 
+    /**
+     * 里程碑名称上限。
+     *
+     * <p>与库表 {@code milestone.name varchar(200)} 对齐：服务层不提前拦，超长名称会以
+     * PG 的「value too long」500 暴露，前端拿不到"是哪个字段超了多少"。
+     */
+    private static final int MILESTONE_NAME_MAX = 200;
+
     private final SysUserMapper userMapper;
 
     @Override
@@ -57,6 +65,7 @@ public class MilestoneServiceImpl extends ServiceImpl<MilestoneMapper, Milestone
     @Override
     @Transactional
     public MilestoneVO create(UUID projectId, CreateMilestoneRequest req) {
+        validateName(req.getName());
         Milestone m = new Milestone();
         m.setId(UUID.randomUUID());
         m.setProjectId(projectId);
@@ -73,7 +82,11 @@ public class MilestoneServiceImpl extends ServiceImpl<MilestoneMapper, Milestone
     @Transactional
     public MilestoneVO update(UUID projectId, UUID id, UpdateMilestoneRequest req) {
         Milestone m = requireMilestone(projectId, id);
-        if (req.getName() != null) m.setName(req.getName());
+        // 非空才更新：长度也只校验本次实际要写的值
+        if (req.getName() != null) {
+            validateName(req.getName());
+            m.setName(req.getName());
+        }
         if (req.getDescription() != null) m.setDescription(req.getDescription());
         if (req.getDueDate() != null) m.setDueDate(req.getDueDate());
         if (req.getStatus() != null) m.setStatus(req.getStatus());
@@ -87,6 +100,13 @@ public class MilestoneServiceImpl extends ServiceImpl<MilestoneMapper, Milestone
     public void delete(UUID projectId, UUID id) {
         requireMilestone(projectId, id);
         removeById(id);
+    }
+
+    /** 里程碑名称长度校验：直接量本次要写入的原始值（与写入口径一致，不做 trim） */
+    private void validateName(String name) {
+        if (name != null && name.length() > MILESTONE_NAME_MAX) {
+            throw new ServiceException(ErrorCode.FIELD_TOO_LONG, "里程碑名称", MILESTONE_NAME_MAX);
+        }
     }
 
     /** 按 id 取里程碑并校验归属项目；不存在与不属于该项目统一按 404 处理 */

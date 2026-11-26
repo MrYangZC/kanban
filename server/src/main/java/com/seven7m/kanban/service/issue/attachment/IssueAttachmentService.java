@@ -1,6 +1,5 @@
 package com.seven7m.kanban.service.issue.attachment;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.seven7m.kanban.dto.issue.AttachmentVO;
 import com.seven7m.kanban.entity.issue.attachment.IssueAttachment;
 import org.springframework.web.multipart.MultipartFile;
@@ -11,14 +10,17 @@ import java.util.UUID;
 /**
  * 工作项附件服务接口。
  *
- * <p>本质是「单实体（attachment）+ 单主 Mapper」的增删查，因此继承 {@link IService}
+ * <p>本质是「单实体（attachment）+ 单主 Mapper」的增删查，因此实现类继承 {@code ServiceImpl}
  * 复用 MyBatis-Plus 的按 id 取 / 保存 / 计数 / 删除能力，实现里不必再写一遍
  * {@code attachmentMapper.xxx} 的样板（这条链路没有自定义 wrapper 或跨表依赖被藏进去）。
  * 领域方法只剩三个：真实文件上传、旧客户端登记元信息、删除（含文件清理）。
  *
  * <p>实现见 {@code com.seven7m.kanban.service.issue.attachment.impl.IssueAttachmentServiceImpl}。
+ *
+ * <p>接口<b>不</b>外露 {@code IService} 的通用写方法（{@code save/updateById/removeById}
+ * 会绕过本域的权限与副作用校验），外部只能调用下面的领域方法。
  */
-public interface IssueAttachmentService extends IService<IssueAttachment> {
+public interface IssueAttachmentService {
 
     /** 某工作项的附件列表（按创建时间倒序；上传人一次性批量查出，避免逐行查用户表） */
     List<AttachmentVO> list(UUID issueId);

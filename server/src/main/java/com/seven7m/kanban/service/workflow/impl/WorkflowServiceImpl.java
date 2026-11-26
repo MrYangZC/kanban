@@ -45,6 +45,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -247,19 +248,20 @@ public class WorkflowServiceImpl implements WorkflowService {
         if (userId == null) {
             return null;
         }
-        // 与 columnsOf 的降级口径保持一致：解析出的人若已不在系统里，按不交接处理
-        String userName = userNames(Set.of(userId)).nameOf(userId);
+        // 与 columnsOf 的降级口径保持一致：解析出的人若已不在系统里，按不交接处理。
+        // 单行场景直接按主键查：此前用 Set.of(id) + selectBatchIds，只查 1 行却走 IN 语法
+        String userName = userNameOf(userId);
         if (userName == null) {
             return null;
         }
         // 落点查不到（迭代被删、标签被删）就只换人：交接本身比落点重要，不能因为落点残缺把人也不转了
         UUID sprintId = config.getTargetSprintId();
-        String sprintName = sprintId == null ? null : sprintNames(Set.of(sprintId)).nameOf(sprintId);
+        String sprintName = sprintId == null ? null : sprintNameOf(sprintId);
         if (sprintName == null) {
             sprintId = null;
         }
         UUID labelId = config.getTargetLabelId();
-        String labelName = labelId == null ? null : labelNames(Set.of(labelId)).nameOf(labelId);
+        String labelName = labelId == null ? null : labelNameOf(labelId);
         if (labelName == null) {
             labelId = null;
         }
@@ -379,7 +381,7 @@ public class WorkflowServiceImpl implements WorkflowService {
             return HandoffType.NONE;
         }
         try {
-            return HandoffType.valueOf(raw.trim().toUpperCase());
+            return HandoffType.valueOf(raw.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             throw new ServiceException(ErrorCode.HANDOFF_TYPE_INVALID);
         }
@@ -411,6 +413,16 @@ public class WorkflowServiceImpl implements WorkflowService {
             names.put(user.getId(), display == null || display.isBlank() ? user.getUsername() : display);
         }
         return NameIndex.of(names);
+    }
+
+    /** 单取用户显示名（主键查询）：displayName 优先，缺失时回落 username；查不到返回 null */
+    private String userNameOf(UUID userId) {
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null) {
+            return null;
+        }
+        String display = user.getDisplayName();
+        return display == null || display.isBlank() ? user.getUsername() : display;
     }
 
     @Override
@@ -446,5 +458,11 @@ public class WorkflowServiceImpl implements WorkflowService {
             names.put(label.getId(), label.getName());
         }
         return NameIndex.of(names);
+    }
+
+    /** 单取标签名（主键查询）；查不到返回 null，调用方据此把落点降级为空 */
+    private String labelNameOf(UUID labelId) {
+        IssueTag label = issueTagMapper.selectById(labelId);
+        return label == null ? null : label.getName();
     }
 }

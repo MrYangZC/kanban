@@ -50,6 +50,37 @@ public interface IssueTagMapper extends BaseMapper<IssueTag> {
     List<UUID> selectIssueIdsByLabels(@Param("labelIds") Collection<UUID> labelIds, @Param("category") String category);
 
     /**
+     * 工作项列表「按标签筛选」用：某项目、某类别下打了指定标签之一的工作项 id。
+     *
+     * <p>与 {@link #selectIssueIdsByLabels} 的区别是**带 project_id**：列表页永远在单个项目内筛选，
+     * 不带项目维度的那个方法会把全库（所有项目）命中该标签的工作项 id 都拉回 Java 再拼 {@code IN}，
+     * 大项目/大标签下既浪费内存，也可能触及 PostgreSQL 的 65535 个绑定参数上限。
+     *
+     * <p>{@code issue_label} 没有 project_id 列，故 JOIN 三张工作项表的公共集合取项目归属。
+     */
+    @Select("""
+            <script>
+            SELECT il.issue_id FROM issue_label il
+            JOIN (
+                SELECT id, project_id FROM task
+                UNION ALL
+                SELECT id, project_id FROM requirement
+                UNION ALL
+                SELECT id, project_id FROM bug
+            ) w ON w.id = il.issue_id
+            WHERE il.category = #{category}
+              AND w.project_id = #{projectId}
+              AND il.label_id IN
+            <foreach collection="labelIds" item="lid" open="(" separator="," close=")">
+                #{lid}
+            </foreach>
+            </script>
+            """)
+    List<UUID> selectIssueIdsByLabelsInProject(@Param("labelIds") Collection<UUID> labelIds,
+                                               @Param("category") String category,
+                                               @Param("projectId") UUID projectId);
+
+    /**
      * 按工作项 id 集合 + category 批量删除标签关联（级联清理用）。
      */
     @Delete("""

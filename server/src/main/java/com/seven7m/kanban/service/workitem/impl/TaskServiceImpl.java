@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 public class TaskServiceImpl extends AbstractWorkItemService<Task> implements TaskService {
 
     public TaskServiceImpl(TaskMapper taskMapper, WorkItemSharedDeps shared) {
-        super(new WorkItemDeps<>(ItemCategory.TASK, taskMapper, taskMapper::nextIssueNumber, Task::new, shared));
+        super(new WorkItemDeps<>(ItemCategory.TASK, taskMapper, taskMapper::nextIssueNumber,
+                Task::new, taskMapper::selectTailSortKey, shared));
     }
 }

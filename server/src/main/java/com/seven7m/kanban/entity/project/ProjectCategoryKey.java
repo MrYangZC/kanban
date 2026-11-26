@@ -1,5 +1,7 @@
 package com.seven7m.kanban.entity.project;
 
+import java.util.Locale;
+
 /**
  * 项目分类筛选键。
  * all：全部项目（当前用户为成员且 status=ACTIVE）
@@ -24,7 +26,7 @@ public enum ProjectCategoryKey {
             return ALL;
         }
         try {
-            return ProjectCategoryKey.valueOf(value.toUpperCase());
+            return ProjectCategoryKey.valueOf(value.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return ALL;
         }

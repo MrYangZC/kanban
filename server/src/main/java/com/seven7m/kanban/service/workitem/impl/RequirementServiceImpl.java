@@ -16,6 +16,7 @@ public class RequirementServiceImpl extends AbstractWorkItemService<Requirement>
 
     public RequirementServiceImpl(RequirementMapper requirementMapper, WorkItemSharedDeps shared) {
         super(new WorkItemDeps<>(ItemCategory.REQUIREMENT, requirementMapper,
-                requirementMapper::nextIssueNumber, Requirement::new, shared));
+                requirementMapper::nextIssueNumber, Requirement::new,
+                requirementMapper::selectTailSortKey, shared));
     }
 }

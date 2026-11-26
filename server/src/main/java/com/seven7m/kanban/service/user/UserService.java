@@ -1,6 +1,5 @@
 package com.seven7m.kanban.service.user;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.dto.project.MemberCandidateVO;
 import com.seven7m.kanban.dto.user.ChangePasswordRequest;
@@ -19,12 +18,15 @@ import java.util.UUID;
 /**
  * 登录与用户管理接口。
  *
- * <p>继承 {@link IService} 是为了复用 MyBatis-Plus 的通用能力（按 id 取、保存、分页、计数），
+ * <p>实现类继承 {@code ServiceImpl} 是为了复用 MyBatis-Plus 的通用能力（按 id 取、保存、分页、计数），
  * 不必在实现里重复 {@code mapper.xxx} 的样板；同时保留领域方法（登录、建档、改密、踢会话）。
  *
  * <p>实现见 {@code com.seven7m.kanban.service.user.impl.UserServiceImpl}。
+ *
+ * <p>接口<b>不</b>外露 {@code IService} 的通用写方法（{@code save/updateById/removeById}
+ * 会绕过本域的权限与副作用校验），外部只能调用下面的领域方法。
  */
-public interface UserService extends IService<SysUser> {
+public interface UserService {
 
     /** 登录：校验口令 + 失败计数限流，成功返回登录态所需信息 */
     LoginVO login(LoginRequest req);

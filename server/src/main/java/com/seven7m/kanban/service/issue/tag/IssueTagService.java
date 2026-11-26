@@ -31,7 +31,11 @@ public interface IssueTagService {
     /** 全局标签库（供标签管理界面选择） */
     List<LabelVO> listGlobal();
 
-    /** 项目选用全局标签（建立 project_label 关系，幂等） */
+    /**
+     * 项目选用全局标签（建立 project_label 关系）。
+     *
+     * <p>重复调用不会重复建立关系；但并发重复提交可能撞唯一约束而抛 400（未做 ON CONFLICT 吞并）。
+     */
     void addProjectLabel(UUID projectId, UUID labelId);
 
     /** 项目取消选用标签（仅解除选用关系，不删除全局标签） */

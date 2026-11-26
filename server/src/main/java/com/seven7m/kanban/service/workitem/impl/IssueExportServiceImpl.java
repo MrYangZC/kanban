@@ -3,6 +3,7 @@ package com.seven7m.kanban.service.workitem.impl;
 import com.seven7m.kanban.common.constant.PageLimits;
 import com.seven7m.kanban.common.domain.NameIndex;
 import com.seven7m.kanban.common.domain.PageResult;
+import com.seven7m.kanban.dto.issue.IssueExportFile;
 import com.seven7m.kanban.dto.issue.IssueFilterRequest;
 import com.seven7m.kanban.dto.issue.IssueVO;
 import com.seven7m.kanban.entity.issuestatus.IssueStatus;
@@ -58,7 +59,7 @@ public class IssueExportServiceImpl implements IssueExportService {
      * @param filter 列表页当前的筛选条件（可为 null，等价于不筛）
      */
     @Override
-    public ExportFile export(UUID projectId, String types, IssueFilterRequest filter) {
+    public IssueExportFile export(UUID projectId, String types, IssueFilterRequest filter) {
         IssueFilterRequest req = filter == null ? new IssueFilterRequest() : filter;
         // 项目以路径参数为准：不允许通过 query 里的 projectId 越权到别的项目
         req.setProjectId(projectId);
@@ -110,7 +111,8 @@ public class IssueExportServiceImpl implements IssueExportService {
             csv.append(csv("【已截断】共 " + total + " 条，本次仅导出前 " + rows.size()
                     + " 条；请缩小筛选范围后分批导出")).append("\r\n");
         }
-        return new ExportFile(filename, csv.toString().getBytes(StandardCharsets.UTF_8), truncated, total, rows.size());
+        return new IssueExportFile(filename, csv.toString().getBytes(StandardCharsets.UTF_8),
+                truncated, total, rows.size());
     }
 
     /** 一次性批量取状态名（CSV 里展示中文状态，而不是 REQ_TODO 这种 code） */

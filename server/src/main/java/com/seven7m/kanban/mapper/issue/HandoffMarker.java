@@ -1,5 +1,6 @@
 package com.seven7m.kanban.mapper.issue;
 
+import com.seven7m.kanban.common.constant.ActivityActions;
 import lombok.Data;
 
 import java.util.UUID;
@@ -14,7 +15,7 @@ import java.util.UUID;
 public class HandoffMarker {
 
     /** 交接动态的动作码：与 {@code AbstractWorkItemService} 写入值保持一致 */
-    public static final String ACTION_ASSIGNEE_CHANGED = "ASSIGNEE_CHANGED";
+    public static final String ACTION_ASSIGNEE_CHANGED = ActivityActions.ASSIGNEE_CHANGED;
 
     private UUID id;
 

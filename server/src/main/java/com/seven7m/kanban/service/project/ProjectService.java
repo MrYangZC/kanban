@@ -1,6 +1,5 @@
 package com.seven7m.kanban.service.project;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.dto.project.CreateProjectRequest;
 import com.seven7m.kanban.dto.project.ProjectCategoryCountsVO;
@@ -16,14 +15,17 @@ import java.util.UUID;
 /**
  * 项目（project 表）的读写服务：创建/修改/列表/详情/归档/删除，以及成员与权限判定入口。
  *
- * <p>继承 {@link IService} 是为了复用 MyBatis-Plus 的通用能力（按 id 取、保存、更新、删除、
+ * <p>实现类继承 {@code ServiceImpl} 是为了复用 MyBatis-Plus 的通用能力（按 id 取、保存、更新、删除、
  * 条件查询、计数），实现里不必再重复 {@code mapper.xxx} 的样板；项目域的领域方法仍在此声明。
  *
  * <p>可见性口径统一由 {@link ProjectQueryScope} 表达，本接口的列表方法都走它，不在实现里另起一套。
  *
  * <p>实现见 {@code com.seven7m.kanban.service.project.impl.ProjectServiceImpl}。
+ *
+ * <p>接口<b>不</b>外露 {@code IService} 的通用写方法（{@code save/updateById/removeById}
+ * 会绕过本域的权限与副作用校验），外部只能调用下面的领域方法。
  */
-public interface ProjectService extends IService<Project> {
+public interface ProjectService {
 
     /** 新建项目：Key 查重 -> 落库 -> 建所有者成员行 + 授权 OWNER -> 初始化默认看板/工作流 */
     ProjectVO create(CreateProjectRequest req);

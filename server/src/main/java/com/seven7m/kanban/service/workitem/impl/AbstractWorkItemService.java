@@ -14,9 +14,8 @@ import com.seven7m.kanban.common.constant.WorkItemColumns;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.enums.IssueScope;
 import com.seven7m.kanban.common.enums.IssueStatusCategory;
-import com.seven7m.kanban.common.exception.ErrorCode;
-import com.seven7m.kanban.common.util.UpdateWrappers;
 import com.seven7m.kanban.common.enums.ItemCategory;
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.IssueProjectCache;
 import com.seven7m.kanban.common.security.Permission;
@@ -24,6 +23,7 @@ import com.seven7m.kanban.common.security.PermissionService;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.common.upload.AttachmentFileStore;
 import com.seven7m.kanban.common.util.LikeEscaper;
+import com.seven7m.kanban.common.util.UpdateWrappers;
 import com.seven7m.kanban.common.util.Uuids;
 import com.seven7m.kanban.dto.issue.CreateIssueRequest;
 import com.seven7m.kanban.dto.issue.IssueFilterRequest;
@@ -63,7 +63,6 @@ import com.seven7m.kanban.service.workitem.WorkItemHandoffService;
 import com.seven7m.kanban.service.workitem.WorkItemParentGuard;
 import com.seven7m.kanban.service.workitem.WorkItemRouter;
 import com.seven7m.kanban.service.workitem.WorkItemService;
-import com.seven7m.kanban.service.workitem.WorkItemSharedDeps;
 import com.seven7m.kanban.service.workitem.WorkItemSort;
 import com.seven7m.kanban.service.workitem.WorkItemSortKeyService;
 import org.springframework.beans.BeanUtils;
@@ -74,8 +73,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -193,7 +192,13 @@ public abstract class AbstractWorkItemService<T extends AbstractWorkItem> implem
         if (req.getStatusId() != null) q.eq(WorkItemColumns.STATUS_ID, req.getStatusId());
 
         // 阶段筛选：状态字典按 category 归类，子查询留在 IssueStatusMapper，这里只拼 id 集合
-        IssueStatusCategory statusCategory = IssueStatusCategory.of(req.getStatusCategory());
+        String rawStatusCategory = req.getStatusCategory();
+        IssueStatusCategory statusCategory = IssueStatusCategory.of(rawStatusCategory);
+        if (statusCategory == null && rawStatusCategory != null && !rawStatusCategory.isBlank()) {
+            // 无法识别的阶段值：旧实现是子查询 category = 该值 → 命中 0 条。
+            // 这里保持一致，不做"静默忽略筛选"——否则前端传错值时会把全部工作项返回，比空列表更难排查。
+            return emptyPage(page, size);
+        }
         if (statusCategory != null) {
             List<UUID> categoryStatusIds = issueStatusMapper().selectIdsByCategory(statusCategory.name());
             if (categoryStatusIds.isEmpty()) return emptyPage(page, size);
@@ -222,9 +227,9 @@ public abstract class AbstractWorkItemService<T extends AbstractWorkItem> implem
             case REPORTED -> q.eq(WorkItemColumns.REPORTER_ID, me);
             case VERIFIED -> q.eq(WorkItemColumns.VERIFIER_ID, me);
             case SHARED -> {
-                // 「共享给我」= 我是参与人；参与关系在子表，id 集合先由 mapper 取回
+                // 「共享给我」= 我是参与人；参与关系在子表，id 集合由 mapper 取回（带项目维度，避免全库 id 回捞）
                 List<UUID> sharedIds = issueParticipantMapper()
-                        .selectIssueIdsByUserAndCategory(me, categoryName());
+                        .selectIssueIdsByUserInProject(me, categoryName(), req.getProjectId());
                 if (sharedIds.isEmpty()) return emptyPage(page, size);
                 q.in(WorkItemColumns.ID, sharedIds);
             }
@@ -236,7 +241,8 @@ public abstract class AbstractWorkItemService<T extends AbstractWorkItem> implem
 
         if (req.getLabelId() != null) {
             List<UUID> labeledIds = issueTagMapper()
-                    .selectIssueIdsByLabels(List.of(req.getLabelId()), categoryName());
+                    .selectIssueIdsByLabelsInProject(List.of(req.getLabelId()), categoryName(),
+                            req.getProjectId());
             if (labeledIds.isEmpty()) return emptyPage(page, size);
             q.in(WorkItemColumns.ID, labeledIds);
         }
@@ -340,10 +346,10 @@ public abstract class AbstractWorkItemService<T extends AbstractWorkItem> implem
     @Transactional
     public IssueVO create(CreateIssueRequest req) {
         Project project = projectMapper().selectById(req.getProjectId());
-        if (project == null) throw new ServiceException(ErrorCode.PROJECT_MISSING);
+        if (project == null) throw new ServiceException(ErrorCode.PROJECT_NOT_FOUND);
         requireProjectWritable(project.getId());
         IssueStatus status = issueStatusMapper().selectById(req.getStatusId());
-        if (status == null) throw new ServiceException(ErrorCode.STATUS_NOT_FOUND);
+        if (status == null) throw new ServiceException(ErrorCode.STATUS_INVALID);
         // 状态字典是全局的，但任务/需求/缺陷各有自己的工作流节点（V31 起）：
         // 只允许用本类别的节点建单，否则会建出「任务停在已修复」这种跨流程脏数据
         UUID targetStatusId = status.getId();
@@ -447,6 +453,7 @@ public abstract class AbstractWorkItemService<T extends AbstractWorkItem> implem
     public IssueVO update(UUID id, UpdateIssueRequest req) {
         T issue = requireIssue(id);
         requireProjectWritable(issue.getProjectId());
+        requireNoClearConflict(req);
         requireUpdatePermissions(issue, req);
         requireReferencesInProject(issue, req);
 
@@ -518,6 +525,38 @@ public abstract class AbstractWorkItemService<T extends AbstractWorkItem> implem
         return req.getStatusId() != null && !req.getStatusId().equals(issue.getStatusId());
     }
 
+    /**
+     * 拒绝自相矛盾的请求：同一字段既赋值又要求清空。
+     *
+     * <p>旧实现不做校验，两条 SET 会同时落到同一列，PostgreSQL 直接报
+     * {@code multiple assignments to same column}（前端看到的是 500）。
+     * 这里提前返回 400 并点名冲突字段，比 500 更容易定位。
+     */
+    private void requireNoClearConflict(UpdateIssueRequest req) {
+        if (req.getClearFields() == null || req.getClearFields().isEmpty()) {
+            return;
+        }
+        Set<String> provided = new LinkedHashSet<>();
+        if (req.getAssigneeId() != null) provided.add(ClearFields.ASSIGNEE_ID);
+        if (req.getVerifierId() != null) provided.add(ClearFields.VERIFIER_ID);
+        if (req.getParentId() != null) provided.add(ClearFields.PARENT_ID);
+        if (req.getDoneAt() != null) provided.add(ClearFields.DONE_AT);
+        if (req.getSprintId() != null) provided.add(ClearFields.SPRINT_ID);
+        if (req.getDueDate() != null) provided.add(ClearFields.DUE_DATE);
+        if (req.getModule() != null) provided.add(ClearFields.MODULE);
+        if (req.getFixVersion() != null) provided.add(ClearFields.FIX_VERSION);
+        if (req.getPlanStart() != null) provided.add(ClearFields.PLAN_START);
+        if (req.getIteration() != null) provided.add(ClearFields.ITERATION);
+        if (req.getNoFixReason() != null) provided.add(ClearFields.NO_FIX_REASON);
+        if (req.getParticipants() != null) provided.add(ClearFields.PARTICIPANTS);
+        if (req.getCcUsers() != null) provided.add(ClearFields.CC_USERS);
+        for (String field : req.getClearFields()) {
+            if (provided.contains(field)) {
+                throw new ServiceException(ErrorCode.CLEAR_FIELD_CONFLICT, field);
+            }
+        }
+    }
+
     /** 普通字段（非空即更新），含需求/缺陷独有的列 */
     private void applyScalarFields(UpdateWrapper<T> uw, T issue, UpdateIssueRequest req) {
         if (req.getTitle() != null) uw.set(WorkItemColumns.TITLE, req.getTitle());
@@ -548,35 +587,55 @@ public abstract class AbstractWorkItemService<T extends AbstractWorkItem> implem
         }
     }
 
-    /** 显式清空字段（updateById 会跳过 null，必须在这里写 set null） */
+    /**
+     * 显式清空字段。
+     *
+     * <p>两处约束：
+     * <ul>
+     *   <li>{@code updateById} 会按字段策略跳过 null，所以「清空」只能显式写 SET；</li>
+     *   <li>统一走 {@link UpdateWrappers#clearToNull} 写字面量 NULL，不依赖驱动对无类型 null 参数的推断，
+     *       也与状态流转/撤销交接里的置空写法保持一致。</li>
+     * </ul>
+     *
+     * <p>{@code done_at} 是个例外：同一次请求既清空 doneAt 又要做状态流转时，
+     * 状态流转分支会自己写 done_at（进 DONE 写 now、离开 DONE 写 NULL），
+     * 两条 SET 同时落到同一列会让 PostgreSQL 报 "multiple assignments to same column"，
+     * 因此状态变更时由流转分支独占该列。
+     */
     private void applyClearFields(UpdateWrapper<T> uw, T issue, UpdateIssueRequest req) {
         if (req.getClearFields() == null) {
             return;
         }
+        boolean statusChanging = isStatusChanging(issue, req);
         for (String field : req.getClearFields()) {
+            if (!ClearFields.ALL.contains(field)) {
+                throw new ServiceException(ErrorCode.CLEAR_FIELD_UNSUPPORTED, field);
+            }
             switch (field) {
-                case ClearFields.ASSIGNEE_ID -> uw.set(WorkItemColumns.ASSIGNEE_ID, null);
-                case ClearFields.VERIFIER_ID -> uw.set(WorkItemColumns.VERIFIER_ID, null);
-                case ClearFields.PARENT_ID -> uw.set(WorkItemColumns.PARENT_ID, null);
-                case ClearFields.DONE_AT -> uw.set(WorkItemColumns.DONE_AT, null);
-                case ClearFields.SPRINT_ID -> uw.set(WorkItemColumns.SPRINT_ID, null);
-                case ClearFields.DUE_DATE -> uw.set(WorkItemColumns.DUE_DATE, null);
+                case ClearFields.ASSIGNEE_ID -> UpdateWrappers.clearToNull(uw, WorkItemColumns.ASSIGNEE_ID);
+                case ClearFields.VERIFIER_ID -> UpdateWrappers.clearToNull(uw, WorkItemColumns.VERIFIER_ID);
+                case ClearFields.PARENT_ID -> UpdateWrappers.clearToNull(uw, WorkItemColumns.PARENT_ID);
+                case ClearFields.DONE_AT -> {
+                    if (!statusChanging) UpdateWrappers.clearToNull(uw, WorkItemColumns.DONE_AT);
+                }
+                case ClearFields.SPRINT_ID -> UpdateWrappers.clearToNull(uw, WorkItemColumns.SPRINT_ID);
+                case ClearFields.DUE_DATE -> UpdateWrappers.clearToNull(uw, WorkItemColumns.DUE_DATE);
                 case ClearFields.PLAN_START -> {
-                    if (issue instanceof Bug) uw.set(WorkItemColumns.PLAN_START, null);
+                    if (issue instanceof Bug) UpdateWrappers.clearToNull(uw, WorkItemColumns.PLAN_START);
                 }
                 case ClearFields.ITERATION -> {
-                    if (issue instanceof Bug) uw.set(WorkItemColumns.ITERATION, null);
+                    if (issue instanceof Bug) UpdateWrappers.clearToNull(uw, WorkItemColumns.ITERATION);
                 }
                 case ClearFields.NO_FIX_REASON -> {
-                    if (issue instanceof Bug) uw.set(WorkItemColumns.NO_FIX_REASON, null);
+                    if (issue instanceof Bug) UpdateWrappers.clearToNull(uw, WorkItemColumns.NO_FIX_REASON);
                 }
                 case ClearFields.MODULE -> {
                     if (issue instanceof Requirement || issue instanceof Bug) {
-                        uw.set(WorkItemColumns.MODULE, null);
+                        UpdateWrappers.clearToNull(uw, WorkItemColumns.MODULE);
                     }
                 }
                 case ClearFields.FIX_VERSION -> {
-                    if (issue instanceof Bug) uw.set(WorkItemColumns.FIX_VERSION, null);
+                    if (issue instanceof Bug) UpdateWrappers.clearToNull(uw, WorkItemColumns.FIX_VERSION);
                 }
                 case ClearFields.PARTICIPANTS, ClearFields.CC_USERS -> {
                     // 非标量字段：由 applyParticipantsAndCc 全量替换
@@ -598,7 +657,7 @@ public abstract class AbstractWorkItemService<T extends AbstractWorkItem> implem
                 ? null : issueStatusMapper().selectById(issue.getStatusId());
         IssueStatus target = issueStatusMapper().selectById(req.getStatusId());
         if (target == null) {
-            throw new ServiceException(ErrorCode.STATUS_NOT_FOUND);
+            throw new ServiceException(ErrorCode.STATUS_INVALID);
         }
         if (!workflowService().canTransition(issue.getProjectId(), category(),
                 issue.getStatusId(), req.getStatusId())) {
@@ -729,7 +788,7 @@ public abstract class AbstractWorkItemService<T extends AbstractWorkItem> implem
             // 跨列拖拽属于「状态变更」，对应 issue:status；同列排序仍只需要 issue:edit（注解已拦）
             requirePermission(issue.getProjectId(), Permission.ISSUE_STATUS, "修改工作项状态");
             target = issueStatusMapper().selectById(toStatus);
-            if (target == null) throw new ServiceException(ErrorCode.STATUS_NOT_FOUND);
+            if (target == null) throw new ServiceException(ErrorCode.STATUS_INVALID);
             if (!workflowService().canTransition(issue.getProjectId(), category(), fromStatus, toStatus)) {
                 String fromName = fromStatusEntity == null ? "未知状态" : fromStatusEntity.getName();
                 throw new ServiceException(ErrorCode.STATUS_TRANSITION_DENIED, fromName, target.getName());
@@ -961,7 +1020,8 @@ public abstract class AbstractWorkItemService<T extends AbstractWorkItem> implem
     /** 排序键计算与列内重排已抽到 {@link WorkItemSortKeyService}（算法与业务字段无关，可独立测试） */
     private String computeSortKey(UUID projectId, UUID statusId, UUID beforeId, UUID afterId) {
         return sortKeyService.computeSortKey(mapper(),
-                new WorkItemSortKeyService.SortKeyRequest(projectId, statusId, beforeId, afterId));
+                new WorkItemSortKeyService.SortKeyRequest(projectId, statusId, beforeId, afterId),
+                deps.tailSortKey());
     }
 
     // ========================= 看板聚合（供 BoardService 调用，已按表隔离） =========================

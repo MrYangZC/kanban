@@ -34,6 +34,7 @@ import com.seven7m.kanban.mapper.handoff.ProjectHandoffMapper;
 import com.seven7m.kanban.mapper.milestone.MilestoneMapper;
 import com.seven7m.kanban.mapper.project.ProjectFavoriteMapper;
 import com.seven7m.kanban.mapper.project.ProjectMapper;
+import com.seven7m.kanban.mapper.project.ProjectVisibilityQuery;
 import com.seven7m.kanban.mapper.project.ProjectMemberMapper;
 import com.seven7m.kanban.service.project.ProjectInitializer;
 import com.seven7m.kanban.service.project.ProjectMemberService;
@@ -69,14 +70,6 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
      */
     private static final int DEFAULT_PAGE_SIZE = 10;
 
-    /** 排序字段白名单：固定在这几个，其余值一律回落到创建时间 */
-    private static final String SORT_FIELD_CREATED_AT = "createdAt";
-    private static final String SORT_FIELD_UPDATED_AT = "updatedAt";
-    private static final String SORT_FIELD_NAME = "name";
-    private static final String SORT_FIELD_PROJECT_KEY = "projectKey";
-
-    /** 升序标记：只有显式传 asc 才升序，缺省沿用"最新在前"的降序语义 */
-    private static final String ORDER_ASC = "asc";
 
     private final ProjectMemberMapper projectMemberMapper;
     private final ProjectFavoriteMapper projectFavoriteMapper;
@@ -176,13 +169,9 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
     @Override
     public List<ProjectVO> listAll(ProjectCategoryKey category) {
         UUID currentUser = UserContext.getUserId();
-        Optional<LambdaQueryWrapper<Project>> query =
-                ProjectQueryScope.visibleQuery(baseMapper, category, currentUser, isSuperAdmin(currentUser));
-        if (query.isEmpty()) {
-            return List.of();
-        }
-        LambdaQueryWrapper<Project> wrapper = query.get().orderByDesc(Project::getCreatedAt);
-        return assembleBatch(list(wrapper), currentUser);
+        ProjectVisibilityQuery query = ProjectQueryScope.visibility(
+                category, currentUser, isSuperAdmin(currentUser), null, null, null);
+        return assembleBatch(baseMapper.selectVisible(query), currentUser);
     }
 
     /**
@@ -202,19 +191,16 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
                 ? DEFAULT_PAGE_SIZE
                 : Math.min(req.getSize(), PageLimits.ADMIN_MAX_SIZE);
 
-        Optional<LambdaQueryWrapper<Project>> visible =
-                ProjectQueryScope.visibleQuery(baseMapper, category, currentUser, isSuperAdmin(currentUser));
-        if (visible.isEmpty()) {
-            return new PageResult<>(0L, pageNum, size, List.of());
-        }
-        LambdaQueryWrapper<Project> query = visible.get();
-        ProjectQueryScope.applyKeyword(query, req.getKeyword());
+        // 可见性条件（成员/角色/收藏/关键词）与排序都在 Mapper 的 EXISTS 查询里，服务层只负责翻译参数
+        ProjectVisibilityQuery query = ProjectQueryScope.visibility(category, currentUser,
+                isSuperAdmin(currentUser), req.getKeyword(), req.getSortField(), req.getSortOrder());
 
-        long total = count(query);
-
-        applyProjectSort(query, req.getSortField(), req.getSortOrder());
-
-        List<Project> projects = page(new Page<>(pageNum, size, false), query).getRecords();
+        long total = baseMapper.countVisible(query);
+        // 分页由 MyBatis-Plus 的拦截器根据 IPage 参数追加 LIMIT/OFFSET；total 用同源的 countVisible 单独取，
+        // 避免 count SQL 也带上 ORDER BY
+        List<Project> projects = total == 0
+                ? List.of()
+                : baseMapper.selectVisiblePage(new Page<>(pageNum, size, false), query);
         return new PageResult<>(total, pageNum, size, assembleBatch(projects, currentUser));
     }
 
@@ -240,31 +226,6 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
         }).collect(Collectors.toList());
     }
 
-    /** 排序字段白名单，防止 SQL 注入 */
-    private void applyProjectSort(LambdaQueryWrapper<Project> q, String sortField, String sortOrder) {
-        if (sortField == null || sortField.isBlank()) {
-            q.orderByDesc(Project::getCreatedAt);
-            return;
-        }
-        // 只有显式 asc 才升序；缺省（null）沿用"最新在前"的降序语义，避免删掉 DTO 默认值后行为反转
-        boolean asc = ORDER_ASC.equalsIgnoreCase(sortOrder);
-        switch (sortField) {
-            case SORT_FIELD_CREATED_AT -> orderProjects(q, Project::getCreatedAt, asc);
-            case SORT_FIELD_UPDATED_AT -> orderProjects(q, Project::getUpdatedAt, asc);
-            case SORT_FIELD_NAME -> orderProjects(q, Project::getName, asc);
-            case SORT_FIELD_PROJECT_KEY -> orderProjects(q, Project::getProjectKey, asc);
-            default -> q.orderByDesc(Project::getCreatedAt);
-        }
-    }
-
-    /** 单个排序项的升/降序落库（把 if/else 收成一处，避免每种字段重复一遍） */
-    private static void orderProjects(LambdaQueryWrapper<Project> q, SFunction<Project, ?> column, boolean asc) {
-        if (asc) {
-            q.orderByAsc(column);
-        } else {
-            q.orderByDesc(column);
-        }
-    }
 
     /**
      * 查询当前用户五个分类的项目计数，满足包含关系：managed ≤ participated ≤ all。
@@ -278,41 +239,22 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
         UUID currentUser = UserContext.getUserId();
         ProjectCategoryCountsVO vo = new ProjectCategoryCountsVO();
 
-        // 与列表口径保持一致：超管计入全部项目，否则项目列表有数据而计数为 0
+        // 与列表口径完全同源：每个分类都走同一条可见性 SQL 的计数，不再各自拼子查询
         boolean superAdmin = isSuperAdmin(currentUser);
-        if (superAdmin) {
-            long activeTotal = countByStatus(ProjectStatus.ACTIVE);
-            vo.setAll(activeTotal);
-            vo.setParticipated(activeTotal);
-            vo.setManaged(activeTotal);
-            vo.setArchived(countByStatus(ProjectStatus.ARCHIVED));
-        } else {
-            List<UUID> memberIds = baseMapper.selectMemberProjectIds(currentUser);
-            long activeMemberTotal = countByStatusAndIds(ProjectStatus.ACTIVE, memberIds);
-            vo.setAll(activeMemberTotal);
-            vo.setParticipated(activeMemberTotal);
-            vo.setManaged(countByStatusAndIds(ProjectStatus.ACTIVE,
-                    ProjectQueryScope.managedProjectIds(baseMapper, currentUser)));
-            vo.setArchived(countByStatusAndIds(ProjectStatus.ARCHIVED, memberIds));
-        }
+        long activeAll = countVisible(ProjectCategoryKey.ALL, currentUser, superAdmin);
+        vo.setAll(activeAll);
+        vo.setParticipated(activeAll);
+        vo.setManaged(countVisible(ProjectCategoryKey.MANAGED, currentUser, superAdmin));
+        vo.setArchived(countVisible(ProjectCategoryKey.ARCHIVED, currentUser, superAdmin));
         // 收藏是用户私人数据、不是权限，因此对超管同样按自己的收藏过滤（与改前一致）
-        vo.setFavorited(countByStatusAndIds(ProjectStatus.ACTIVE, baseMapper.selectFavoritedProjectIds(currentUser)));
+        vo.setFavorited(countVisible(ProjectCategoryKey.FAVORITED, currentUser, superAdmin));
         return vo;
     }
 
-    /** 按状态统计项目数 */
-    private long countByStatus(ProjectStatus status) {
-        return count(Wrappers.<Project>lambdaQuery().eq(Project::getStatus, status.name()));
-    }
-
-    /** 按状态 + 可见项目 id 集合统计；ids 为空直接 0，不查库 */
-    private long countByStatusAndIds(ProjectStatus status, List<UUID> ids) {
-        if (ids.isEmpty()) {
-            return 0L;
-        }
-        return count(Wrappers.<Project>lambdaQuery()
-                .eq(Project::getStatus, status.name())
-                .in(Project::getId, ids));
+    /** 单个分类的项目计数：参数翻译复用 {@link ProjectQueryScope}，SQL 在 Mapper 里 */
+    private long countVisible(ProjectCategoryKey category, UUID userId, boolean superAdmin) {
+        ProjectVisibilityQuery query = ProjectQueryScope.visibility(category, userId, superAdmin, null, null, null);
+        return baseMapper.countVisible(query);
     }
 
     @Override
@@ -380,7 +322,7 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
     public void unarchive(UUID projectId, UUID userId) {
         Project p = requireProject(projectId);
         if (!isAdmin(projectId, userId)) {
-            throw new ServiceException(ErrorCode.PROJECT_UNARCHIVE_ADMIN_ONLY);
+            throw new ServiceException(ErrorCode.PROJECT_ADMIN_ONLY);
         }
         if (ProjectStatus.ACTIVE == ProjectStatus.of(p.getStatus())) {
             throw new ServiceException(ErrorCode.PROJECT_NOT_ARCHIVED);

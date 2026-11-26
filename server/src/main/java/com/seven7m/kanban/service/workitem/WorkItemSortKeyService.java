@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BiFunction;
 
 /**
  * 看板列内排序键（fractional index）的维护逻辑。
@@ -61,18 +62,20 @@ public class WorkItemSortKeyService {
      * 计算目标位置的 sort_key；结果过长时先把整列改写成等宽键再重算。
      * 重排后相邻键之间恢复大量间隔，后续插入不再退化。
      */
-    public <T extends AbstractWorkItem> String computeSortKey(BaseMapper<T> mapper, SortKeyRequest request) {
-        String key = computeOnce(mapper, request);
+    public <T extends AbstractWorkItem> String computeSortKey(BaseMapper<T> mapper, SortKeyRequest request,
+                                                              BiFunction<UUID, UUID, String> tailSortKey) {
+        String key = computeOnce(mapper, request, tailSortKey);
         if (key != null && key.length() > SORT_KEY_REBALANCE_THRESHOLD) {
             int count = rebalanceColumn(mapper, request);
             log.info("sort_key 超长触发列内重排: project={}, status={}, rows={}",
                     request.projectId(), request.statusId(), count);
-            key = computeOnce(mapper, request);
+            key = computeOnce(mapper, request, tailSortKey);
         }
         return key;
     }
 
-    private <T extends AbstractWorkItem> String computeOnce(BaseMapper<T> mapper, SortKeyRequest request) {
+    private <T extends AbstractWorkItem> String computeOnce(BaseMapper<T> mapper, SortKeyRequest request,
+                                                             BiFunction<UUID, UUID, String> tailSortKey) {
         UUID statusId = request.statusId();
         UUID beforeId = request.beforeId();
         UUID afterId = request.afterId();
@@ -102,19 +105,10 @@ public class WorkItemSortKeyService {
             return SortKeyUtils.between(null, a.getSortKey());
         }
         // 未指定相邻卡片：追加到目标列末尾
-        return SortKeyUtils.after(tailSortKey(mapper, request.projectId(), statusId));
+        return SortKeyUtils.after(tailSortKey.apply(request.projectId(), statusId));
     }
 
-    /** 目标状态列内当前最大的 sort_key，用于把工作项追加到列尾；空列返回 null */
-    private <T extends AbstractWorkItem> String tailSortKey(BaseMapper<T> mapper, UUID projectId, UUID statusId) {
-        // 取列表再取第一条：在 QueryWrapper 上拼 LIMIT 片段属于把 SQL 写回服务层
-        T tail = mapper.selectList(Wrappers.<T>query()
-                        .eq(WorkItemColumns.PROJECT_ID, projectId)
-                        .eq(WorkItemColumns.STATUS_ID, statusId)
-                        .orderByDesc(WorkItemColumns.SORT_KEY))
-                .stream().findFirst().orElse(null);
-        return tail == null ? null : tail.getSortKey();
-    }
+
 
     /**
      * 把某一列的 sort_key 全部改写成等宽键（保持现有顺序）。

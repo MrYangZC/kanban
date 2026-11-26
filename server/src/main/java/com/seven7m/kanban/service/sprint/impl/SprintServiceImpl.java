@@ -37,6 +37,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SprintServiceImpl extends ServiceImpl<SprintMapper, Sprint> implements SprintService {
 
+    /**
+     * 迭代名称上限。
+     *
+     * <p>与库表 {@code sprint.name varchar(100)} 对齐：服务层不提前拦，超长名称会以
+     * PG 的「value too long」500 暴露，前端拿不到"是哪个字段超了多少"。
+     */
+    private static final int SPRINT_NAME_MAX = 100;
+
+    /** 迭代目标上限，与库表 {@code sprint.goal varchar(500)} 对齐，口径同 {@link #SPRINT_NAME_MAX} */
+    private static final int SPRINT_GOAL_MAX = 500;
+
     private final SysUserMapper userMapper;
 
     @Override
@@ -60,6 +71,20 @@ public class SprintServiceImpl extends ServiceImpl<SprintMapper, Sprint> impleme
         return toVO(requireSprint(projectId, id));
     }
 
+    /** 迭代名称长度校验：直接量本次要写入的原始值（与写入口径一致，不做 trim） */
+    private void validateName(String name) {
+        if (name != null && name.length() > SPRINT_NAME_MAX) {
+            throw new ServiceException(ErrorCode.FIELD_TOO_LONG, "迭代名称", SPRINT_NAME_MAX);
+        }
+    }
+
+    /** 迭代目标长度校验：同 {@link #validateName}，只校验本次实际要写的值 */
+    private void validateGoal(String goal) {
+        if (goal != null && goal.length() > SPRINT_GOAL_MAX) {
+            throw new ServiceException(ErrorCode.FIELD_TOO_LONG, "迭代目标", SPRINT_GOAL_MAX);
+        }
+    }
+
     /** 迭代起止日期校验：结束日期不能早于开始日期 */
     private void validateDateRange(LocalDate start, LocalDate end) {
         if (start != null && end != null && end.isBefore(start)) {
@@ -71,6 +96,8 @@ public class SprintServiceImpl extends ServiceImpl<SprintMapper, Sprint> impleme
     @Transactional
     public SprintVO create(UUID projectId, CreateSprintRequest req) {
         validateDateRange(req.getStartDate(), req.getEndDate());
+        validateName(req.getName());
+        validateGoal(req.getGoal());
         Sprint sprint = new Sprint();
         sprint.setId(UUID.randomUUID());
         sprint.setProjectId(projectId);
@@ -89,8 +116,15 @@ public class SprintServiceImpl extends ServiceImpl<SprintMapper, Sprint> impleme
     @Transactional
     public SprintVO update(UUID projectId, UUID id, UpdateSprintRequest req) {
         Sprint sprint = requireSprint(projectId, id);
-        if (req.getName() != null) sprint.setName(req.getName());
-        if (req.getGoal() != null) sprint.setGoal(req.getGoal());
+        // 非空才更新：长度也只校验本次实际要写的那两个值
+        if (req.getName() != null) {
+            validateName(req.getName());
+            sprint.setName(req.getName());
+        }
+        if (req.getGoal() != null) {
+            validateGoal(req.getGoal());
+            sprint.setGoal(req.getGoal());
+        }
         LocalDate newStart = req.getStartDate() != null ? req.getStartDate() : sprint.getStartDate();
         LocalDate newEnd = req.getEndDate() != null ? req.getEndDate() : sprint.getEndDate();
         validateDateRange(newStart, newEnd);

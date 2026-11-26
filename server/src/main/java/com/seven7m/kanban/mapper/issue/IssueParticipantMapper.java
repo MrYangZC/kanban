@@ -16,17 +16,32 @@ import java.util.UUID;
 public interface IssueParticipantMapper extends BaseMapper<IssueParticipant> {
 
     /**
-     * 「共享给我」筛选用：某用户在某类别下参与的全部工作项 id。
+     * 「共享给我」筛选用：某用户在某项目、某类别下参与的工作项 id。
      *
      * <p>此前工作项列表在条件构造器里手写
      * {@code id IN (SELECT issue_id FROM issue_participant WHERE user_id = ... AND category = ...)}，
-     * 把子查询留在了 Service 层。这里收回 mapper，Service 只负责把结果交给
-     * {@code wrapper.in(id, ids)}。
+     * 把子查询留在了 Service 层。收回 mapper 后要注意 <b>必须带 project_id</b>：
+     * 只按 user/category 取会把该用户在所有项目下的工作项 id 全拉回 Java 再拼 {@code IN}，
+     * 大账号下既浪费内存也逼近 PostgreSQL 的 65535 个绑定参数上限。
+     *
+     * <p>{@code issue_participant} 没有 project_id 列，因此 JOIN 三张工作项表的公共集合取项目归属；
+     * {@code project_id} 条件会被下推到每个 UNION 分支（各表都有 {@code (project_id, ...)} 索引）。
      */
     @Select("""
-            SELECT issue_id FROM issue_participant
-            WHERE user_id = #{userId} AND category = #{category}
+            SELECT ip.issue_id
+            FROM issue_participant ip
+            JOIN (
+                SELECT id, project_id FROM task
+                UNION ALL
+                SELECT id, project_id FROM requirement
+                UNION ALL
+                SELECT id, project_id FROM bug
+            ) w ON w.id = ip.issue_id
+            WHERE ip.user_id = #{userId}
+              AND ip.category = #{category}
+              AND w.project_id = #{projectId}
             """)
-    List<UUID> selectIssueIdsByUserAndCategory(@Param("userId") UUID userId,
-                                               @Param("category") String category);
+    List<UUID> selectIssueIdsByUserInProject(@Param("userId") UUID userId,
+                                             @Param("category") String category,
+                                             @Param("projectId") UUID projectId);
 }

@@ -1,6 +1,5 @@
 package com.seven7m.kanban.service.issue.comment;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.seven7m.kanban.dto.issue.IssueActivityVO;
 import com.seven7m.kanban.dto.issue.IssueTimelineVO;
 import com.seven7m.kanban.entity.issue.comment.IssueComment;
@@ -10,13 +9,16 @@ import java.util.UUID;
 /**
  * 工作项评论与动态服务接口。
  *
- * <p>评论本身是「单实体（issue_comment）+ 单主 Mapper」的增删，因此继承 {@link IService}
+ * <p>评论本身是「单实体（issue_comment）+ 单主 Mapper」的增删，因此实现类继承 {@code ServiceImpl}
  * 复用 MyBatis-Plus 的按 id 取 / 保存 / 计数 / 删除能力；时间线是评论与动态的合并查询，
  * 走 {@code IssueTimelineMapper} 的定制 SQL，不在通用 CRUD 范围内。
  *
  * <p>实现见 {@code com.seven7m.kanban.service.issue.comment.impl.IssueCommentServiceImpl}。
+ *
+ * <p>接口<b>不</b>外露 {@code IService} 的通用写方法（{@code save/updateById/removeById}
+ * 会绕过本域的权限与副作用校验），外部只能调用下面的领域方法。
  */
-public interface IssueCommentService extends IService<IssueComment> {
+public interface IssueCommentService {
 
     /**
      * 评论 + 动态的时间线（分页，按时间倒序：最新在前）。

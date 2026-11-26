@@ -1,6 +1,5 @@
 package com.seven7m.kanban.service.announcement;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.seven7m.kanban.dto.announcement.AnnouncementVO;
 import com.seven7m.kanban.dto.announcement.CreateAnnouncementRequest;
 import com.seven7m.kanban.dto.announcement.UpdateAnnouncementRequest;
@@ -12,12 +11,15 @@ import java.util.UUID;
 /**
  * 公告(Announcement)服务：项目级公告的 CRUD。
  *
- * <p>继承 {@link IService} 复用 MyBatis-Plus 的单表通用能力（按 id 取、保存、删除、按条件取列表）；
+ * <p>实现类继承 {@code ServiceImpl} 复用 MyBatis-Plus 的单表通用能力（按 id 取、保存、删除、按条件取列表）；
  * 作者展示名要跨表查用户，仍走注入的 {@code SysUserMapper}，列表场景批量查一次避免 N+1。
  *
  * <p>实现见 {@link com.seven7m.kanban.service.announcement.impl.AnnouncementServiceImpl}。
+ *
+ * <p>接口<b>不</b>外露 {@code IService} 的通用写方法（{@code save/updateById/removeById}
+ * 会绕过本域的权限与副作用校验），外部只能调用下面的领域方法。
  */
-public interface AnnouncementService extends IService<Announcement> {
+public interface AnnouncementService {
 
     /** 项目下的公告列表（置顶优先，其次按创建时间倒序） */
     List<AnnouncementVO> list(UUID projectId);

@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 public class BugServiceImpl extends AbstractWorkItemService<Bug> implements BugService {
 
     public BugServiceImpl(BugMapper bugMapper, WorkItemSharedDeps shared) {
-        super(new WorkItemDeps<>(ItemCategory.BUG, bugMapper, bugMapper::nextIssueNumber, Bug::new, shared));
+        super(new WorkItemDeps<>(ItemCategory.BUG, bugMapper, bugMapper::nextIssueNumber,
+                Bug::new, bugMapper::selectTailSortKey, shared));
     }
 }

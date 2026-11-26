@@ -189,14 +189,11 @@ public class WorkItemHandoffService {
      * </ol>
      */
     public RevokePlan planRevoke(Context ctx) {
-        // 取最近一条交接/撤销动态。不用 selectOne + last("LIMIT 1")：在条件构造器上
-        // 拼 SQL 片段属于越层写法，取列表再取第一条等价
-        IssueActivity last = issueActivityMapper.selectList(Wrappers.<IssueActivity>lambdaQuery()
-                        .eq(IssueActivity::getIssueId, ctx.issueId())
-                        .eq(IssueActivity::getCategory, ctx.category().name())
-                        .in(IssueActivity::getAction, ACTION_ASSIGNEE_CHANGED, ACTION_HANDOFF_REVOKED)
-                        .orderByDesc(IssueActivity::getCreatedAt))
-                .stream().findFirst().orElse(null);
+        // 取最近一条交接/撤销动态：由 Mapper 的 ORDER BY ... LIMIT 1 完成，
+        // 与 IssueTimelineMapper#latestHandoff（决定撤销按钮是否可见）共用同一取值规则，
+        // 避免"按钮亮着、点下去却取到另一条"的割裂
+        IssueActivity last = issueActivityMapper.selectLatestHandoffActivity(
+                ctx.issueId(), ctx.category().name(), ACTION_ASSIGNEE_CHANGED, ACTION_HANDOFF_REVOKED);
         if (last == null || !ACTION_ASSIGNEE_CHANGED.equals(last.getAction())) {
             throw new ServiceException(ErrorCode.HANDOFF_NOTHING_TO_REVOKE);
         }

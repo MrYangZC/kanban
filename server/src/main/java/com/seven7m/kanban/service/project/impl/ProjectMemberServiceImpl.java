@@ -3,7 +3,9 @@ package com.seven7m.kanban.service.project.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.seven7m.kanban.common.cache.RequestScopedCacheStore;
 import com.seven7m.kanban.common.exception.ErrorCode;
+import com.seven7m.kanban.common.util.LikeEscaper;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.MemberRolePort;
 import com.seven7m.kanban.common.security.PermissionService;
@@ -59,11 +61,6 @@ public class ProjectMemberServiceImpl extends ServiceImpl<ProjectMemberMapper, P
     /** 候选用户搜索的每页条数上限（下拉框不需要更多） */
     private static final int MAX_CANDIDATE_LIMIT = 50;
 
-    /** 角色缓存 TTL：5 分钟 */
-    private static final long ROLE_CACHE_TTL_MS = 5 * 60 * 1000;
-
-    /** 容量上限：超限整体清空，防止"用户数 × 项目数"很大时单例 Bean 内存无界增长 */
-    private static final int ROLE_CACHE_MAX_SIZE = 50_000;
 
     @Autowired
     @Lazy
@@ -81,28 +78,8 @@ public class ProjectMemberServiceImpl extends ServiceImpl<ProjectMemberMapper, P
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
 
-    /** 角色缓存：key=projectId:userId，value=角色集合或 NONE（非成员），TTL 5 分钟 */
-    private final Map<String, CacheEntry> roleCache = new ConcurrentHashMap<>();
-
-    private void ensureRoleCacheCapacity() {
-        if (roleCache.size() >= ROLE_CACHE_MAX_SIZE) {
-            roleCache.clear();
-        }
-    }
-
-    private static class CacheEntry {
-        final Set<String> roles;
-        final long expireAt;
-
-        CacheEntry(Set<String> roles) {
-            this.roles = roles;
-            this.expireAt = System.currentTimeMillis() + ROLE_CACHE_TTL_MS;
-        }
-
-        boolean alive() {
-            return System.currentTimeMillis() < expireAt;
-        }
-    }
+    /** 请求级缓存的 cacheName：同一请求内反复判角色只打一次库，跨请求重新读，避免多实例陈旧 */
+    private static final String ROLE_CACHE_NAME = "memberRoles";
 
     /** 项目成员列表（含用户展示信息与角色集合），按加入时间排序 */
     @Override
@@ -148,7 +125,9 @@ public class ProjectMemberServiceImpl extends ServiceImpl<ProjectMemberMapper, P
             q.notIn(SysUser::getId, memberIds);
         }
         if (!kw.isEmpty()) {
-            q.and(w -> w.like(SysUser::getUsername, kw).or().like(SysUser::getDisplayName, kw));
+            // 与项目列表同一口径：转义 LIKE 通配符，否则搜 "_" / "%" 会把整张用户表都命中
+            String pattern = LikeEscaper.contains(kw);
+            q.and(w -> w.like(SysUser::getUsername, pattern).or().like(SysUser::getDisplayName, pattern));
         }
         return userMapper.selectPage(new Page<>(1, max, false), q).getRecords().stream().map(u -> {
             MemberCandidateVO vo = new MemberCandidateVO();
@@ -243,8 +222,11 @@ public class ProjectMemberServiceImpl extends ServiceImpl<ProjectMemberMapper, P
     }
 
     /**
-     * 查询用户在指定项目中的角色集合，带短 TTL 缓存避免鉴权拦截器每次查库。
-     * 非成员返回空集合。缓存 key 为 projectId:userId，TTL 5 分钟自动失效。
+     * 查询用户在指定项目中的角色集合。非成员返回空集合。
+     *
+     * <p>缓存只活在**当前请求**内（key = projectId:userId）：鉴权拦截器 + 列表装配会在同一次请求里
+     * 反复判角色，请求级缓存足以省掉这些重复查询；跨请求一律重新读库，
+     * 避免多实例部署时"A 节点改了角色、B 节点还按旧角色放行"。
      */
     @Override
     public Set<String> getRoles(UUID projectId, UUID userId) {
@@ -252,18 +234,16 @@ public class ProjectMemberServiceImpl extends ServiceImpl<ProjectMemberMapper, P
             return Set.of();
         }
         String cacheKey = projectId + ":" + userId;
-        CacheEntry entry = roleCache.get(cacheKey);
-        if (entry != null && entry.alive()) {
-            return entry.roles;
+        Object cached = RequestScopedCacheStore.get(ROLE_CACHE_NAME, cacheKey);
+        if (cached instanceof Set<?>) {
+            @SuppressWarnings("unchecked")
+            Set<String> hit = (Set<String>) cached;
+            return hit;
         }
-        if (!projectService.isMember(projectId, userId)) {
-            ensureRoleCacheCapacity();
-            roleCache.put(cacheKey, new CacheEntry(Set.of()));
-            return Set.of();
-        }
-        Set<String> roles = new LinkedHashSet<>(userRoleMapper.selectRoleCodesByProjectAndUser(projectId, userId));
-        ensureRoleCacheCapacity();
-        roleCache.put(cacheKey, new CacheEntry(roles));
+        Set<String> roles = projectService.isMember(projectId, userId)
+                ? new LinkedHashSet<>(userRoleMapper.selectRoleCodesByProjectAndUser(projectId, userId))
+                : Set.of();
+        RequestScopedCacheStore.put(ROLE_CACHE_NAME, cacheKey, roles);
         return roles;
     }
 
@@ -288,22 +268,24 @@ public class ProjectMemberServiceImpl extends ServiceImpl<ProjectMemberMapper, P
     }
 
     /**
-     * 角色变更后使缓存失效，保证权限及时生效。
-     * userId 为 null 时失效该项目下的全部用户（原实现只删 "pid:null" 这个不存在的键，等同空操作）。
+     * 角色变更后使缓存失效，保证同一请求内后续的判定立刻看到新角色。
+     *
+     * <p>缓存本身随请求结束而消失，所以这里不需要"跨实例广播"；userId 为 null 时整体清空
+     * （粒度做不到按项目前缀清，且代价只是本请求多查几次库）。
      */
     @Override
     public void evictRoleCache(UUID projectId, UUID userId) {
         if (projectId == null) {
-            // 项目维度未知，只能全量失效（极少使用）
-            roleCache.clear();
+            // 项目维度未知，只能把当前请求内的角色缓存整体清空（极少使用）
+            RequestScopedCacheStore.clear(ROLE_CACHE_NAME);
             return;
         }
         if (userId == null) {
-            String prefix = projectId + ":";
-            roleCache.keySet().removeIf(k -> k.startsWith(prefix));
+            // 缓存只活在当前请求里，粒度做不到按项目前缀清；直接整体清空即可（代价仅是本请求再查几次库）
+            RequestScopedCacheStore.clear(ROLE_CACHE_NAME);
             return;
         }
-        roleCache.remove(projectId + ":" + userId);
+        RequestScopedCacheStore.evict(ROLE_CACHE_NAME, projectId + ":" + userId);
     }
 
     /** 写入用户-角色关联（RBAC：一人可多角色），供项目创建等内部逻辑调用 */

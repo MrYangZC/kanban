@@ -24,6 +24,12 @@ public final class PageLimits {
     /** 工作项列表每页上限 */
     public static final int LIST_MAX_SIZE = 1000;
 
+    /** 项目动态时间线缺省条数（与"只展示最近若干条"的产品口径一致） */
+    public static final int ACTIVITY_DEFAULT_SIZE = 20;
+
+    /** 项目动态时间线单次上限 */
+    public static final int ACTIVITY_MAX_SIZE = 100;
+
     private PageLimits() {
     }
 }

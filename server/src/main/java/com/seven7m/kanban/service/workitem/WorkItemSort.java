@@ -118,7 +118,7 @@ public final class WorkItemSort {
     }
 
     private static void defaultOrder(QueryWrapper<?> q) {
-        q.orderByAsc("status_id").orderByAsc("sort_key");
+        q.orderByAsc(WorkItemColumns.STATUS_ID).orderByAsc(WorkItemColumns.SORT_KEY);
     }
 
     private static Comparator<IssueVO> defaultOrder() {

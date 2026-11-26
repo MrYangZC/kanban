@@ -75,21 +75,39 @@ public enum ErrorCode {
     /** 删除用户前仍有评论/动态等业务痕迹 */
     USER_HAS_ACTIVITY(400, "该用户存在评论或动态记录，不允许删除，可改为禁用账号"),
     UUID_INVALID(400, "%s 格式非法: %s"),
+    /**
+     * 通用长度校验：第一个参数是字段人话名（如"迭代名称"），第二个是上限字符数。
+     *
+     * <p>为什么统一成一条：库里的 varchar(n) 才是最终约束，服务层不提前拦就会以 500 的形式暴露
+     * （PG 报 value too long），前端拿不到"哪个字段超了多少"。各域只需传自己的上限常量。
+     */
+    FIELD_TOO_LONG(400, "%s不能超过 %s 个字符"),
 
     // ==================== 项目 ====================
     PROJECT_NOT_FOUND(404, "项目不存在"),
-    /** 建项目/建工作项过程中引用到的项目不存在（历史语义为 400） */
+    /**
+     * 保存工作流交接配置（WorkflowService#saveHandoff）时引用到的项目不存在。
+     *
+     * <p>与 {@link #PROJECT_NOT_FOUND} 文案相同、码不同（历史接口对"读项目"返回 404、
+     * 对"写操作里引用了不存在的项目"返回 400），为保持前端行为不变而保留两个常量。
+     * 新增代码请优先用 404 的那个，除非确实是在校验请求体。
+     */
     PROJECT_MISSING(400, "项目不存在"),
     PROJECT_KEY_EXISTS(400, "项目 Key 已存在：%s"),
     PROJECT_ACCESS_DENIED(403, "无项目访问权限"),
     PROJECT_EDIT_DENIED(403, "无项目编辑权限"),
     PROJECT_ADMIN_ONLY(403, "仅项目管理员可操作"),
     PROJECT_ARCHIVE_ADMIN_ONLY(403, "仅项目管理员可归档"),
-    PROJECT_UNARCHIVE_ADMIN_ONLY(403, "仅项目管理员可操作"),
     PROJECT_DELETE_ADMIN_ONLY(403, "仅项目管理员可删除"),
     PROJECT_ALREADY_ARCHIVED(400, "项目已归档"),
     PROJECT_NOT_ARCHIVED(400, "项目未归档"),
     PROJECT_ARCHIVED_READONLY(400, "项目已归档，请先取消归档后再修改"),
+    /**
+     * 项目至少要留一个所有者（改角色时触发）。
+     *
+     * <p>与 {@code MEMBER_LAST_OWNER} 是同一约束的两个入口：移除成员说"不能移除最后一个所有者"，
+     * 改角色说"至少需保留一个所有者"。两条都是历史接口原话，为不改前端提示而分别保留。
+     */
     PROJECT_AT_LEAST_ONE_OWNER(400, "项目至少需保留一个所有者"),
     /** 删除项目前仍有工作项 */
     PROJECT_HAS_WORK_ITEMS(400, "项目下还有 %s 个工作项，请先删除或归档后再删除项目"),
@@ -107,10 +125,14 @@ public enum ErrorCode {
     WORK_ITEM_NOT_FOUND(404, "%s 不存在"),
     ISSUE_NOT_FOUND(404, "工作项不存在"),
     STATUS_NOT_FOUND(404, "状态不存在"),
+    /** 请求体里传了无效的状态 id（参数问题，沿用历史 400 语义） */
+    STATUS_INVALID(400, "状态不存在"),
     STATUS_MISSING_FOR_MOVE(400, "该工作项缺少当前状态，无法移动，请先在详情中设置状态"),
-    STATUS_NOT_IN_WORKFLOW(400, "状态不属于该工作项类型的工作流"),
+    STATUS_NOT_IN_WORKFLOW(400, "该状态不属于当前工作项类型的工作流"),
     STATUS_TRANSITION_DENIED(400, "不允许从「%s」流转到「%s」"),
     WORK_ITEM_TYPE_NOT_FOUND(400, "工作项类型不存在: %s"),
+    /** 路由前置校验用：只给了 issueTypeId 但查不到对应类型（历史文案不带 id） */
+    WORK_ITEM_TYPE_MISSING(400, "工作项类型不存在"),
     WORK_ITEM_TYPE_REQUIRED(400, "缺少工作项类型：issueTypeId 与 issueTypeCode 至少填一个"),
     WORK_ITEM_TYPE_UNKNOWN(400, "未知的工作项类型: %s"),
     WORK_ITEM_TYPE_UNINITIALIZED(400, "未初始化 IssueType: %s"),
@@ -123,6 +145,8 @@ public enum ErrorCode {
     PARENT_IS_DESCENDANT(400, "不能把工作项移动到它自己的子工作项下"),
     PARENT_CYCLE(400, "工作项层级异常（可能存在环）"),
     CLEAR_FIELD_UNSUPPORTED(400, "不支持清空字段: %s"),
+    /** 同一次请求里既给某字段赋值、又要求清空它 */
+    CLEAR_FIELD_CONFLICT(400, "同一字段不能既赋值又清空: %s"),
     NEIGHBOR_NOT_FOUND(400, "相邻卡片不存在"),
     NEIGHBOR_WRONG_COLUMN(400, "相邻卡片不属于目标状态列"),
     PERMISSION_DENIED_ACTION(403, "无权限%s"),
@@ -172,6 +196,12 @@ public enum ErrorCode {
     HANDOFF_NOTE_TOO_LONG(400, "交接说明不能超过 500 字"),
     HANDOFF_MEMBER_REQUIRED(400, "请选择接手的成员"),
     HANDOFF_MEMBER_NOT_FOUND(400, "接手的成员不存在"),
+    /**
+     * 交接列配置的接手人不是项目成员。
+     *
+     * <p>与 {@link #MEMBER_NOT_FOUND} 文案相同、码不同：成员管理接口用 404（"查无此成员"），
+     * 交接配置是校验请求体，沿用历史 400。两者语义与前端行为都不同，故分开保留。
+     */
     HANDOFF_MEMBER_NOT_IN_PROJECT(400, "该用户不是项目成员"),
     HANDOFF_SPRINT_IN_OTHER_PROJECT(400, "落点迭代不存在或不属于该项目"),
     HANDOFF_LABEL_NOT_IN_LIBRARY(400, "落点标签不在本项目的标签库里"),

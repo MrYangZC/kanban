@@ -2,6 +2,7 @@ package com.seven7m.kanban.service.issue.comment.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.seven7m.kanban.common.constant.DisplayNames;
 import com.seven7m.kanban.common.constant.PageLimits;
 import com.seven7m.kanban.common.domain.NameIndex;
 import com.seven7m.kanban.common.exception.ErrorCode;
@@ -58,7 +59,6 @@ public class IssueCommentServiceImpl extends ServiceImpl<IssueCommentMapper, Iss
     private static final String TIMELINE_TYPE_COMMENT = "COMMENT";
 
     /** 操作人已不存在（或未记录）时的展示名，与前端"未知用户"的口径保持一致 */
-    private static final String UNKNOWN_ACTOR_NAME = "未知";
 
     private final IssueTimelineMapper timelineMapper;
     private final SysUserMapper userMapper;
@@ -125,7 +125,7 @@ public class IssueCommentServiceImpl extends ServiceImpl<IssueCommentMapper, Iss
             vo.setId(row.getId());
             vo.setType(row.getType());
             vo.setActorId(actorId);
-            vo.setActorName(actor == null ? UNKNOWN_ACTOR_NAME : actor.getDisplayName());
+            vo.setActorName(actor == null ? DisplayNames.UNKNOWN_USER : actor.getDisplayName());
             vo.setActorAvatarUrl(actor == null ? null : actor.getAvatarUrl());
             vo.setContent(row.getContent());
             vo.setParentId(row.getParentId());
@@ -174,7 +174,7 @@ public class IssueCommentServiceImpl extends ServiceImpl<IssueCommentMapper, Iss
         vo.setId(c.getId());
         vo.setType(TIMELINE_TYPE_COMMENT);
         vo.setActorId(c.getUserId());
-        vo.setActorName(u == null ? UNKNOWN_ACTOR_NAME : u.getDisplayName());
+        vo.setActorName(u == null ? DisplayNames.UNKNOWN_USER : u.getDisplayName());
         vo.setActorAvatarUrl(u == null ? null : u.getAvatarUrl());
         vo.setParentId(c.getParentId());
         vo.setContent(c.getContent());
@@ -182,6 +182,11 @@ public class IssueCommentServiceImpl extends ServiceImpl<IssueCommentMapper, Iss
         return vo;
     }
 
+    /**
+     * 删除评论。
+     *
+     * <p>归档项目只读，删除同样被拦（与被拦的新建/编辑路径一致）。
+     */
     @Override
     @Transactional
     public void deleteComment(UUID issueId, UUID commentId) {
@@ -189,6 +194,8 @@ public class IssueCommentServiceImpl extends ServiceImpl<IssueCommentMapper, Iss
         if (c == null || !c.getIssueId().equals(issueId)) {
             return;
         }
+        // 归档项目只读：删除评论同样属于修改工作项，与新建路径（addComment）同一套拦截
+        projectWriteGuard.requireWritable(workItemRouter.getProjectId(issueId));
         // 只能删自己发表的评论；系统管理员可代为清理。
         // 此前只要有 issue:comment 权限，任何人都能删别人的评论，且不留任何审计痕迹。
         UUID currentUser = UserContext.getUserId();

@@ -1,6 +1,7 @@
 package com.seven7m.kanban.service.workitem;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.seven7m.kanban.common.constant.WorkItemColumns;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.common.exception.ErrorCode;
@@ -32,6 +33,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -83,7 +85,7 @@ public class WorkItemRouter implements IssueLocationPort {
         // 只传 issueTypeId 时先反查类型编码，避免落表与非 TASK 类型不一致
         if ((code == null || code.isBlank()) && req.getIssueTypeId() != null) {
             IssueType type = issueTypeMapper.selectById(req.getIssueTypeId());
-            if (type == null) throw new ServiceException(ErrorCode.WORK_ITEM_TYPE_NOT_FOUND, req.getIssueTypeId());
+            if (type == null) throw new ServiceException(ErrorCode.WORK_ITEM_TYPE_MISSING);
             code = type.getCode();
         }
         return routeByTypeCode(code).create(req);
@@ -173,11 +175,11 @@ public class WorkItemRouter implements IssueLocationPort {
     public long countByProject(UUID projectId) {
         long total = 0;
         total += taskMapper.selectCount(new QueryWrapper<Task>()
-                .eq("project_id", projectId));
+                .eq(WorkItemColumns.PROJECT_ID, projectId));
         total += requirementMapper.selectCount(new QueryWrapper<Requirement>()
-                .eq("project_id", projectId));
+                .eq(WorkItemColumns.PROJECT_ID, projectId));
         total += bugMapper.selectCount(new QueryWrapper<Bug>()
-                .eq("project_id", projectId));
+                .eq(WorkItemColumns.PROJECT_ID, projectId));
         return total;
     }
 
@@ -273,7 +275,7 @@ public class WorkItemRouter implements IssueLocationPort {
      */
     public static ItemCategory categoryOfCode(String code) {
         if (code == null || code.isBlank()) return null;
-        return switch (code.trim().toUpperCase()) {
+        return switch (code.trim().toUpperCase(Locale.ROOT)) {
             case "TASK", "IMPROVEMENT" -> ItemCategory.TASK; // V27：改进类归入任务表
             case "STORY", "FEATURE", "REQUIREMENT" -> ItemCategory.REQUIREMENT;
             case "BUG", "FUNC_DEFECT", "PERF_DEFECT", "SEC_DEFECT", "COMPAT_DEFECT", "UI_DEFECT" ->
@@ -357,7 +359,7 @@ public class WorkItemRouter implements IssueLocationPort {
             }
         }
 
-        boolean asc = !"desc".equalsIgnoreCase(req.getSortOrder());
+        boolean asc = !WorkItemSort.DESC.equalsIgnoreCase(req.getSortOrder());
         Comparator<IssueVO> cmp = comparatorFor(req.getSortField());
         merged.sort(asc ? cmp : cmp.reversed());
 
@@ -381,6 +383,15 @@ public class WorkItemRouter implements IssueLocationPort {
         c.setKeyword(req.getKeyword());
         c.setIssueTypeCodes(req.getIssueTypeCodes());
         c.setGroupBy(req.getGroupBy());
+        // 人员与时间区间同样必须带过去：漏一个就会让「全部工作项」视图里的该筛选静默失效
+        c.setAssigneeId(req.getAssigneeId());
+        c.setReporterId(req.getReporterId());
+        c.setCreatedFrom(req.getCreatedFrom());
+        c.setCreatedTo(req.getCreatedTo());
+        c.setUpdatedFrom(req.getUpdatedFrom());
+        c.setUpdatedTo(req.getUpdatedTo());
+        c.setDueFrom(req.getDueFrom());
+        c.setDueTo(req.getDueTo());
         c.setSprintId(req.getSprintId());
         c.setPage(1);
         c.setSize(fetchSize);
