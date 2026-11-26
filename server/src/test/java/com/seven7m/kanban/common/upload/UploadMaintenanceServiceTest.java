@@ -39,7 +39,7 @@ class UploadMaintenanceServiceTest {
         when(attachmentMapper.selectObjs(any())).thenReturn(objs("uploads/keep.png"));
         when(uploadFileMapper.selectObjs(any())).thenReturn(objs());
         service = new UploadMaintenanceService(
-                new UploadProperties(tempDir.toString(), 50), attachmentMapper, uploadFileMapper);
+                new UploadProperties(tempDir.toString(), 50, ""), attachmentMapper, uploadFileMapper);
     }
 
     private static List<Object> objs(String... values) {

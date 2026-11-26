@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
@@ -26,20 +27,20 @@ public class AnnouncementController {
 
     private final AnnouncementService announcementService;
 
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'issue:view')")
     @GetMapping
     public R<List<AnnouncementVO>> list(@PathVariable UUID projectId) {
         return R.ok(announcementService.list(projectId));
     }
 
-    @ProjectRoleAnnotation(Permission.ANNOUNCEMENT_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'announcement:manage')")
     @PostMapping
     public R<AnnouncementVO> create(@PathVariable UUID projectId,
                                     @Valid @RequestBody CreateAnnouncementRequest req) {
         return R.ok(announcementService.create(projectId, req));
     }
 
-    @ProjectRoleAnnotation(Permission.ANNOUNCEMENT_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'announcement:manage')")
     @PutMapping("/{id}")
     public R<AnnouncementVO> update(@PathVariable UUID projectId,
                                     @PathVariable UUID id,
@@ -47,7 +48,7 @@ public class AnnouncementController {
         return R.ok(announcementService.update(projectId, id, req));
     }
 
-    @ProjectRoleAnnotation(Permission.ANNOUNCEMENT_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'announcement:manage')")
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable UUID projectId,
                           @PathVariable UUID id) {

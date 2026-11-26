@@ -84,7 +84,7 @@ export function filterIssues(payload: IssueFilterPayload) {
 /**
  * 工作项导出地址（CSV）。
  * 直接用 window.open 触发浏览器下载：会话是 Cookie，无需额外请求头。
- * 注意必须带上 baseURL 的 /api 前缀（window.open 不走 axios）。
+ * 注意必须带上 API 前缀（window.open 不走 axios 的 baseURL，只能自己拼）。
  */
 export function exportIssuesUrl(projectId: string, params: {
   types?: string[]
@@ -96,7 +96,8 @@ export function exportIssuesUrl(projectId: string, params: {
   if (params.scope) query.set('scope', params.scope)
   if (params.keyword) query.set('keyword', params.keyword)
   const suffix = query.toString() ? `?${query.toString()}` : ''
-  return `/api/v1/projects/${projectId}/issues/export${suffix}`
+  // 与 request.ts 的 API_BASE 口径一致：接口前缀由 nginx 分配为 /kanban-api
+  return `/kanban-api/v1/projects/${projectId}/issues/export${suffix}`
 }
 
 // ---- 看板 / 度量 ----

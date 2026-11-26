@@ -19,7 +19,6 @@ import com.seven7m.kanban.service.workitem.WorkItemRouter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -50,10 +49,6 @@ public class IssueAttachmentService {
     private final AttachmentFileStore attachmentFileStore;
     private final PermissionService permissionService;
     private final ProjectWriteGuard projectWriteGuard;
-
-    /** 服务 context-path（默认 /api），用于拼附件的对外访问地址 */
-    @Value("${server.servlet.context-path:}")
-    private String contextPath;
 
     /** 类别名（TASK/REQUIREMENT/BUG）；工作项不存在时由 router 统一抛 404 */
     private String categoryOf(UUID issueId) {
@@ -162,7 +157,7 @@ public class IssueAttachmentService {
         a.setContentType(file.getContentType());
         a.setFileSize(file.getSize());
         // 由配置推导访问路径，避免把 context-path（/api）写死：改部署前缀时历史数据与新数据都还能取到
-        a.setUrl(contextPath + "/uploads/" + filename);
+        a.setUrl(uploadProperties.publicUrl(filename));
         a.setUploadedBy(UserContext.getUserId());
         a.setCreatedAt(LocalDateTime.now());
         attachmentMapper.insert(a);

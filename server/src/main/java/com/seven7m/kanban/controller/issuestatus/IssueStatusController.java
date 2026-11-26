@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller.issuestatus;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.common.security.Permission;
@@ -34,7 +35,7 @@ public class IssueStatusController {
      * 项目指定类别工作流的状态列表（供详情页状态下拉、新建默认状态）。
      * category=TASK/REQUIREMENT/BUG，缺省 BUG（兼容旧调用）。
      */
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'issue:view')")
     @GetMapping("/{projectId}/statuses")
     public R<List<IssueStatus>> projectStatuses(@PathVariable UUID projectId,
                                                 @RequestParam(required = false) String category) {

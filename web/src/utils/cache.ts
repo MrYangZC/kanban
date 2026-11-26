@@ -3,6 +3,23 @@
  * 由 stores/user、api/request 共用，避免同一字符串在两处硬编码后失配。
  */
 export const AUTH_USER_KEY = 'kanban_user'
+/** JWT 存放键：接口调用时放进 Authorization 头（不是 Cookie 会话） */
+export const AUTH_TOKEN_KEY = 'kanban_token'
+
+/** 读取访问令牌 */
+export function readToken(): string | null {
+  return localStorage.getItem(AUTH_TOKEN_KEY)
+}
+
+/** 保存访问令牌 */
+export function writeToken(token: string): void {
+  localStorage.setItem(AUTH_TOKEN_KEY, token)
+}
+
+/** 清除访问令牌 */
+export function clearToken(): void {
+  localStorage.removeItem(AUTH_TOKEN_KEY)
+}
 
 interface Entry<T> {
   data?: T

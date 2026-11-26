@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
@@ -27,7 +28,7 @@ public class ProjectActivityController {
 
     private final ProjectActivityService projectActivityService;
 
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'issue:view')")
     @GetMapping
     public R<List<ProjectActivityVO>> list(@PathVariable UUID projectId,
                                            @RequestParam(defaultValue = "20") int limit) {

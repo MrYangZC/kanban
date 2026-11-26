@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.common.security.Permission;
@@ -42,7 +43,7 @@ public class WorkflowController {
      * category=TASK/REQUIREMENT/BUG，缺省 BUG（兼容旧调用）。
      * 属项目内数据，需具备工作项查看权限，避免任意登录用户遍历他项目的工作流配置。
      */
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'issue:view')")
     @GetMapping("/{projectId}/transitions")
     public R<List<WorkflowTransitionVO>> transitions(@PathVariable UUID projectId,
                                                      @RequestParam(required = false) String category) {
@@ -54,7 +55,7 @@ public class WorkflowController {
      * 工作流的全部列 + 每列交接配置。看板列头与详情页状态下拉共用。
      * category 缺省 TASK（与看板默认类别一致；该接口无历史调用方）。
      */
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'issue:view')")
     @GetMapping("/{projectId}/workflow-columns")
     public R<List<WorkflowColumnVO>> columns(@PathVariable UUID projectId,
                                             @RequestParam(required = false) String category) {
@@ -66,7 +67,7 @@ public class WorkflowController {
      * 保存某一列的交接配置。handoffType=NONE 即清除，保留原负责人。
      * 属项目流程配置，用 project:workflow 权限（与工作流设置同级别），不能只要求 issue:view。
      */
-    @ProjectRoleAnnotation(Permission.PROJECT_WORKFLOW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'project:workflow')")
     @PutMapping("/{projectId}/workflow-columns/{statusId}/handoff")
     public R<WorkflowColumnVO> saveHandoff(@PathVariable UUID projectId,
                                           @PathVariable UUID statusId,

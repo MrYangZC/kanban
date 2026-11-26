@@ -2,7 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 
 const router = createRouter({
-  history: createWebHistory(),
+  // base 取 Vite 的 BASE_URL：开发时是 `/`，部署到子路径（如 /kanban/）时由 `vite build --base=/kanban/` 注入，
+  // 这样路由、history 回退与静态资源前缀三处口径一致
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/', redirect: '/projects' },
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },

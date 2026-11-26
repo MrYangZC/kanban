@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller.issue.tag;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
@@ -31,27 +32,27 @@ public class IssueTagController {
      * 若沿用该码，DEV/QA/MEMBER/VIEWER 会被 403，导致看板/列表/详情的标签静默消失。
      * 写接口（下方 add/remove/addProjectLabel/removeProjectLabel）仍要求 PROJECT_LABEL。
      */
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'issue:view')")
     @GetMapping("/projects/{projectId}/tags")
     public R<List<LabelVO>> projectTags(@PathVariable UUID projectId) {
         return R.ok(tagService.listForProject(projectId));
     }
 
     /** 某 issue 已关联标签（项目上下文由 issueId 解析，权限口径同上） */
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.hasIssue(#issueId, 'issue:view')")
     @GetMapping("/issues/{issueId}/tags")
     public R<List<LabelVO>> issueTags(@PathVariable UUID issueId) {
         return R.ok(tagService.listForIssue(issueId));
     }
 
-    @ProjectRoleAnnotation(Permission.PROJECT_LABEL)
+    @PreAuthorize("@projectAuth.hasIssue(#issueId, 'project:label')")
     @PostMapping("/issues/{issueId}/tags")
     public R<Void> add(@PathVariable UUID issueId, @Valid @RequestBody AddTagRequest body) {
         tagService.addToIssue(body.getProjectId(), issueId, body.getName(), body.getColor());
         return R.ok();
     }
 
-    @ProjectRoleAnnotation(Permission.PROJECT_LABEL)
+    @PreAuthorize("@projectAuth.hasIssue(#issueId, 'project:label')")
     @DeleteMapping("/issues/{issueId}/tags/{labelId}")
     public R<Void> remove(@PathVariable UUID issueId, @PathVariable UUID labelId) {
         tagService.removeFromIssue(issueId, labelId);
@@ -69,7 +70,7 @@ public class IssueTagController {
     }
 
     /** 项目选用标签 */
-    @ProjectRoleAnnotation(Permission.PROJECT_LABEL)
+    @PreAuthorize("@projectAuth.has(#projectId, 'project:label')")
     @PostMapping("/projects/{projectId}/labels/{labelId}")
     public R<Void> addProjectLabel(@PathVariable UUID projectId, @PathVariable UUID labelId) {
         tagService.addProjectLabel(projectId, labelId);
@@ -77,7 +78,7 @@ public class IssueTagController {
     }
 
     /** 项目取消选用标签 */
-    @ProjectRoleAnnotation(Permission.PROJECT_LABEL)
+    @PreAuthorize("@projectAuth.has(#projectId, 'project:label')")
     @DeleteMapping("/projects/{projectId}/labels/{labelId}")
     public R<Void> removeProjectLabel(@PathVariable UUID projectId, @PathVariable UUID labelId) {
         tagService.removeProjectLabel(projectId, labelId);

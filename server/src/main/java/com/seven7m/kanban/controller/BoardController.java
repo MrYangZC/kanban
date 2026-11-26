@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.dto.board.BoardGroupView;
 import com.seven7m.kanban.dto.board.BoardView;
 import com.seven7m.kanban.service.board.BoardService;
@@ -36,7 +37,7 @@ public class BoardController {
      * （TASK 4 列 vs REQUIREMENT 6 列）。不传时按 TASK 处理，只适合「任务看板」这一种场景；
      * 前端所有调用点都显式传类别，避免出现「列数对不上、卡片全空」的假象。
      */
-    @ProjectRoleAnnotation(Permission.BOARD_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'board:view')")
     @GetMapping("/{projectId}/board")
     public R<BoardView> getBoard(@PathVariable UUID projectId,
                                 @RequestParam(required = false) String category) {
@@ -44,7 +45,7 @@ public class BoardController {
     }
 
     /** 分组看板：groupBy=STATUS/ASSIGNEE/PRIORITY/SPRINT（缺省 STATUS） */
-    @ProjectRoleAnnotation(Permission.BOARD_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'board:view')")
     @GetMapping("/{projectId}/board/grouped")
     public R<BoardGroupView> getBoardGrouped(@PathVariable UUID projectId,
                                              @RequestParam(required = false) String groupBy,

@@ -11,6 +11,17 @@ kanban:
     dir: ${KANBAN_UPLOAD_DIR:./uploads}
     # 单个工作项附件数量上限，<=0 表示不限制
     max-per-issue: ${KANBAN_UPLOAD_MAX_PER_ISSUE:50}
+    # 附件/头像的对外访问前缀（不含结尾的 /uploads）。默认取 context-path，
+    # 部署在 nginx 的专属前缀下时用 KANBAN_UPLOAD_PUBLIC_PREFIX 覆盖（例如 /kanban-api），
+    # 使后端返回给浏览器的地址与它实际发出的前缀一致。
+    public-prefix: ${KANBAN_UPLOAD_PUBLIC_PREFIX:${server.servlet.context-path:}}
+  # JWT 认证（替代原 HttpSession 方案）
+  jwt:
+    # 签名密钥：生产务必用环境变量 KANBAN_JWT_SECRET 覆盖，至少 32 字节，泄露即可伪造任意用户
+    secret: ${KANBAN_JWT_SECRET:kanban-dev-only-secret-change-in-production-32b}
+    # 有效期（分钟）。本方案不支持主动失效，TTL 就是越权窗口，建议 ≤ 120
+    expire-minutes: ${KANBAN_JWT_EXPIRE_MINUTES:120}
+    issuer: ${KANBAN_JWT_ISSUER:kanban}
   dev:
     # 一次性 Excel 导入工具（@Profile("dev")）的数据源路径；留空时该接口拒绝执行
     excel-path: ${KANBAN_DEV_EXCEL_PATH:}

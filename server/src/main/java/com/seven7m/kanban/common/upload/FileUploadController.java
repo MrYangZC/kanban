@@ -7,7 +7,6 @@ import com.seven7m.kanban.common.util.Uuids;
 import com.seven7m.kanban.entity.upload.UploadFile;
 import com.seven7m.kanban.mapper.upload.UploadFileMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -32,10 +31,6 @@ public class FileUploadController {
 
     private final UploadProperties uploadProperties;
     private final UploadFileMapper uploadFileMapper;
-
-    /** 服务 context-path（默认 /api），用于返回可直接访问的站内地址 */
-    @Value("${server.servlet.context-path:}")
-    private String contextPath;
 
     @PostMapping("/image")
     public R<UploadImageVO> uploadImage(@RequestParam("file") MultipartFile file,
@@ -72,7 +67,7 @@ public class FileUploadController {
         record.setCreatedAt(LocalDateTime.now());
         uploadFileMapper.insert(record);
 
-        // 由配置推导，不写死 /api：部署前缀变化时前后端无需同步改
-        return R.ok(new UploadImageVO(contextPath + "/uploads/" + filename));
+        // 由配置推导，不写死 /api：部署前缀变化（如 nginx 用 /kanban-api）时前后端无需同步改
+        return R.ok(new UploadImageVO(uploadProperties.publicUrl(filename)));
     }
 }

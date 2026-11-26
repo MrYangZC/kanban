@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "build:prod": "vue-tsc -b && vite build --base=/kanban/",
     "typecheck": "vue-tsc -b",
     "preview": "vite preview",
     "test:e2e": "playwright test"

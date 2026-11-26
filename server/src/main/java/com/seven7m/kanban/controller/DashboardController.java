@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
@@ -26,7 +27,7 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
 
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'issue:view')")
     @GetMapping
     public R<DashboardVO> getDashboard(@PathVariable UUID projectId) {
         return R.ok(dashboardService.getDashboard(projectId));

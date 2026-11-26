@@ -1,7 +1,7 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
-import com.seven7m.kanban.common.security.RequireAdmin;
 import com.seven7m.kanban.entity.rbac.Menu;
 import com.seven7m.kanban.entity.rbac.PermissionDef;
 import com.seven7m.kanban.dto.rbac.MenuRequest;
@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * RBAC 全局管理后台接口（系统管理员）。受 @RequireAdmin 保护。
+ * RBAC 全局管理后台接口（系统管理员）。受 @PreAuthorize("hasRole('ADMIN')") 保护。
  */
 @Validated
 @RestController
@@ -37,13 +37,13 @@ public class RbacAdminController {
     private final RbacAdminService rbacAdminService;
 
     // ---------------- 角色 ----------------
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/roles")
     public R<List<Role>> listRoles() {
         return R.ok(rbacAdminService.listRoles());
     }
 
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     // 入参用请求 DTO 而非 Role 实体：实体含 id/createdBy/updatedBy，
     // 直接接参会让调用方注入这些字段（mass assignment）
     @PostMapping("/roles")
@@ -51,13 +51,13 @@ public class RbacAdminController {
         return R.ok(rbacAdminService.createRole(req));
     }
 
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/roles/{id}")
     public R<Role> updateRole(@PathVariable UUID id, @Valid @RequestBody RoleRequest req) {
         return R.ok(rbacAdminService.updateRole(id, req));
     }
 
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/roles/{id}")
     public R<Void> deleteRole(@PathVariable UUID id) {
         rbacAdminService.deleteRole(id);
@@ -65,19 +65,19 @@ public class RbacAdminController {
     }
 
     // ---------------- 权限定义 + 角色-权限码 ----------------
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/permissions")
     public R<List<PermissionDef>> listPermissions() {
         return R.ok(rbacAdminService.listAllPermissions());
     }
 
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/roles/{roleId}/permissions")
     public R<List<String>> listRolePermissions(@PathVariable UUID roleId) {
         return R.ok(rbacAdminService.listRolePermissions(roleId));
     }
 
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/roles/{roleId}/permissions")
     public R<Void> assignRolePermissions(@PathVariable UUID roleId,
                                          @RequestBody List<String> permissionCodes) {
@@ -86,25 +86,25 @@ public class RbacAdminController {
     }
 
     // ---------------- 菜单（导航） ----------------
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/menus")
     public R<List<Menu>> listMenus() {
         return R.ok(rbacAdminService.listMenus());
     }
 
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/menus")
     public R<Menu> createMenu(@Valid @RequestBody MenuRequest req) {
         return R.ok(rbacAdminService.createMenu(req));
     }
 
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/menus/{id}")
     public R<Menu> updateMenu(@PathVariable UUID id, @Valid @RequestBody MenuRequest req) {
         return R.ok(rbacAdminService.updateMenu(id, req));
     }
 
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/menus/{id}")
     public R<Void> deleteMenu(@PathVariable UUID id) {
         rbacAdminService.deleteMenu(id);
@@ -112,13 +112,13 @@ public class RbacAdminController {
     }
 
     // ---------------- 角色-菜单 ----------------
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/roles/{roleId}/menus")
     public R<List<UUID>> listRoleMenus(@PathVariable UUID roleId) {
         return R.ok(rbacAdminService.listRoleMenus(roleId));
     }
 
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/roles/{roleId}/menus")
     public R<Void> assignRoleMenus(@PathVariable UUID roleId, @RequestBody List<UUID> menuIds) {
         rbacAdminService.assignRoleMenus(roleId, menuIds);
@@ -126,13 +126,13 @@ public class RbacAdminController {
     }
 
     // ---------------- 用户-角色 ----------------
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/users/{userId}/roles")
     public R<List<UUID>> listUserRoles(@PathVariable UUID userId, @RequestParam UUID projectId) {
         return R.ok(rbacAdminService.listUserRoles(userId, projectId));
     }
 
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/users/{userId}/roles")
     public R<Void> assignUserRoles(@PathVariable UUID userId,
                                    @RequestParam UUID projectId,

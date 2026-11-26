@@ -1,5 +1,5 @@
 import axios, { AxiosError, type AxiosResponse } from 'axios'
-import { AUTH_USER_KEY, clearAllCaches } from '@/utils/cache'
+import { AUTH_TOKEN_KEY, AUTH_USER_KEY, clearAllCaches } from '@/utils/cache'
 import { notifyError } from '@/utils/error'
 
 /**
@@ -27,22 +27,49 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * API 前缀：nginx 给 kanban 分配的专属前缀 /kanban-api（站点根上不占 /api，避免与其他项目冲突）。
+ * nginx 会把 /kanban-api/ 摘掉再转给后端 /api/，所以这里和后端的 context-path 不是同一个字符串，
+ * 后端那边靠 SERVER_SERVLET_SESSION_COOKIE_PATH + KANBAN_UPLOAD_PUBLIC_PREFIX 对齐到 /kanban-api。
+ */
+export const API_BASE = '/kanban-api'
+
 const http = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
   timeout: 15000,
-  // 同源 Session 认证：携带 Cookie 以维持登录态
+  // 认证走 Authorization: Bearer（JWT），不再依赖会话 Cookie。
+  // 仍需 withCredentials：附件 <img> 之外的跨域场景几乎没有，但保留可避免将来拆域时踩坑。
   withCredentials: true
+})
+
+/**
+ * 每个请求带上 JWT。
+ *
+ * <p>放在请求拦截器而不是逐个调用点：漏带一次就是 401，且排查成本高。
+ * 注意 <img src> 之类浏览器原生请求不走 axios，后端为 /uploads/** 保留了
+ * 路径受限的 HttpOnly Cookie 作为兜底（见后端 JwtAuthenticationFilter）。
+ */
+http.interceptors.request.use((config) => {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY)
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 /** 401 可能由多个并发请求同时触发：只跳转一次，避免重复整页刷新 */
 let redirectingToLogin = false
 
+/** 登录页地址同样跟随部署路径，避免子路径部署时跳到站点根下的 /login（404） */
+const LOGIN_PATH = `${import.meta.env.BASE_URL}login`
+
 function redirectToLogin(): void {
-  if (redirectingToLogin || window.location.pathname === '/login') return
+  if (redirectingToLogin || window.location.pathname === LOGIN_PATH) return
   redirectingToLogin = true
   localStorage.removeItem(AUTH_USER_KEY)
+  localStorage.removeItem(AUTH_TOKEN_KEY)
   clearAllCaches()
-  window.location.href = '/login'
+  window.location.href = LOGIN_PATH
 }
 
 http.interceptors.response.use(

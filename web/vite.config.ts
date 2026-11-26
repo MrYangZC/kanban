@@ -31,6 +31,13 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       allowedHosts: true,
       proxy: {
+        // 生产由 nginx 把 /kanban-api/ 摘掉再转给后端 /api/；开发环境用同一规则，
+        // 否则前端请求 /kanban-api 会 404（本地没有那层 nginx）
+        '/kanban-api': {
+          target: apiTarget,
+          changeOrigin: true,
+          rewrite: (p: string) => p.replace(/^\/kanban-api/, '/api')
+        },
         '/api': {
           target: apiTarget,
           changeOrigin: true

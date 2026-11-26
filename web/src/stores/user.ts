@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { LoginVO } from '@/api/types'
 import { logout as apiLogout } from '@/api'
-import { AUTH_USER_KEY, clearAllCaches } from '@/utils/cache'
+import { AUTH_TOKEN_KEY, AUTH_USER_KEY, clearAllCaches } from '@/utils/cache'
 
 export const useUserStore = defineStore('user', () => {
   const user = ref<LoginVO | null>(null)
@@ -19,7 +19,19 @@ export const useUserStore = defineStore('user', () => {
 
   function setLogin(vo: LoginVO) {
     user.value = vo
+    // token 单独存一个键：它是请求头要用的凭证，和"用户展示信息"的生命周期不同
+    if (vo.token) localStorage.setItem(AUTH_TOKEN_KEY, vo.token)
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(vo))
+  }
+
+  /** token 是否已过期（本地粗判：真正的校验在后端，这里只为避免带着必死 token 发请求） */
+  function isTokenExpired(): boolean {
+    const token = localStorage.getItem(AUTH_TOKEN_KEY)
+    if (!token) return true
+    const expiresAt = user.value?.expiresAt
+    // 没有 expiresAt（老缓存）时不做本地判断，交给后端 401
+    if (!expiresAt) return false
+    return Date.now() >= expiresAt
   }
 
   /** 局部更新当前登录用户（改名/换头像后让全局头像位立即刷新） */
@@ -35,6 +47,12 @@ export const useUserStore = defineStore('user', () => {
     if (!raw) return
     try {
       user.value = JSON.parse(raw)
+      // 本地已判定过期：直接按未登录处理，省掉一轮必然 401 的请求
+      if (isTokenExpired()) {
+        user.value = null
+        localStorage.removeItem(AUTH_USER_KEY)
+        localStorage.removeItem(AUTH_TOKEN_KEY)
+      }
     } catch {
       // 本地缓存损坏（手工编辑/旧版本数据结构）：丢弃，回到未登录态
       localStorage.removeItem(AUTH_USER_KEY)
@@ -43,8 +61,8 @@ export const useUserStore = defineStore('user', () => {
   }
 
   /**
-   * 登出：先通知后端销毁 HttpSession，再清理本地状态。
-   * 服务端异常（会话已失效/网络故障）不应阻止本地退出，否则用户会卡在已登录界面。
+   * 登出：JWT 无状态，后端没有可销毁的会话，实际上就是清本地凭证。
+   * 仍调用一次接口：一是清掉附件用的 HttpOnly Cookie，二是保留将来加黑名单的挂点。
    */
   async function logout() {
     try {
@@ -54,8 +72,9 @@ export const useUserStore = defineStore('user', () => {
     }
     user.value = null
     localStorage.removeItem(AUTH_USER_KEY)
+    localStorage.removeItem(AUTH_TOKEN_KEY)
     clearAllCaches()
   }
 
-  return { user, isLoggedIn, isAdmin, setLogin, patchProfile, restore, logout }
+  return { user, isLoggedIn, isAdmin, setLogin, patchProfile, restore, logout, isTokenExpired }
 })

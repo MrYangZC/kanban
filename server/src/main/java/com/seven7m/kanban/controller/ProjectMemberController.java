@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
@@ -30,7 +31,7 @@ public class ProjectMemberController {
 
     private final ProjectMemberService projectMemberService;
 
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'issue:view')")
     @GetMapping
     public R<List<ProjectMemberVO>> list(@PathVariable UUID projectId) {
         return R.ok(projectMemberService.list(projectId));
@@ -40,7 +41,7 @@ public class ProjectMemberController {
      * 「添加成员」的可选用户（未加入本项目的用户），支持账号/显示名搜索。
      * 不用 GET /users：那接口只对系统管理员开放，项目管理员加成员时会 403。
      */
-    @ProjectRoleAnnotation(Permission.PROJECT_MEMBER)
+    @PreAuthorize("@projectAuth.has(#projectId, 'project:member')")
     @GetMapping("/candidates")
     public R<List<MemberCandidateVO>> candidates(@PathVariable UUID projectId,
                                                  @RequestParam(required = false) String keyword,
@@ -48,21 +49,21 @@ public class ProjectMemberController {
         return R.ok(projectMemberService.candidates(projectId, keyword, limit));
     }
 
-    @ProjectRoleAnnotation(Permission.PROJECT_MEMBER)
+    @PreAuthorize("@projectAuth.has(#projectId, 'project:member')")
     @PostMapping
     public R<ProjectMemberVO> add(@PathVariable UUID projectId,
                                   @Valid @RequestBody AddMemberRequest req) {
         return R.ok(projectMemberService.add(projectId, req));
     }
 
-    @ProjectRoleAnnotation(Permission.PROJECT_MEMBER)
+    @PreAuthorize("@projectAuth.has(#projectId, 'project:member')")
     @DeleteMapping("/{userId}")
     public R<Void> remove(@PathVariable UUID projectId, @PathVariable UUID userId) {
         projectMemberService.remove(projectId, userId);
         return R.ok();
     }
 
-    @ProjectRoleAnnotation(Permission.PROJECT_MEMBER)
+    @PreAuthorize("@projectAuth.has(#projectId, 'project:member')")
     @PutMapping("/{userId}/roles")
     public R<ProjectMemberVO> updateRoles(@PathVariable UUID projectId,
                                           @PathVariable UUID userId,

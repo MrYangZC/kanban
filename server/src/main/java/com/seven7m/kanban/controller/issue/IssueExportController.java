@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller.issue;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
 import com.seven7m.kanban.service.workitem.IssueExportService;
@@ -36,7 +37,7 @@ public class IssueExportController {
      * @param types 类型编码，逗号分隔（如 TASK,IMPROVEMENT）；为空导出全部
      * @param scope 范围（ASSIGNED/REPORTED/VERIFIED/SHARED/ARCHIVED），与列表一致
      */
-    @ProjectRoleAnnotation(Permission.ISSUE_EXPORT)
+    @PreAuthorize("@projectAuth.has(#projectId, 'issue:export')")
     @GetMapping("/export")
     public ResponseEntity<byte[]> export(@PathVariable UUID projectId,
                                          @RequestParam(required = false) String types,

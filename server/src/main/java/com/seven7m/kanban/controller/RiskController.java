@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
@@ -34,32 +35,32 @@ public class RiskController {
 
     private final RiskService riskService;
 
-    @ProjectRoleAnnotation(Permission.RISK_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'risk:view')")
     @GetMapping
     public R<List<RiskVO>> list(@PathVariable UUID projectId) {
         return R.ok(riskService.listByProject(projectId));
     }
 
-    @ProjectRoleAnnotation(Permission.RISK_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'risk:view')")
     @GetMapping("/{id}")
     public R<RiskVO> detail(@PathVariable UUID projectId, @PathVariable UUID id) {
         return R.ok(riskService.detail(projectId, id));
     }
 
-    @ProjectRoleAnnotation(Permission.RISK_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'risk:manage')")
     @PostMapping
     public R<RiskVO> create(@PathVariable UUID projectId, @Valid @RequestBody CreateRiskRequest req) {
         return R.ok(riskService.create(projectId, req));
     }
 
-    @ProjectRoleAnnotation(Permission.RISK_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'risk:manage')")
     @PutMapping("/{id}")
     public R<RiskVO> update(@PathVariable UUID projectId, @PathVariable UUID id,
                             @Valid @RequestBody UpdateRiskRequest req) {
         return R.ok(riskService.update(projectId, id, req));
     }
 
-    @ProjectRoleAnnotation(Permission.RISK_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'risk:manage')")
     @DeleteMapping("/{id}")
     public R<Void> remove(@PathVariable UUID projectId, @PathVariable UUID id) {
         riskService.remove(projectId, id);

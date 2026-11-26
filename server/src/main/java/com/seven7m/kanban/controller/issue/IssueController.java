@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller.issue;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.security.Permission;
@@ -34,26 +35,26 @@ public class IssueController {
 
     private final WorkItemRouter workItemRouter;
 
-    @ProjectRoleAnnotation(Permission.ISSUE_CREATE)
+    @PreAuthorize("@projectAuth.has(#req.projectId, 'issue:create')")
     @PostMapping
     public R<IssueVO> create(@Valid @RequestBody CreateIssueRequest req) {
         return R.ok(workItemRouter.create(req));
     }
 
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.hasId(#id, 'issue:view')")
     @GetMapping("/{id}")
     public R<IssueVO> get(@PathVariable UUID id) {
         return R.ok(workItemRouter.getById(id));
     }
 
-    @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
+    @PreAuthorize("@projectAuth.hasId(#id, 'issue:edit')")
     @PutMapping("/{id}")
     public R<IssueVO> update(@PathVariable UUID id, @Valid @RequestBody UpdateIssueRequest req) {
         return R.ok(workItemRouter.update(id, req));
     }
 
     /** 拖拽：状态 + 位置一次提交（自由流转，仅校验目标状态属于本项目） */
-    @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
+    @PreAuthorize("@projectAuth.hasId(#id, 'issue:edit')")
     @PatchMapping("/{id}/position")
     public R<IssueVO> move(@PathVariable UUID id, @Valid @RequestBody MoveIssueRequest req) {
         return R.ok(workItemRouter.move(id, req));
@@ -63,13 +64,13 @@ public class IssueController {
      * 撤销最近一次交接：负责人退回交接前的人。
      * 与改负责人同一权限（能改负责人的人才能撤销交接，撤销不比改负责人更危险）。
      */
-    @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
+    @PreAuthorize("@projectAuth.hasId(#id, 'issue:edit')")
     @PostMapping("/{id}/handoff/revoke")
     public R<IssueVO> revokeHandoff(@PathVariable UUID id) {
         return R.ok(workItemRouter.revokeHandoff(id));
     }
 
-    @ProjectRoleAnnotation(Permission.ISSUE_DELETE)
+    @PreAuthorize("@projectAuth.hasId(#id, 'issue:delete')")
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable UUID id) {
         workItemRouter.delete(id);
@@ -83,21 +84,21 @@ public class IssueController {
      * 服务端还会校验每个 id 确实属于该项目（否则"换个 projectId 就能删别人的工作项"）。
      * 返回 deleted/skipped/failed 三项计数，前端据此给出准确提示。
      */
-    @ProjectRoleAnnotation(Permission.ISSUE_DELETE)
+    @PreAuthorize("@projectAuth.has(#req.projectId, 'issue:delete')")
     @PostMapping("/batch-delete")
     public R<BatchDeleteResult> batchDelete(@RequestBody @Valid BatchDeleteIssueRequest req) {
         return R.ok(workItemRouter.batchDelete(req.getProjectId(), req.getIds()));
     }
 
     /** 列表过滤：左侧过滤器 + 顶部筛选，返回分页 IssueVO（只读，项目成员含 VIEWER 可读） */
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.has(#req.projectId, 'issue:view')")
     @PostMapping("/filter")
     public R<PageResult<IssueVO>> filter(@Valid @RequestBody IssueFilterRequest req) {
         return R.ok(workItemRouter.listByFilter(req));
     }
 
     /** 获取某任务的子任务列表（只读） */
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.hasId(#id, 'issue:view')")
     @GetMapping("/{id}/children")
     public R<List<IssueVO>> children(@PathVariable UUID id) {
         return R.ok(workItemRouter.listChildren(id));

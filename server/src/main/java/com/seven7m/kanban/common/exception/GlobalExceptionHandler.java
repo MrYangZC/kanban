@@ -34,6 +34,30 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 方法级鉴权失败（{@code @PreAuthorize} 抛出的 AuthorizationDeniedException）。
+     *
+     * <p>必须在 {@link #handleException} 之前被匹配到：这个异常是从方法调用处抛出的，
+     * 走的是 ControllerAdvice 而不是 Security 的 ExceptionTranslationFilter，
+     * 若不显式处理就会被兜底的 Exception 处理器当成系统故障返回 500——
+     * 前端会把"没权限"误判成"服务出错"，运维也会收到无意义的错误告警。
+     */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public R<Void> handleAccessDenied(org.springframework.security.access.AccessDeniedException e,
+                                      HttpServletRequest request) {
+        log.warn("权限不足 {} {}: {}", request.getMethod(), request.getRequestURI(), e.getMessage());
+        return R.fail(403, "无权限执行该操作");
+    }
+
+    /** 认证失败（如匿名访问被拦下）：401，与 SecurityConfig 的入口点文案保持一致 */
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public R<Void> handleUnauthenticated(org.springframework.security.core.AuthenticationException e) {
+        log.warn("认证失败: {}", e.getMessage());
+        return R.fail(401, "未登录或登录已过期");
+    }
+
+    /**
      * 把 Spring 默认的英文校验消息统一成本地化文案，并带上字段名。
      * 注解未显式声明 message 时会得到 "must not be blank" 这类英文，直接返回给前端不可读。
      */

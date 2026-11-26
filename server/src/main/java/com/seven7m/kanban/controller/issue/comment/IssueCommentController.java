@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller.issue.comment;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
@@ -25,7 +26,7 @@ public class IssueCommentController {
 
     private final IssueCommentService commentService;
 
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.hasIssue(#issueId, 'issue:view')")
     @GetMapping("/{issueId}/activities")
     public R<IssueTimelineVO> list(@PathVariable UUID issueId,
                                    @RequestParam(defaultValue = "1") int page,
@@ -33,13 +34,13 @@ public class IssueCommentController {
         return R.ok(commentService.listActivities(issueId, page, size));
     }
 
-    @ProjectRoleAnnotation(Permission.ISSUE_COMMENT)
+    @PreAuthorize("@projectAuth.hasIssue(#issueId, 'issue:comment')")
     @PostMapping("/{issueId}/comments")
     public R<IssueActivityVO> add(@PathVariable UUID issueId, @Valid @RequestBody AddCommentRequest body) {
         return R.ok(commentService.addComment(issueId, body.getContent(), body.getParentId()));
     }
 
-    @ProjectRoleAnnotation(Permission.ISSUE_COMMENT)
+    @PreAuthorize("@projectAuth.hasIssue(#issueId, 'issue:comment')")
     @DeleteMapping("/{issueId}/comments/{commentId}")
     public R<Void> delete(@PathVariable UUID issueId, @PathVariable UUID commentId) {
         commentService.deleteComment(issueId, commentId);

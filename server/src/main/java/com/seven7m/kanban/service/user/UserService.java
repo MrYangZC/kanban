@@ -7,7 +7,6 @@ import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.PermissionService;
 import com.seven7m.kanban.common.security.UserContext;
-import com.seven7m.kanban.common.security.UserSessionRegistry;
 import com.seven7m.kanban.common.util.LikeEscaper;
 import com.seven7m.kanban.dto.project.MemberCandidateVO;
 import com.seven7m.kanban.dto.user.ChangePasswordRequest;
@@ -29,8 +28,9 @@ import com.seven7m.kanban.mapper.project.ProjectMemberMapper;
 import com.seven7m.kanban.mapper.rbac.UserRoleMapper;
 import com.seven7m.kanban.mapper.user.SysUserMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +50,7 @@ import java.util.stream.Collectors;
  * 种子管理员口令只以 bcrypt 哈希形式存在于数据库迁移脚本中，代码与注释不再出现明文；
  * 管理员新建用户时若不填口令，由服务端生成随机口令，不再使用固定值。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -60,10 +61,10 @@ public class UserService {
     private final IssueCommentMapper commentMapper;
     private final IssueActivityMapper activityMapper;
     /** 账号被禁用/删除/改密后立即踢掉旧会话，避免"禁用不生效" */
-    private final UserSessionRegistry sessionRegistry;
     /** is_admin 变更后需要失效权限缓存（superAdminFlag / projectPermissions） */
     private final PermissionService permissionService;
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    /** 由 SecurityConfig 提供的同一个 BCrypt 实例（注入而非各自 new，避免强度配置漂移） */
+    private final PasswordEncoder passwordEncoder;
 
     /** 用户名不存在时也跑一次等成本哈希比对，让响应时间与「密码错误」一致，避免用户名枚举 */
     private static final String DUMMY_HASH = "$2a$10$" + "0".repeat(53);
@@ -244,7 +245,8 @@ public class UserService {
         }
         // 禁用账号或重置密码后，旧会话必须立刻失效：否则"已禁用"的账号还能继续操作到会话超时
         if (passwordChanged || Boolean.FALSE.equals(req.getEnabled())) {
-            sessionRegistry.invalidateAll(id);
+            // JWT 无主动失效：旧 token 在过期前仍有效，窗口由 kanban.jwt.expire-minutes 控制
+        log.info("用户 {} 已被禁用/删除，其已签发的 JWT 将在过期后失效", id);
         }
         return toVO(u);
     }
@@ -276,7 +278,8 @@ public class UserService {
             throw new ServiceException(400, "该用户存在评论或动态记录，不允许删除，可改为禁用账号");
         }
         // 删号前先踢掉会话：否则被删用户仍能凭旧 Session 继续调用接口（直到超时）
-        sessionRegistry.invalidateAll(id);
+        // JWT 无主动失效：旧 token 在过期前仍有效，窗口由 kanban.jwt.expire-minutes 控制
+        log.info("用户 {} 已被禁用/删除，其已签发的 JWT 将在过期后失效", id);
         userMapper.deleteById(id);
     }
 
@@ -335,7 +338,7 @@ public class UserService {
 
     /** 当前用户修改密码：需校验旧密码；成功后踢掉该用户其它会话（含被盗会话） */
     @Transactional
-    public void changePassword(UUID id, ChangePasswordRequest req, String currentSessionId) {
+    public void changePassword(UUID id, ChangePasswordRequest req) {
         SysUser u = userMapper.selectById(id);
         if (u == null) {
             throw new ServiceException(404, "用户不存在");
@@ -350,6 +353,7 @@ public class UserService {
         u.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
         userMapper.updateById(u);
         // 保留当前会话（本人刚改完密码不该被自己踢下线），其余会话一律失效
-        sessionRegistry.invalidateOthers(id, currentSessionId);
+        // 同上：改密后旧 token 不会被撤销，靠短 TTL 收敛暴露窗口
+        log.info("用户 {} 修改了密码，其已签发的 JWT 将在过期后失效", id);
     }
 }

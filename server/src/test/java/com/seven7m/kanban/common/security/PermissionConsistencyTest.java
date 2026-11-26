@@ -1,6 +1,6 @@
 package com.seven7m.kanban.common.security;
 
-import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -36,6 +36,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 本测试直接读 {@code db/migration} 下的 SQL 做比对，因此新增迁移时必须同步更新权益数据。
  */
 class PermissionConsistencyTest {
+
+    /** 项目级权限表达式里的权限码：@projectAuth.has(#projectId, 'issue:view') */
+    private static final Pattern PROJECT_AUTH_CODE = Pattern.compile(
+            "@projectAuth\\.(?:has|hasIssue|hasId)\\([^,]+,\\s*'([^']+)'\\)");
+
 
     /** V1.0.0 里的权限码种子：INSERT INTO ... ("code", ...) VALUES ('issue:view', ...) */
     private static final Pattern SEED_PERMISSION = Pattern.compile(
@@ -111,15 +116,10 @@ class PermissionConsistencyTest {
         scanner.addIncludeFilter(new AnnotationTypeFilter(RestController.class));
         for (BeanDefinition bd : scanner.findCandidateComponents("com.seven7m.kanban")) {
             Class<?> type = Class.forName(bd.getBeanClassName());
-            ProjectRoleAnnotation onType = type.getAnnotation(ProjectRoleAnnotation.class);
-            if (onType != null) {
-                codes.addAll(List.of(onType.value()));
-            }
+            // 权限码现在写在 @PreAuthorize 的 SpEL 里：@projectAuth.has(#projectId, 'issue:view')
+            collectPreAuthorizeCodes(type.getAnnotation(PreAuthorize.class), codes);
             for (Method m : type.getDeclaredMethods()) {
-                ProjectRoleAnnotation onMethod = m.getAnnotation(ProjectRoleAnnotation.class);
-                if (onMethod != null) {
-                    codes.addAll(List.of(onMethod.value()));
-                }
+                collectPreAuthorizeCodes(m.getAnnotation(PreAuthorize.class), codes);
             }
         }
         return codes;
@@ -174,5 +174,22 @@ class PermissionConsistencyTest {
         assertThat(codes).doesNotHaveDuplicates();
         assertThat(codes).allSatisfy(code ->
                 assertThat(code).as("权限码命名应为 module:action").matches("^[a-z]+:[a-z_]+$"));
+    }
+
+    /**
+     * 从 @PreAuthorize 表达式里取出权限码。
+     *
+     * <p>只认 {@code @projectAuth.has/hasIssue/hasId(..., 'code')} 这一种形态：
+     * 迁移后项目级权限必须经 ProjectAuth 判定，其它写法（如直接 hasAuthority('xxx')）
+     * 意味着有人绕过了项目作用域，直接报错比静默忽略更安全。
+     */
+    private static void collectPreAuthorizeCodes(PreAuthorize annotation, Set<String> codes) {
+        if (annotation == null) {
+            return;
+        }
+        Matcher m = PROJECT_AUTH_CODE.matcher(annotation.value());
+        while (m.find()) {
+            codes.add(m.group(1));
+        }
     }
 }

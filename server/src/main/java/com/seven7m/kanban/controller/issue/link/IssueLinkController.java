@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller.issue.link;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
@@ -25,19 +26,19 @@ public class IssueLinkController {
 
     private final IssueLinkService linkService;
 
-    @ProjectRoleAnnotation(Permission.ISSUE_VIEW)
+    @PreAuthorize("@projectAuth.hasIssue(#issueId, 'issue:view')")
     @GetMapping("/{issueId}/links")
     public R<List<LinkVO>> list(@PathVariable UUID issueId) {
         return R.ok(linkService.list(issueId));
     }
 
-    @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
+    @PreAuthorize("@projectAuth.hasIssue(#issueId, 'issue:edit')")
     @PostMapping("/{issueId}/links")
     public R<LinkVO> add(@PathVariable UUID issueId, @Valid @RequestBody AddLinkRequest body) {
         return R.ok(linkService.add(issueId, body.getTargetIssueId(), body.getRelationType()));
     }
 
-    @ProjectRoleAnnotation(Permission.ISSUE_EDIT)
+    @PreAuthorize("@projectAuth.hasIssue(#issueId, 'issue:edit')")
     @DeleteMapping("/{issueId}/links/{linkId}")
     public R<Void> delete(@PathVariable UUID issueId, @PathVariable UUID linkId) {
         linkService.delete(issueId, linkId);

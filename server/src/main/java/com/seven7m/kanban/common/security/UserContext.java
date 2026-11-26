@@ -39,6 +39,17 @@ public class UserContext {
     }
 
     /**
+     * 操作人 id，未登录时返回 null。
+     *
+     * <p>与 {@link #getUserId()} 的区别：业务代码应继续用会抛异常的那个——
+     * 走到业务层还没有登录态属于配置错误，应该炸出来；而鉴权判定本身要处理"匿名"这种正常情况
+     * （例如 Spring Security 的匿名请求），此时必须能拿到 null 而不是异常。
+     */
+    public static UUID getUserIdOrNull() {
+        return USER_ID.get();
+    }
+
+    /**
      * 操作人名称，未设置时抛异常。
      */
     public static String getUsername() {

@@ -14,8 +14,17 @@ public class LoginVO {
     /** 头像地址（/api/uploads/xxx），为空时前端回退首字头像；BeanUtils 从 SysUser 同名属性拷贝 */
     private String avatarUrl;
 
-    // 注意：这里不再下发 token。登录态完全由服务端 HttpSession（JSESSIONID Cookie）承载，
-    // 此前下发的 "stub-{userId}" 既不可校验、也无法撤销，前端却存进 localStorage 当作凭证，属于误导性死数据。
+    /**
+     * 访问令牌（JWT，HS256）。前端存 localStorage 并在请求头带
+     * {@code Authorization: Bearer <token>}。
+     *
+     * <p>此前这里下发过一个不可校验的 "stub-{userId}"，那确实是误导性死数据；
+     * 现在的 token 由服务端签名，篡改与过期都会被拒。
+     */
+    private String token;
+
+    /** token 过期时刻（epoch 毫秒），前端据此提前提示重新登录，避免请求到一半才发现过期 */
+    private Long expiresAt;
 
     /**
      * 是否系统管理员，供前端路由/菜单判定使用。

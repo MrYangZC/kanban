@@ -1,5 +1,6 @@
 package com.seven7m.kanban.service.project;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.seven7m.kanban.common.exception.ServiceException;
@@ -314,7 +315,7 @@ public class ProjectMemberService implements MemberRolePort {
 
     /**
      * 成员维护权限：OWNER/ADMIN/PM。
-     * 与接口上的 {@code @ProjectRoleAnnotation(Permission.PROJECT_MEMBER)} 口径保持一致
+     * 与接口上的 {@code @PreAuthorize("@projectAuth.has(#projectId, 'project:member')")} 口径保持一致
      * （role_permission 里 OWNER/ADMIN/PM 都持有 project:member），
      * 之前这里用的是 isOwner，导致前端提示可管理的 ADMIN/PM 一操作就 403。
      */

@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
@@ -26,20 +27,20 @@ public class MilestoneController {
 
     private final MilestoneService milestoneService;
 
-    @ProjectRoleAnnotation(Permission.MILESTONE_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'milestone:view')")
     @GetMapping
     public R<List<MilestoneVO>> list(@PathVariable UUID projectId) {
         return R.ok(milestoneService.list(projectId));
     }
 
-    @ProjectRoleAnnotation(Permission.MILESTONE_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'milestone:manage')")
     @PostMapping
     public R<MilestoneVO> create(@PathVariable UUID projectId,
                                  @Valid @RequestBody CreateMilestoneRequest req) {
         return R.ok(milestoneService.create(projectId, req));
     }
 
-    @ProjectRoleAnnotation(Permission.MILESTONE_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'milestone:manage')")
     @PutMapping("/{id}")
     public R<MilestoneVO> update(@PathVariable UUID projectId,
                                  @PathVariable UUID id,
@@ -47,7 +48,7 @@ public class MilestoneController {
         return R.ok(milestoneService.update(projectId, id, req));
     }
 
-    @ProjectRoleAnnotation(Permission.MILESTONE_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'milestone:manage')")
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable UUID projectId,
                           @PathVariable UUID id) {

@@ -1,8 +1,8 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.exception.ServiceException;
-import com.seven7m.kanban.common.security.RequireAdmin;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.service.dev.ExcelImportService;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +36,7 @@ public class ExcelImportController {
     @Value("${kanban.dev.excel-path:}")
     private String excelPath;
 
-    @RequireAdmin
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/import-excel")
     public R<ExcelImportService.ExcelImportResult> importExcel() {
         if (excelPath == null || excelPath.isBlank()) {

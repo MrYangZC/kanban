@@ -18,7 +18,7 @@ class AttachmentFileStoreTest {
     Path tempDir;
 
     private AttachmentFileStore store() {
-        return new AttachmentFileStore(new UploadProperties(tempDir.toString(), 50));
+        return new AttachmentFileStore(new UploadProperties(tempDir.toString(), 50, ""));
     }
 
     @Test

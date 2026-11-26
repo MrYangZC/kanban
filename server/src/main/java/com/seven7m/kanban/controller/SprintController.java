@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.Permission;
 import com.seven7m.kanban.common.security.annotation.ProjectRoleAnnotation;
@@ -34,45 +35,45 @@ public class SprintController {
 
     private final SprintService sprintService;
 
-    @ProjectRoleAnnotation(Permission.SPRINT_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'sprint:view')")
     @GetMapping
     public R<List<SprintVO>> list(@PathVariable UUID projectId) {
         return R.ok(sprintService.listByProject(projectId));
     }
 
-    @ProjectRoleAnnotation(Permission.SPRINT_VIEW)
+    @PreAuthorize("@projectAuth.has(#projectId, 'sprint:view')")
     @GetMapping("/{id}")
     public R<SprintVO> detail(@PathVariable UUID projectId, @PathVariable UUID id) {
         return R.ok(sprintService.detail(projectId, id));
     }
 
-    @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'sprint:manage')")
     @PostMapping
     public R<SprintVO> create(@PathVariable UUID projectId, @Valid @RequestBody CreateSprintRequest req) {
         return R.ok(sprintService.create(projectId, req));
     }
 
-    @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'sprint:manage')")
     @PutMapping("/{id}")
     public R<SprintVO> update(@PathVariable UUID projectId, @PathVariable UUID id,
                               @Valid @RequestBody UpdateSprintRequest req) {
         return R.ok(sprintService.update(projectId, id, req));
     }
 
-    @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'sprint:manage')")
     @DeleteMapping("/{id}")
     public R<Void> remove(@PathVariable UUID projectId, @PathVariable UUID id) {
         sprintService.remove(projectId, id);
         return R.ok();
     }
 
-    @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'sprint:manage')")
     @PostMapping("/{id}/start")
     public R<SprintVO> start(@PathVariable UUID projectId, @PathVariable UUID id) {
         return R.ok(sprintService.start(projectId, id));
     }
 
-    @ProjectRoleAnnotation(Permission.SPRINT_MANAGE)
+    @PreAuthorize("@projectAuth.has(#projectId, 'sprint:manage')")
     @PostMapping("/{id}/complete")
     public R<SprintVO> complete(@PathVariable UUID projectId, @PathVariable UUID id) {
         return R.ok(sprintService.complete(projectId, id));

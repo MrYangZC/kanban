@@ -1,5 +1,6 @@
 package com.seven7m.kanban.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.domain.R;
 import com.seven7m.kanban.common.security.Permission;
@@ -77,7 +78,7 @@ public class ProjectController {
     }
 
     @PutMapping("/{id}")
-    @ProjectRoleAnnotation(Permission.PROJECT_SETTING)
+    @PreAuthorize("@projectAuth.has(#id, 'project:setting')")
     public R<ProjectVO> update(@PathVariable UUID id, @Valid @RequestBody UpdateProjectRequest req) {
         return R.ok(projectService.update(id, req));
     }
@@ -106,7 +107,7 @@ public class ProjectController {
      * 与"改项目基本信息"的 project:setting 区分开。
      */
     @PutMapping("/{id}/archive")
-    @ProjectRoleAnnotation(Permission.PROJECT_ARCHIVE)
+    @PreAuthorize("@projectAuth.has(#id, 'project:archive')")
     public R<Void> archive(@PathVariable UUID id) {
         projectService.archive(id, UserContext.getUserId());
         return R.ok();
@@ -116,7 +117,7 @@ public class ProjectController {
      * 取消归档项目（仅 OWNER/ADMIN 可操作）。
      */
     @PutMapping("/{id}/unarchive")
-    @ProjectRoleAnnotation(Permission.PROJECT_ARCHIVE)
+    @PreAuthorize("@projectAuth.has(#id, 'project:archive')")
     public R<Void> unarchive(@PathVariable UUID id) {
         projectService.unarchive(id, UserContext.getUserId());
         return R.ok();
@@ -126,7 +127,7 @@ public class ProjectController {
      * 删除项目（仅 OWNER/ADMIN 可操作）。
      */
     @DeleteMapping("/{id}")
-    @ProjectRoleAnnotation(Permission.PROJECT_DELETE)
+    @PreAuthorize("@projectAuth.has(#id, 'project:delete')")
     public R<Void> delete(@PathVariable UUID id) {
         projectService.delete(id, UserContext.getUserId());
         return R.ok();

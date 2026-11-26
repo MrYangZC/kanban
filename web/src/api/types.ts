@@ -365,6 +365,10 @@ export interface LoginVO {
    * 前端不应再用 username === 'admin' 自行推断（与后端 AdminAuthInterceptor 口径不一致）。
    */
   isAdmin?: boolean
+  /** 访问令牌（JWT），请求时放在 Authorization: Bearer 里 */
+  token?: string
+  /** token 过期时刻（epoch 毫秒），用于提前提示重新登录 */
+  expiresAt?: number
 }
 
 /** 当前登录用户个人资料 */

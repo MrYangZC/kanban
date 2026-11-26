@@ -1,5 +1,6 @@
 package com.seven7m.kanban.service.rbac;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.toolkit.Db;
 import com.seven7m.kanban.common.exception.ServiceException;
@@ -31,7 +32,7 @@ import java.util.UUID;
 
 /**
  * RBAC 全局管理后台服务：角色、菜单（导航）、角色-菜单、用户-角色、角色-权限码 的配置维护。
- * 接口受 {@code @RequireAdmin} + AdminAuthInterceptor 保护。
+ * 接口受 {@code @PreAuthorize("hasRole('ADMIN')")} + AdminAuthInterceptor 保护。
  */
 @Slf4j
 @Service
