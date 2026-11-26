@@ -7,6 +7,7 @@ import { Plus, Search, Trash2, Pencil, X, ImagePlus, Users } from 'lucide-vue-ne
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import TableSkeleton from '@/components/common/TableSkeleton.vue'
 import TableEmpty from '@/components/common/TableEmpty.vue'
+import Pagination from '@/components/project/Pagination.vue'
 import { useViewportWidth } from '@/composables/useViewportWidth'
 import { AVATAR_ACCEPT, validateAvatarFile } from '@/utils/avatar'
 import { required, maxLen, minLen, email, codePattern } from '@/utils/formRules'
@@ -67,6 +68,13 @@ onBeforeUnmount(() => {
 
 function onPageChange(p: number) {
   page.value = p
+  load()
+}
+
+/** 改每页条数后回到第 1 页，否则可能停在不存在的页码上看到空列表 */
+function onSizeChange(s: number) {
+  size.value = s
+  page.value = 1
   load()
 }
 
@@ -282,13 +290,13 @@ onMounted(load)
     </div>
 
     <div class="mt-4 flex justify-end">
-      <el-pagination
-        v-model:current-page="page"
-        :page-size="size"
+      <Pagination
+        :current-page="page"
         :total="total"
-        layout="total, prev, pager, next"
-        background
-        @current-change="onPageChange"
+        :page-size="size"
+        :page-sizes="[10, 20, 50]"
+        @update:page="onPageChange"
+        @update:page-size="onSizeChange"
       />
     </div>
 

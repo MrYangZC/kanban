@@ -3,6 +3,7 @@ import type { Component } from 'vue'
 import { Plus, Search, ArrowLeft } from 'lucide-vue-next'
 import ScopeNav, { type ScopeNavGroup } from './ScopeNav.vue'
 import ViewTabs, { type ViewTab } from './ViewTabs.vue'
+import Pagination from '@/components/project/Pagination.vue'
 
 const props = withDefaults(defineProps<{
   title: string
@@ -146,18 +147,15 @@ function onSizeChange(v: number) {
         <!-- 分页条 -->
         <div
           v-if="showPagination && total !== undefined"
-          class="glass-bar flex shrink-0 items-center justify-between border-t px-4 py-3"
+          class="glass-bar flex shrink-0 items-center justify-center border-t px-4 py-3"
         >
-          <span class="text-xs text-ink-secondary">共 {{ total }} 条</span>
-          <el-pagination
+          <Pagination
             :current-page="page"
-            :page-size="size"
             :total="total"
+            :page-size="size"
             :page-sizes="[25, 50, 100]"
-            layout="prev, pager, next, sizes"
-            background
-            @current-change="onPageChange"
-            @size-change="onSizeChange"
+            @update:page="onPageChange"
+            @update:page-size="onSizeChange"
           />
         </div>
       </main>

@@ -11,18 +11,21 @@
  * update:page / update:pageSize 两个事件驱动加载，接口不变。
  * 中文文案（共 N 条）由 App.vue 的 el-config-provider zh-cn 提供。
  */
-const props = defineProps<{
-  currentPage: number
-  total: number
-  pageSize: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    currentPage: number
+    total: number
+    pageSize: number
+    /** 可选每页条数；各页业务量不同（工作项 25/50/100，项目 10/20/25/50），所以由调用方决定 */
+    pageSizes?: number[]
+  }>(),
+  { pageSizes: () => [10, 20, 25, 50] }
+)
 
 const emit = defineEmits<{
   (e: 'update:page', page: number): void
   (e: 'update:pageSize', size: number): void
 }>()
-
-const pageSizeOptions = [10, 20, 25, 50]
 
 function onPageChange(page: number) {
   if (page === props.currentPage) return
@@ -39,7 +42,7 @@ function onSizeChange(size: number) {
   <el-pagination
     :current-page="currentPage"
     :page-size="pageSize"
-    :page-sizes="pageSizeOptions"
+    :page-sizes="pageSizes"
     :total="total"
     :pager-count="5"
     layout="total, sizes, prev, pager, next"
