@@ -2,18 +2,19 @@
 /**
  * 项目列表的表格视图（el-table 版）。
  *
- * <p>原先由 ProjectTableRow.vue 渲染 `<tr>`，但 el-table 只接受列定义、无法插入行组件，
- * 所以把行内逻辑（收藏/归档/进入任务页/状态徽标）并入本组件，删除该子组件。
- *
  * <p>整行可点进入项目（与卡片视图一致）：el-table 的 row-click 是行级事件，
- * 行内所有可交互元素（收藏/编辑/成员/任务/归档/删除/进入）都必须 `.stop`，
+ * 行内所有可交互元素（收藏/编辑/更多/成员/任务/进入）都必须 `.stop`，
  * 否则点按钮会顺带跳转一次。
+ *
+ * <p>列宽与行高按"信息紧凑但可呼吸"调过：行内边距 7px（约 44px 行高），
+ * 固定列收窄到刚够内容，描述列吃掉剩余宽度；操作列只留收藏/编辑/更多/进入，
+ * 归档与删除这类低频且不可逆的操作收进二级菜单。
  */
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { toastUndo } from '@/utils/feedback'
 import {
-  Star, Pencil, Users, UserPlus, ListTodo, FolderKanban, ArrowRight, Trash2, Archive, ArchiveRestore
+  Star, Pencil, Users, ListTodo, ArrowRight, Trash2, Archive, ArchiveRestore, MoreHorizontal, UserPlus
 } from 'lucide-vue-next'
 import type { Project } from '@/api/types'
 import { useProjectCategoryStore } from '@/stores/projectCategory'
@@ -89,123 +90,128 @@ async function onArchive(raw: unknown) {
     reportError(e, '操作失败')
   }
 }
+
+/**
+ * 「更多」下拉里的低频操作。
+ *
+ * <p>归档/删除/加成员原本是三个常驻图标，和收藏、编辑挤在一行，
+ * 五个图标 + 一个文字按钮让操作列比信息列还宽，而且删除这种不可逆操作
+ * 和高频的"收藏"视觉权重一样。收进二级菜单后，行内只留高频项。
+ */
+function onCommand(cmd: string, raw: unknown) {
+  const p = asProject(raw)
+  if (cmd === 'members') {
+    emit('addMember', p)
+  } else if (cmd === 'archive') {
+    void onArchive(p)
+  } else if (cmd === 'delete') {
+    emit('delete', p)
+  }
+}
 </script>
 
 <template>
-  <div class="wi-table animate-fade-in-up">
-    <el-table :data="projects" row-key="id" class="wi-el-table" empty-text="暂无项目" @row-click="onRowClick">
-      <el-table-column label="项目 Key" width="120">
+  <div class="wi-table project-table animate-fade-in-up">
+    <el-table
+      :data="projects"
+      row-key="id"
+      class="wi-el-table"
+      empty-text="暂无项目"
+      @row-click="onRowClick"
+    >
+      <el-table-column label="项目 Key" width="124">
         <template #default="{ row }">
-          <div class="flex items-center gap-2">
-            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-primary-50 text-primary-500">
-              <FolderKanban :size="14" />
-            </div>
-            <span class="text-xs font-semibold uppercase tracking-wider text-primary-500">{{ row.projectKey }}</span>
-          </div>
+          <span class="project-key">{{ row.projectKey }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="项目名称" min-width="160">
+
+      <el-table-column label="项目名称" min-width="190">
         <template #default="{ row }">
-          <span
-            class="cursor-pointer font-medium text-ink transition-colors hover:text-primary-600"
-            @click.stop="emit('openBoard', asProject(row))"
-          >{{ row.name }}</span>
+          <span class="project-name" @click.stop="emit('openBoard', asProject(row))">{{ row.name }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="状态" width="110">
+
+      <el-table-column label="状态" width="104">
         <template #default="{ row }">
-          <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" :class="statusOf(row).cls">
+          <span class="project-badge" :class="statusOf(row).cls">
             <span class="h-1.5 w-1.5 rounded-full" :class="statusOf(row).dot"></span>
             {{ statusOf(row).label }}
           </span>
         </template>
       </el-table-column>
+
       <el-table-column label="描述" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">
-          <!-- 没有描述时用弱化的短横线：整列重复"暂无描述"会把留白变成噪音 -->
+          <!-- 没有描述时用弱化的短横线：整列重复「暂无描述」会把留白变成噪音 -->
           <span v-if="row.description" class="text-sm text-ink-secondary">{{ row.description }}</span>
           <span v-else class="text-sm text-ink-placeholder">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="成员" width="90" align="center">
+
+      <el-table-column label="成员" width="82" align="center">
         <template #default="{ row }">
-          <button
-            class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-ink-secondary transition hover:bg-surface-hover hover:text-primary-600"
-            title="成员"
-            @click.stop="emit('openMembers', asProject(row))"
-          >
-            <Users :size="14" />
-            <span class="font-medium">{{ row.stats?.memberCount || 0 }}</span>
+          <button class="project-metric" title="成员" @click.stop="emit('openMembers', asProject(row))">
+            <Users :size="13" />
+            <span>{{ row.stats?.memberCount || 0 }}</span>
           </button>
         </template>
       </el-table-column>
-      <el-table-column label="任务" width="90" align="center">
+
+      <el-table-column label="任务" width="82" align="center">
         <template #default="{ row }">
-          <button
-            class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-ink-secondary transition hover:bg-surface-hover hover:text-primary-600"
-            title="任务"
-            @click.stop="goTasks(row)"
-          >
-            <ListTodo :size="14" />
-            <span class="font-medium">{{ row.stats?.issueCount || 0 }}</span>
+          <button class="project-metric" title="任务" @click.stop="goTasks(row)">
+            <ListTodo :size="13" />
+            <span>{{ row.stats?.issueCount || 0 }}</span>
           </button>
         </template>
       </el-table-column>
-      <el-table-column label="创建时间" width="120">
-        <template #default="{ row }"><span class="text-sm text-ink-secondary">{{ dateOf(row) }}</span></template>
+
+      <el-table-column label="创建时间" width="108">
+        <template #default="{ row }"><span class="project-date">{{ dateOf(row) }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" width="240" align="right">
+
+      <el-table-column label="操作" width="168" align="right">
         <template #default="{ row }">
-          <div class="flex items-center justify-end gap-1">
+          <div class="flex items-center justify-end gap-0.5">
             <button
-              class="rounded-md p-1.5 transition hover:bg-surface-hover"
-              :class="row.favorited ? 'text-warning' : 'text-ink-secondary hover:text-warning'"
+              class="project-icon-btn"
+              :class="row.favorited ? 'text-warning' : ''"
               title="收藏"
               @click.stop="onFavorite(row)"
             >
               <Star :size="15" :fill="row.favorited ? 'currentColor' : 'none'" />
             </button>
             <button
-              class="rounded-md p-1.5 text-ink-secondary transition hover:bg-surface-hover hover:text-primary"
-              :class="{ 'cursor-not-allowed opacity-50': !row.canEdit }"
+              class="project-icon-btn"
+              :class="{ 'cursor-not-allowed opacity-40': !row.canEdit }"
               title="编辑项目"
               :disabled="!row.canEdit"
               @click.stop="emit('openEdit', asProject(row))"
             >
               <Pencil :size="15" />
             </button>
-            <button
-              class="rounded-md p-1.5 text-ink-secondary transition hover:bg-surface-hover hover:text-primary"
-              :class="{ 'cursor-not-allowed opacity-50': !row.canManage }"
-              :title="row.canManage ? '添加成员' : '仅项目所有者/管理员/项目经理可添加成员'"
-              :disabled="!row.canManage"
-              @click.stop="emit('addMember', asProject(row))"
-            >
-              <UserPlus :size="15" />
-            </button>
-            <button
-              class="rounded-md p-1.5 text-ink-secondary transition hover:bg-surface-hover hover:text-primary"
-              :class="{ 'cursor-not-allowed opacity-50': !row.canArchive }"
-              :title="row.status === 'ARCHIVED' ? '取消归档' : '归档（仅所有者/管理员）'"
-              :disabled="!row.canArchive"
-              @click.stop="onArchive(row)"
-            >
-              <ArchiveRestore v-if="row.status === 'ARCHIVED'" :size="15" />
-              <Archive v-else :size="15" />
-            </button>
-            <button
-              class="rounded-md p-1.5 text-ink-secondary transition hover:bg-rose-50 hover:text-rose-500"
-              :class="{ 'cursor-not-allowed opacity-50': !row.canDelete }"
-              :title="row.canDelete ? '删除项目' : '仅项目所有者/管理员可删除项目'"
-              :disabled="!row.canDelete"
-              @click.stop="emit('delete', asProject(row))"
-            >
-              <Trash2 :size="15" />
-            </button>
-            <button
-              class="ml-1 flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary-600 transition hover:bg-primary-500 hover:text-white"
-              @click.stop="emit('openBoard', asProject(row))"
-            >
+            <el-dropdown trigger="click" placement="bottom-end" @command="(cmd: string) => onCommand(cmd, row)">
+              <button class="project-icon-btn" title="更多操作" @click.stop>
+                <MoreHorizontal :size="15" />
+              </button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="members" :disabled="!row.canManage">
+                    <UserPlus :size="14" class="mr-1.5" />添加成员
+                  </el-dropdown-item>
+                  <el-dropdown-item command="archive" :disabled="!row.canArchive">
+                    <ArchiveRestore v-if="row.status === 'ARCHIVED'" :size="14" class="mr-1.5" />
+                    <Archive v-else :size="14" class="mr-1.5" />
+                    {{ row.status === 'ARCHIVED' ? '取消归档' : '归档' }}
+                  </el-dropdown-item>
+                  <el-dropdown-item command="delete" :disabled="!row.canDelete" divided>
+                    <Trash2 :size="14" class="mr-1.5 text-danger" />
+                    <span class="text-danger">删除项目</span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <button class="project-enter" @click.stop="emit('openBoard', asProject(row))">
               进入
               <ArrowRight :size="12" />
             </button>

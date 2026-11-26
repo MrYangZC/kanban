@@ -108,8 +108,10 @@ export const PROJECT_STATUS_ALIAS: Record<string, string> = {
 
 export const PROJECT_STATUS_BADGE: Record<string, ProjectStatusBadge> = {
   ARCHIVED: { label: '已归档', cls: 'bg-surface-light text-ink-secondary', dot: 'bg-ink-secondary' },
-  COMPLETED: { label: '已完成', cls: 'bg-success-light text-success', dot: 'bg-success' },
-  IN_PROGRESS: { label: '进行中', cls: 'bg-primary-50 text-primary-600', dot: 'bg-primary-500' },
+  // 配色按状态递进：未开始(琥珀) → 进行中(绿) → 已完成(蓝) → 已归档(灰) → 已关闭(红)，
+  // 五个状态五色，扫一眼就能区分；此前「进行中」用的是主色蓝，和链接/按钮同色，不够醒目。
+  COMPLETED: { label: '已完成', cls: 'bg-primary-50 text-primary-600', dot: 'bg-primary-500' },
+  IN_PROGRESS: { label: '进行中', cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
   NOT_STARTED: { label: '未开始', cls: 'bg-warning-light text-warning', dot: 'bg-warning' },
   CLOSED: { label: '已关闭', cls: 'bg-danger-light text-danger', dot: 'bg-danger' }
 }

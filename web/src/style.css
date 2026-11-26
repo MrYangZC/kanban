@@ -464,6 +464,64 @@ body {
     @apply flex items-center gap-1 rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink-regular transition hover:bg-surface-page;
   }
 
+  /* ------------------------------------------------------------------
+     工作项筛选条（对齐云效的「筛选」交互）
+     结构：工具栏下方一条筛选条 =「筛选」入口 + 已生效条件 chip + 分组维度；
+     入口点开是面板（字段按组罗列、可搜索、底部存筛选方案）。
+     与旧 BoardView 里那排裸 <select> 的区别：条件可见、可单删、跨视图一致。
+     ------------------------------------------------------------------ */
+  .filter-bar {
+    @apply flex flex-wrap items-center gap-2 border-b px-4 py-2;
+    border-color: var(--glass-line);
+    background-color: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
+  .filter-trigger {
+    @apply flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-xs text-ink-regular transition hover:bg-surface-page;
+  }
+  /* 有条件生效时按钮描边点亮：提醒用户「当前看到的不是全量」 */
+  .filter-trigger.is-active {
+    border-color: rgba(64, 158, 255, 0.5);
+    color: var(--primary);
+  }
+  .filter-badge {
+    @apply inline-flex items-center justify-center rounded-full text-[10px] font-medium text-white;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    line-height: 1;
+    background-color: var(--primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .filter-chip {
+    @apply inline-flex items-center gap-1 rounded-lg py-0.5 pl-2 pr-1 text-xs;
+    background-color: rgba(64, 158, 255, 0.08);
+    color: var(--ink-regular);
+  }
+  .filter-chip-x {
+    @apply flex items-center justify-center rounded text-ink-placeholder transition hover:bg-white hover:text-danger;
+    width: 16px;
+    height: 16px;
+  }
+  .filter-select {
+    @apply cursor-pointer rounded-md bg-transparent py-0.5 text-xs text-ink outline-none;
+  }
+  /* 时间区间的日期输入：窄、无边框，与同排的下拉视觉一致 */
+  .filter-date {
+    @apply cursor-pointer rounded-md bg-surface-page px-1.5 py-0.5 text-xs text-ink outline-none;
+    width: 118px;
+  }
+  .filter-panel-title {
+    @apply px-2 pb-1 pt-2 text-[11px] font-medium text-ink-placeholder;
+  }
+  .filter-panel-title.is-first {
+    @apply px-0 pt-0;
+  }
+  .filter-field-row {
+    @apply flex items-center justify-between gap-2 rounded-md px-2 py-1 transition hover:bg-surface-page;
+  }
+
   /* 列表表格 */
   /* 粘性表头必须保持较高不透明度，否则行内容会从表头下方透出 */
 
@@ -944,8 +1002,13 @@ body {
   .kanban-col {
     display: flex;
     height: 100%;
-    width: 280px;
-    flex-shrink: 0;
+    /* 列宽等分可用宽度：屏幕够宽时把整行铺满，不再在右侧留一大片空白；
+       同时给一个最小宽度，列数多（缺陷流 6~7 列）或窗口窄时不再压缩列身，
+       由 .kanban-cols 的 overflow-x 接管横向滚动。
+       flex-basis 必须写 0（而不是 280px），否则「基础宽度 + 平均剩余」会让
+       多出来的空间被各列按比例放大，仍然不均等。 */
+    flex: 1 1 0;
+    min-width: 280px;
     flex-direction: column;
     border-radius: 0.75rem;
     background-color: rgba(255, 255, 255, 0.3);
@@ -1174,6 +1237,29 @@ body {
   /* 树形根节点整行浅底，用来区分分组 */
   .wi-table .wi-el-table .el-table__row.wi-row-root > td.el-table__cell {
     background-color: rgba(48, 49, 51, 0.018);
+  }
+  /* 分组视图的组标题行：整行 span 成一条标题，底色压住 hover 态避免看着像可点 */
+  .wi-table .wi-el-table .el-table__row.wi-group-row {
+    cursor: default;
+  }
+  .wi-table .wi-el-table .el-table__row.wi-group-row > td.el-table__cell,
+  .wi-table .wi-el-table .el-table__row.wi-group-row:hover > td.el-table__cell {
+    background-color: rgba(48, 49, 51, 0.035) !important;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+  .wi-group-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .wi-group-title .wi-group-count {
+    font-weight: 400;
+    color: var(--ink-secondary);
+    font-variant-numeric: tabular-nums;
   }
   /* el-table 的树形缩进由内部 padding 控制，微调让层级更清晰 */
   .wi-table .wi-el-table .el-table__indent {
@@ -1435,3 +1521,130 @@ body {
   .el-form-item.is-error .el-textarea__inner {
     box-shadow: 0 0 0 1px var(--danger-text) inset;
   }
+
+/* ==================================================================
+   项目列表（表格视图）专用排版
+   目标：信息紧凑但不挤——行高约 44px、固定列收到刚够内容、描述列吃剩余宽度；
+   同时把层次做出来：表头浅底、行 hover、Key 用圆角标签、状态用彩色胶囊。
+   作用域统一挂在 .wi-table.project-table 上，避免影响工作项表与其他 el-table。
+   ================================================================== */
+.wi-table.project-table .wi-el-table {
+  --el-table-row-hover-bg-color: var(--primary-light);
+  --el-table-header-bg-color: #f6f8fb;
+}
+/* 行高收紧：默认 10px 上下内边距在 8 列的项目表里显得空旷 */
+.wi-table.project-table .wi-el-table .el-table__cell {
+  padding: 7px 0;
+}
+/* 表头加浅底色 + 加重字重，让"表头 / 数据行"两级关系立起来 */
+.wi-table.project-table .wi-el-table th.el-table__cell {
+  background-color: #f6f8fb !important;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+/* 行 hover：整行浅蓝，配合 el-table 的 row-hover 变量 */
+.wi-table.project-table .wi-el-table tbody tr:hover > td.el-table__cell {
+  background-color: var(--primary-light) !important;
+}
+
+/* 项目 Key：圆角蓝色标签，此前是"小图标 + 小字"，存在感太弱 */
+.project-key {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--primary-dark);
+  background-color: var(--primary-light);
+  box-shadow: inset 0 0 0 1px rgba(64, 158, 255, 0.22);
+}
+
+/* 项目名称：主信息，加粗一档，hover 变主色提示可点 */
+.project-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.project-name:hover {
+  color: var(--primary-dark);
+}
+
+/* 状态胶囊：比之前的徽标更醒目（进行中 = 绿色，见 issueDict 的映射） */
+.project-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 成员/任务计数：弱化成"指标"，hover 才提示可点 */
+.project-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-secondary);
+  transition: background-color 0.15s, color 0.15s;
+}
+.project-metric:hover {
+  background-color: var(--primary-light);
+  color: var(--primary-dark);
+}
+
+/* 日期：等宽数字，弱化 */
+.project-date {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-secondary);
+}
+
+/* 操作列图标按钮：统一 26px 命中区，hover 才出现底色 */
+.project-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--ink-secondary);
+  transition: background-color 0.15s, color 0.15s;
+}
+.project-icon-btn:hover:not(:disabled) {
+  background-color: var(--surface-hover, rgba(0, 0, 0, 0.04));
+  color: var(--primary-dark);
+}
+
+/* 「进入 →」：从纯文字改成描边按钮，作为行内最明确的主操作 */
+.project-enter {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(64, 158, 255, 0.35);
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--primary-dark);
+  background-color: #fff;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.project-enter:hover {
+  border-color: var(--primary);
+  background-color: var(--primary);
+  color: #fff;
+}
