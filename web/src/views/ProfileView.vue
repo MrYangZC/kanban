@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PASSWORD_MIN_LENGTH, passwordError } from '@/utils/formRules'
 import { ref, onMounted, computed } from 'vue'
 import { getMyProfile, updateMyProfile, changeMyPassword, uploadImage } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -121,8 +122,9 @@ async function onChangePassword() {
     ElMessage.warning('请输入新密码')
     return
   }
-  if (pwdForm.value.newPassword.length < 6) {
-    ElMessage.warning('新密码长度不能少于 6 位')
+  const pwdError = passwordError(userStore.user?.username || '', pwdForm.value.newPassword)
+  if (pwdError) {
+    ElMessage.warning(pwdError)
     return
   }
   if (pwdForm.value.newPassword !== pwdForm.value.confirmPassword) {
@@ -293,7 +295,7 @@ onMounted(loadProfile)
             </div>
             <div>
               <label class="label-base">新密码</label>
-              <input v-model="pwdForm.newPassword" type="password" class="input-base" placeholder="至少 6 位" autocomplete="new-password" />
+              <input v-model="pwdForm.newPassword" type="password" class="input-base" :placeholder="`至少 ${PASSWORD_MIN_LENGTH} 位`" autocomplete="new-password" />
             </div>
             <div>
               <label class="label-base">确认新密码</label>

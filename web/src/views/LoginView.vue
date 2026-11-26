@@ -3,7 +3,9 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { login as apiLogin } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { LayoutGrid } from 'lucide-vue-next'
+
+/** 品牌标识：public/logo.svg，拼接 BASE_URL 以适配 /kanban/ 子路径部署 */
+const logoUrl = `${import.meta.env.BASE_URL}logo.svg`
 
 const username = ref('')
 const password = ref('')
@@ -28,13 +30,8 @@ async function onSubmit() {
   <div class="app-canvas flex h-full items-center justify-center">
     <div class="glass-pop w-[380px] rounded-2xl p-8">
       <div class="mb-6 flex items-center gap-3">
-        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white">
-          <LayoutGrid :size="22" />
-        </div>
-        <div>
-          <div class="text-lg font-semibold text-ink-900">Kanban</div>
-          <div class="text-xs text-ink-400">研发项目看板</div>
-        </div>
+        <img :src="logoUrl" alt="Kanban" class="h-10 w-auto select-none" draggable="false" />
+        <div class="text-xs text-ink-400">研发项目看板</div>
       </div>
       <form class="space-y-4" @submit.prevent="onSubmit">
         <div>

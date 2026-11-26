@@ -11,9 +11,12 @@ import { ElMessage } from 'element-plus'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import {
-  LayoutGrid, ChevronDown, Search, Plus, Bell,
+  ChevronDown, Search, Plus, Bell,
   FolderKanban, UserCog, LogOut, User, X, Shield
 } from 'lucide-vue-next'
+
+/** 品牌标识：放在 public/logo.svg，用 BASE_URL 拼接以适配 /kanban/ 子路径部署 */
+const logoUrl = `${import.meta.env.BASE_URL}logo.svg`
 
 const route = useRoute()
 const router = useRouter()
@@ -229,9 +232,8 @@ onBeforeUnmount(() => {
   <!-- z-50：.glass-bar 的 backdrop-filter 会生成独立层叠上下文，header 若不显式提层，
        其内部下拉仍会被 DOM 顺序靠后的内容区（同样带 backdrop-filter 的 toolbar/粘性表头）盖住 -->
   <header class="glass-bar relative z-50 flex h-14 shrink-0 items-center gap-4 border-b px-4">
-    <div class="flex items-center gap-2">
-      <div class="sidebar-logo-icon"><LayoutGrid :size="18" /></div>
-      <span class="font-semibold text-ink">Kanban</span>
+    <div class="flex items-center">
+      <img :src="logoUrl" alt="Kanban" class="h-8 w-auto select-none" draggable="false" />
     </div>
 
     <nav class="flex items-center gap-1">

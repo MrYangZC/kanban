@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PASSWORD_RULES_TEXT, passwordError } from '@/utils/formRules'
 import { computed, onBeforeUnmount, onMounted, ref, reactive, watch } from 'vue'
 import { listUsersPage, createUser, updateUser, deleteUser, uploadImage } from '@/api'
 import type { UserVO } from '@/api/types'
@@ -126,11 +127,23 @@ function openEdit(raw: unknown) {
 /** 表单校验：新建时密码必填，编辑时留空表示不修改 */
 const userFormRef = ref<{ validate: () => Promise<boolean>; clearValidate: () => void } | null>(null)
 
+const passwordValidator = {
+  validator: (_rule: unknown, value: string, callback: (e?: Error) => void) => {
+    // 留空表示"不修改密码"（编辑态）；新建态的必填由 required 规则负责
+    if (!value) return callback()
+    const msg = passwordError(form.username || '', value)
+    return msg ? callback(new Error(msg)) : callback()
+  },
+  trigger: 'blur'
+}
+
 const userRules = computed(() => ({
   username: editing.value ? [] : [required('用户名'), minLen(3, '用户名'), codePattern()],
   displayName: [required('显示名'), maxLen(30, '显示名')],
   email: [email()],
-  password: editing.value ? [minLen(6, '密码')] : [required('初始密码'), minLen(6, '密码')]
+  password: editing.value
+        ? [{ validator: passwordValidator, trigger: 'blur' }]
+        : [required('初始密码'), { validator: passwordValidator, trigger: 'blur' }]
 }))
 
 async function onSubmitUser() {
@@ -331,8 +344,9 @@ onMounted(load)
               <span>可进入用户管理 / RBAC，并对全部项目拥有管理权</span>
             </label>
           </el-form-item>
-          <el-form-item :label="editing ? '重置密码（留空不改）' : '初始密码（必填，至少 6 位）'" prop="password">
+          <el-form-item :label="editing ? '重置密码（留空不改）' : '初始密码'" prop="password">
             <el-input v-model="form.password" type="password" show-password :placeholder="editing ? '留空则不修改密码' : '请输入初始密码'" />
+            <div class="mt-1 text-xs text-ink-secondary">{{ PASSWORD_RULES_TEXT }}</div>
           </el-form-item>
         </el-form>
         <div class="mt-6 flex justify-end gap-2">

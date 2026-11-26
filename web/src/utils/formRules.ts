@@ -99,3 +99,38 @@ export function notBeforeToday(): FormItemRule {
     trigger: 'change'
   }
 }
+
+/** 与后端 PasswordPolicy 完全一致的密码规则（口径不一致会让用户"前端过了后端报错"） */
+export const PASSWORD_MIN_LENGTH = 10
+
+/** 规则说明文案，供表单提示使用 */
+export const PASSWORD_RULES_TEXT =
+  '至少 10 位，需同时包含字母和数字，不能包含用户名、不能是常见弱口令、不能有 3 个连续相同字符'
+
+/**
+ * 密码强度校验，返回错误文案；合规返回空串。
+ * 与后端保持一致，避免前端放行、后端 400 的割裂体验。
+ */
+export function passwordError(username: string, password: string): string {
+  if (!password) return '密码不能为空'
+  if (password.length < PASSWORD_MIN_LENGTH) return `密码长度不能少于 ${PASSWORD_MIN_LENGTH} 位`
+  // 后端按 UTF-8 字节数限制 72（BCrypt 上限），这里按字符粗略提示
+  if (new TextEncoder().encode(password).length > 72) return '密码过长（超过 72 字节的部分不会被校验）'
+  if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return '密码必须同时包含字母和数字'
+  if (/(.)\1{2,}/.test(password)) return '密码不能包含 3 个及以上连续相同字符'
+  if (username && username.trim().length >= 3 && password.toLowerCase().includes(username.trim().toLowerCase())) {
+    return '密码不能包含用户名'
+  }
+  return ''
+}
+
+/** Element Plus 表单校验器：密码强度 */
+export function passwordRule(username: () => string) {
+  return {
+    validator: (_rule: unknown, value: string, callback: (e?: Error) => void) => {
+      const msg = passwordError(username(), value || '')
+      return msg ? callback(new Error(msg)) : callback()
+    },
+    trigger: 'blur'
+  }
+}

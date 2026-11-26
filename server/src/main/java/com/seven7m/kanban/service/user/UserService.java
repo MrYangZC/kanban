@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.exception.ServiceException;
+import com.seven7m.kanban.common.security.PasswordPolicy;
 import com.seven7m.kanban.common.security.PermissionService;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.common.util.LikeEscaper;
@@ -194,6 +195,7 @@ public class UserService {
         if (req.getPassword() == null || req.getPassword().isBlank()) {
             throw new ServiceException(400, "初始密码不能为空");
         }
+        PasswordPolicy.validate(req.getUsername(), req.getPassword());
         SysUser u = new SysUser();
         u.setId(UUID.randomUUID());
         u.setUsername(req.getUsername());
@@ -235,6 +237,8 @@ public class UserService {
         }
         boolean passwordChanged = req.getPassword() != null && !req.getPassword().isBlank();
         if (passwordChanged) {
+            // 管理员重置密码也要过同一套强度校验：否则"用户自己设不了弱密码、管理员可以"就成后门
+            PasswordPolicy.validate(u.getUsername(), req.getPassword());
             u.setPasswordHash(passwordEncoder.encode(req.getPassword()));
         }
         userMapper.updateById(u);
@@ -347,8 +351,9 @@ public class UserService {
                 || !passwordEncoder.matches(req.getOldPassword(), u.getPasswordHash())) {
             throw new ServiceException(400, "原密码不正确");
         }
-        if (req.getNewPassword().length() < 6) {
-            throw new ServiceException(400, "新密码长度不能少于 6 位");
+        PasswordPolicy.validate(u.getUsername(), req.getNewPassword());
+        if (passwordEncoder.matches(req.getNewPassword(), u.getPasswordHash())) {
+            throw new ServiceException(400, "新密码不能与原密码相同");
         }
         u.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
         userMapper.updateById(u);

@@ -62,6 +62,20 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable())
                 .logout(logout -> logout.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // 安全响应头：X-Frame-Options / X-Content-Type-Options / Cache-Control 由 Spring Security
+                // 默认下发，这里补齐默认没有的三项。
+                // 注意 CSP 不在这里配：后端要服务 Swagger UI（内联脚本+样式），严格 CSP 会把它打死；
+                // 前端页面的 CSP 由 nginx 下发（见 deploy/kanban/nginx-kanban.conf）。
+                .headers(headers -> headers
+                        .referrerPolicy(ref -> ref.policy(
+                                org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter
+                                        .ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .permissionsPolicyHeader(pp -> pp.policy(
+                                "geolocation=(), microphone=(), camera=(), payment=(), usb=(), interest-cohort=()"))
+                        // HSTS 仅在 HTTPS 请求上下发（Spring Security 默认按 HTTPS 匹配，本地 http 不会带）
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31_536_000)))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(unauthorizedEntryPoint())
                         .accessDeniedHandler(forbiddenHandler()))
