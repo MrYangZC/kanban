@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import SideNavList, { type SideNavItem } from '@/components/common/SideNavList.vue'
 import { useProjectStore } from '@/stores/project'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import {
@@ -43,6 +44,11 @@ const NAV_ITEMS = computed(() =>
   ALL_NAV_ITEMS.filter((item) => !item.perm || hasPermission(item.perm))
 )
 
+/** 导航数据映射成共用侧栏组件需要的结构（只有数据不同，标记与另一处侧栏一致） */
+const sideNavItems = computed<SideNavItem[]>(() =>
+  NAV_ITEMS.value.map((item) => ({ key: item.name, label: item.label, icon: item.icon }))
+)
+
 const currentNav = computed(() => {
   const segments = route.path.split('/')
   return segments[3] || 'overview'
@@ -82,26 +88,18 @@ onMounted(async () => {
   <div class="flex h-full overflow-hidden">
     <!-- 左侧导航栏 -->
     <aside
-      class="flex shrink-0 flex-col border-r border-line bg-surface-muted transition-all"
+      class="flex shrink-0 flex-col border-r border-line-light bg-gradient-sidebar transition-all"
       :class="sidebarCollapsed ? 'w-14' : 'w-52'"
     >
-      <nav class="flex-1 overflow-y-auto py-3">
-        <button
-          v-for="item in NAV_ITEMS"
-          :key="item.name"
-          class="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm transition"
-          :class="currentNav === item.name
-            ? 'bg-primary/10 font-medium text-primary'
-            : 'text-ink-regular hover:bg-black/5 hover:text-ink'"
-          @click="navigate(item.name)"
-        >
-          <component :is="item.icon" :size="16" class="shrink-0" />
-          <span v-if="!sidebarCollapsed" class="truncate">{{ item.label }}</span>
-        </button>
-      </nav>
+      <SideNavList
+        :items="sideNavItems"
+        :active="currentNav"
+        :collapsed="sidebarCollapsed"
+        @select="navigate"
+      />
       <!-- 折叠按钮 -->
       <button
-        class="flex items-center justify-center border-t border-line py-2.5 text-ink-secondary transition hover:bg-black/5 hover:text-ink"
+        class="flex items-center justify-center border-t border-line-light py-2.5 text-ink-secondary transition hover:bg-surface-hover hover:text-ink"
         @click="sidebarCollapsed = !sidebarCollapsed"
       >
         <ArrowRight :size="16" :class="sidebarCollapsed ? '' : 'rotate-180'" />
