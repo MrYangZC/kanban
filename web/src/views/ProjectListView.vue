@@ -32,6 +32,19 @@ const editDialogVisible = ref(false)
 const editing = ref(false)
 const editForm = ref({ id: '', name: '', description: '' })
 
+// 新建项目用与「编辑项目」同构的对话框：字段、宽度、校验都一样，
+// 之前这里是 ElMessageBox.prompt（只能填名称），于是"建的时候没描述、改的时候才有"，
+// 用户建完还得再点一次编辑才能补描述。
+const createDialogVisible = ref(false)
+const creating = ref(false)
+const createForm = ref({ name: '', description: '' })
+const createFormRef = ref<{ validate: () => Promise<boolean>; clearValidate: () => void } | null>(null)
+
+const createRules = {
+  name: [required('项目名称'), maxLen(60, '项目名称')],
+  description: [maxLen(200, '项目描述')]
+}
+
 const currentCategoryLabel = computed(() => {
   const cat = categories.value.find((c) => c.key === selectedCategory.value)
   return cat?.label || '全部项目'
@@ -43,17 +56,36 @@ const currentCategoryCount = computed(() => {
 })
 
 async function onNewProject() {
+  createForm.value = { name: '', description: '' }
+  createDialogVisible.value = true
+  // 清掉上一次留下的红色校验提示，否则重新打开时还挂着"项目名称不能为空"
+  nextTick(() => createFormRef.value?.clearValidate())
+}
+
+/**
+ * 项目标识（projectKey）由名称推导：后端要求字母数字、且项目内唯一。
+ * 中文名推导不出字符时退回 PROJ（后端会再加随机后缀兜底）。
+ */
+function deriveProjectKey(name: string): string {
+  return name.replace(/\s/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'PROJ'
+}
+
+async function onSubmitCreate() {
+  const valid = await createFormRef.value?.validate().then(() => true).catch(() => false)
+  if (!valid) return
+  const name = createForm.value.name.trim()
+  if (!name) return
+  creating.value = true
   try {
-    const { value: name } = await ElMessageBox.prompt('项目命名', '新建项目', {
-      inputPlaceholder: '例如：支付中台'
-    })
-    const key = name.replace(/\s/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'PROJ'
-    await createProject(key, name)
+    await createProject(deriveProjectKey(name), name, createForm.value.description.trim())
+    createDialogVisible.value = false
+    ElMessage.success('项目已创建，默认看板已就绪')
     await store.loadCategoryCounts()
     await store.loadProjects()
-    ElMessage.success('项目已创建，默认看板已就绪')
-  } catch {
-    /* 取消 */
+  } catch (e: unknown) {
+    reportError(e, '创建失败')
+  } finally {
+    creating.value = false
   }
 }
 
@@ -251,6 +283,21 @@ onMounted(async () => {
           @delete="onDelete"
         />
 
+
+        <el-dialog v-model="createDialogVisible" title="新建项目" width="460px">
+          <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="80px">
+            <el-form-item label="项目名称" prop="name">
+              <el-input v-model="createForm.name" placeholder="例如：支付中台" autofocus />
+            </el-form-item>
+            <el-form-item label="项目描述" prop="description">
+              <el-input v-model="createForm.description" type="textarea" :rows="3" placeholder="项目描述（可选）" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button :disabled="creating" @click="createDialogVisible = false">取消</el-button>
+            <el-button type="primary" :loading="creating" :disabled="creating" @click="onSubmitCreate">确定</el-button>
+          </template>
+        </el-dialog>
 
         <el-dialog v-model="editDialogVisible" title="编辑项目" width="460px">
           <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="80px">
