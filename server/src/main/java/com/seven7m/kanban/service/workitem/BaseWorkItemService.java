@@ -195,6 +195,15 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
                     + " AND category = {1})", req.getLabelId(), categoryName());
         }
 
+        // 人员维度（云效筛选面板的「人员」组）：负责人 / 创建者
+        if (req.getAssigneeId() != null) q.eq("assignee_id", req.getAssigneeId());
+        if (req.getReporterId() != null) q.eq("reporter_id", req.getReporterId());
+
+        // 时间维度（「时间」组）：按天区间，边界都含当天
+        applyTimestampRange(q, "created_at", req.getCreatedFrom(), req.getCreatedTo());
+        applyTimestampRange(q, "updated_at", req.getUpdatedFrom(), req.getUpdatedTo());
+        applyDateRange(q, "due_date", req.getDueFrom(), req.getDueTo());
+
         // 工作项类型编码过滤（需求/任务/缺陷分类，避免列表互相混入）
         if (req.getIssueTypeCodes() != null && !req.getIssueTypeCodes().isEmpty()) {
             List<IssueType> types = issueTypeMapper().selectList(Wrappers.<IssueType>lambdaQuery()
@@ -990,6 +999,24 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
     private void applySort(QueryWrapper<T> q, String sortField, String sortOrder) {
         // 排序规则（SQL 片段）与跨表合并用的内存 Comparator 共用 WorkItemSort 这一份定义
         WorkItemSort.applySql(q, sortField, sortOrder, category());
+    }
+
+    /**
+     * 时间戳列（created_at / updated_at）的按天区间，两端都含当天。
+     *
+     * <p>上界用 {@code < 次日 00:00} 而不是 {@code <= 当天 23:59:59}：
+     * created_at 带毫秒，写死 23:59:59 会漏掉当天最后 1 秒内的记录，
+     * 而"次日零点之前"这个写法与列上有没有毫秒、数据库怎么截断都无关。
+     */
+    private void applyTimestampRange(QueryWrapper<T> q, String column, java.time.LocalDate from, java.time.LocalDate to) {
+        if (from != null) q.ge(column, from.atStartOfDay());
+        if (to != null) q.lt(column, to.plusDays(1).atStartOfDay());
+    }
+
+    /** 纯日期列（due_date）的按天区间，两端都含当天 */
+    private void applyDateRange(QueryWrapper<T> q, String column, java.time.LocalDate from, java.time.LocalDate to) {
+        if (from != null) q.ge(column, from);
+        if (to != null) q.le(column, to);
     }
 
     private T requireIssue(UUID id) {

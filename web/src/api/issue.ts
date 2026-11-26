@@ -82,22 +82,71 @@ export function filterIssues(payload: IssueFilterPayload) {
 }
 
 /**
- * 工作项导出地址（CSV）。
- * 直接用 window.open 触发浏览器下载：会话是 Cookie，无需额外请求头。
- * 注意必须带上 API 前缀（window.open 不走 axios 的 baseURL，只能自己拼）。
+ * 导出当前筛选结果为 CSV，并直接触发浏览器下载。
+ *
+ * <p>不再用 `window.open(url)`：认证走 `Authorization: Bearer`，而 window.open 是浏览器原生请求，
+ * 带不上拦截器注入的请求头（过去靠 Cookie 兜底，改造后必然 401）。这里改用 axios 取 blob，
+ * 顺带能把整份筛选条件作为 query 参数下发，保证「列表看到的」与「导出的」是同一套条件。
+ *
+ * @param payload 列表页当前的筛选条件（与 filterIssues 的入参同源）
+ * @param types   工作项类型码；为空表示不按类型过滤
+ * @returns 总命中数、本次实际行数、是否因单次上限被截断
  */
-export function exportIssuesUrl(projectId: string, params: {
-  types?: string[]
-  scope?: string
-  keyword?: string
-} = {}) {
-  const query = new URLSearchParams()
-  if (params.types?.length) query.set('types', params.types.join(','))
-  if (params.scope) query.set('scope', params.scope)
-  if (params.keyword) query.set('keyword', params.keyword)
-  const suffix = query.toString() ? `?${query.toString()}` : ''
-  // 与 request.ts 的 API_BASE 口径一致：接口前缀由 nginx 分配为 /kanban-api
-  return `/kanban-api/v1/projects/${projectId}/issues/export${suffix}`
+export async function exportIssuesCsv(projectId: string, payload: IssueFilterPayload, types: string[] = []) {
+  // 只搬运后端 IssueFilterRequest 认的筛选字段；分页/排序/类型码在这里单独处理
+  const filterKeys = [
+    'scope', 'keyword', 'statusId', 'statusCategory', 'priority', 'severity',
+    'labelId', 'sprintId', 'assigneeId', 'reporterId',
+    'createdFrom', 'createdTo', 'updatedFrom', 'updatedTo', 'dueFrom', 'dueTo'
+  ] as const
+  const params: Record<string, string> = {}
+  for (const key of filterKeys) {
+    const value = payload[key]
+    if (typeof value === 'string' && value) params[key] = value
+  }
+  if (payload.overdue) params.overdue = 'true'
+  if (types.length) params.types = types.join(',')
+
+  const resp = await http.get<Blob>(`/v1/projects/${projectId}/issues/export`, {
+    params,
+    responseType: 'blob'
+  })
+  const headers = resp.headers as Record<string, string>
+  const filename = filenameFromDisposition(headers['content-disposition']) || `issues-${Date.now()}.csv`
+  saveBlob(resp.data, filename)
+  return {
+    filename,
+    total: Number(headers['x-export-total'] ?? 0),
+    rows: Number(headers['x-export-rows'] ?? 0),
+    truncated: String(headers['x-export-truncated'] ?? 'false') === 'true'
+  }
+}
+
+/** 后端用 Content-Disposition 下发文件名（非 ASCII 走 filename*=UTF-8''），两种写法都兼容 */
+function filenameFromDisposition(disposition?: string): string | null {
+  if (!disposition) return null
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(disposition)
+  if (utf8) {
+    try {
+      return decodeURIComponent(utf8[1])
+    } catch {
+      return utf8[1]
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(disposition)
+  return plain ? plain[1] : null
+}
+
+/** 用临时 a 标签触发下载；objectURL 在点击后再释放，避免部分浏览器取消下载 */
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 // ---- 看板 / 度量 ----

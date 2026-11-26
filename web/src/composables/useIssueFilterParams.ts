@@ -9,9 +9,21 @@ export interface IssueFilterSource {
   typeCodes?: () => string[] | undefined
   scope?: () => string | undefined
   keyword?: () => string | undefined
+  statusId?: () => string | undefined
   statusCategory?: () => string | undefined
-  overdue?: () => boolean | undefined
+  priority?: () => string | undefined
+  severity?: () => string | undefined
+  labelId?: () => string | undefined
   sprintId?: () => string | undefined
+  assigneeId?: () => string | undefined
+  reporterId?: () => string | undefined
+  createdFrom?: () => string | undefined
+  createdTo?: () => string | undefined
+  updatedFrom?: () => string | undefined
+  updatedTo?: () => string | undefined
+  dueFrom?: () => string | undefined
+  dueTo?: () => string | undefined
+  overdue?: () => boolean | undefined
 }
 
 /**
@@ -28,18 +40,42 @@ export function useIssueFilterParams(source: IssueFilterSource) {
   return function buildFilterParams(extra: Partial<IssueFilterPayload> = {}): IssueFilterPayload {
     const scope = source.scope?.()
     const keyword = source.keyword?.()
+    const statusId = source.statusId?.()
     const statusCategory = source.statusCategory?.()
-    const overdue = source.overdue?.()
+    const priority = source.priority?.()
+    const severity = source.severity?.()
+    const labelId = source.labelId?.()
     const sprintId = source.sprintId?.()
+    const assigneeId = source.assigneeId?.()
+    const reporterId = source.reporterId?.()
+    const createdFrom = source.createdFrom?.()
+    const createdTo = source.createdTo?.()
+    const updatedFrom = source.updatedFrom?.()
+    const updatedTo = source.updatedTo?.()
+    const dueFrom = source.dueFrom?.()
+    const dueTo = source.dueTo?.()
+    const overdue = source.overdue?.()
 
     return {
       projectId: source.projectId(),
       scope: scope || undefined,
       keyword: keyword || undefined,
+      statusId: statusId || undefined,
       issueTypeCodes: source.typeCodes?.(),
       statusCategory: statusCategory || undefined,
-      overdue: overdue || undefined,
+      priority: priority || undefined,
+      severity: severity || undefined,
+      labelId: labelId || undefined,
       sprintId: sprintId || undefined,
+      assigneeId: assigneeId || undefined,
+      reporterId: reporterId || undefined,
+      createdFrom: createdFrom || undefined,
+      createdTo: createdTo || undefined,
+      updatedFrom: updatedFrom || undefined,
+      updatedTo: updatedTo || undefined,
+      dueFrom: dueFrom || undefined,
+      dueTo: dueTo || undefined,
+      overdue: overdue || undefined,
       ...extra
     }
   }

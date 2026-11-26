@@ -1,30 +1,47 @@
 <script setup lang="ts">
-import { PASSWORD_MIN_LENGTH, passwordError } from '@/utils/formRules'
-import { ref, onMounted, computed } from 'vue'
+/**
+ * 个人中心（方案 B：左侧只读名片 + 右侧表单）。
+ *
+ * <p>职责切得很干净：
+ * <ul>
+ *   <li>左栏是「名片」——头像 + 身份 + 只读资料，唯一可交互的是头像本身（点击即换，选完立刻生效）；</li>
+ *   <li>右栏是「表单」——基本信息（显示名/邮箱）与修改密码，各自一个保存按钮；</li>
+ *   <li>头像不再进表单：换完就提交，避免出现「选了一张图但忘了保存」这种半生效状态。</li>
+ * </ul>
+ */
+import { computed, onMounted, ref, watch } from 'vue'
 import { getMyProfile, updateMyProfile, changeMyPassword, uploadImage } from '@/api'
 import { useUserStore } from '@/stores/user'
 import type { ProfileVO } from '@/api/types'
 import { ElMessage } from 'element-plus'
 import { reportError } from '@/utils/error'
-import { AVATAR_ACCEPT, validateAvatarFile } from '@/utils/avatar'
-import { User, Lock, Save, Camera, ShieldCheck, Clock, ImagePlus } from 'lucide-vue-next'
+import { AVATAR_ACCEPT, avatarColor, validateAvatarFile } from '@/utils/avatar'
+import { PASSWORD_MIN_LENGTH, passwordError } from '@/utils/formRules'
+import {
+  AtSign, CalendarClock, Camera, Loader2, Lock, Save, ShieldCheck, User, UserRound
+} from 'lucide-vue-next'
 
 const userStore = useUserStore()
 
 const profile = ref<ProfileVO | null>(null)
 const loading = ref(true)
 
-const form = ref({ displayName: '', email: '', avatarUrl: '' })
+/** 基本信息表单：只保留显示名与邮箱（头像走左栏点击，不进表单） */
+const form = ref({ displayName: '', email: '' })
 const savingProfile = ref(false)
+
 const uploadingAvatar = ref(false)
 const avatarInput = ref<HTMLInputElement | null>(null)
 
 const pwdForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const savingPwd = ref(false)
 
-// 预览跟随表单：选好图先看到效果，点「保存」才写库
-const avatarDisplay = computed(() => form.value.avatarUrl || '')
-const initial = computed(() => profile.value?.displayName?.charAt(0) || 'U')
+const avatarUrl = computed(() => profile.value?.avatarUrl || '')
+/** 图片加载失败（历史上传文件被清理、静态资源 401 等）时退回文字头像，别把 alt 文字甩在圆里 */
+const avatarBroken = ref(false)
+watch(avatarUrl, () => { avatarBroken.value = false })
+const initial = computed(() => profile.value?.displayName?.charAt(0) || profile.value?.username?.charAt(0) || 'U')
+const initialBg = computed(() => avatarColor(profile.value?.displayName || profile.value?.username))
 
 function fmtTime(t?: string | null): string {
   if (!t) return '-'
@@ -39,8 +56,7 @@ async function loadProfile() {
     profile.value = await getMyProfile()
     form.value = {
       displayName: profile.value.displayName || '',
-      email: profile.value.email || '',
-      avatarUrl: profile.value.avatarUrl || ''
+      email: profile.value.email || ''
     }
   } catch (e: unknown) {
     reportError(e, '加载个人信息失败')
@@ -49,45 +65,50 @@ async function loadProfile() {
   }
 }
 
-function triggerAvatarUpload() {
+/** 右上角头像等全局位置要立刻跟着变，否则要等下次登录 */
+function syncLoginStore(p: ProfileVO) {
+  if (userStore.user) {
+    userStore.setLogin({
+      ...userStore.user,
+      displayName: p.displayName,
+      avatarUrl: p.avatarUrl
+    })
+  }
+}
+
+function pickAvatar() {
+  if (uploadingAvatar.value) return
   avatarInput.value?.click()
 }
 
+/**
+ * 换头像：上传成功即写库，不需要再点「保存」。
+ * 只提交 avatarUrl——显示名/邮箱用服务端当前值，避免把用户「还没保存的输入」顺带写进去。
+ */
 async function onAvatarChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   // 立刻清空，否则重复选同一张图不会再触发 change
   input.value = ''
   if (!file) return
+
   const invalid = validateAvatarFile(file)
   if (invalid) {
     ElMessage.warning(invalid)
     return
   }
+
   uploadingAvatar.value = true
   try {
-    const res = await uploadImage(file)
-    // 只回填表单：点「保存」才落库，避免误选一张就永久生效
-    form.value.avatarUrl = res.url
-  } catch (e: unknown) {
-    reportError(e, '头像上传失败')
+    const uploaded = await uploadImage(file)
+    const updated = await updateMyProfile({ avatarUrl: uploaded.url })
+    profile.value = updated
+    syncLoginStore(updated)
+    ElMessage.success('头像已更新')
+  } catch (err: unknown) {
+    reportError(err, '头像更新失败')
   } finally {
     uploadingAvatar.value = false
-  }
-}
-
-function onClearAvatar() {
-  form.value.avatarUrl = ''
-}
-
-function syncLoginStore(p: ProfileVO) {
-  if (userStore.user) {
-    // 同步头像：否则右上角等全局头像位要等下次登录才换成新图
-    userStore.setLogin({
-      ...userStore.user,
-      displayName: p.displayName,
-      avatarUrl: p.avatarUrl
-    })
   }
 }
 
@@ -100,10 +121,10 @@ async function onSaveProfile() {
   try {
     const updated = await updateMyProfile({
       displayName: form.value.displayName.trim(),
-      email: form.value.email.trim(),
-      avatarUrl: form.value.avatarUrl
+      email: form.value.email.trim()
     })
     profile.value = updated
+    form.value = { displayName: updated.displayName || '', email: updated.email || '' }
     syncLoginStore(updated)
     ElMessage.success('个人信息已保存')
   } catch (e: unknown) {
@@ -151,164 +172,186 @@ onMounted(loadProfile)
 
 <template>
   <div class="page-container">
-    <!-- 标题区（与用户管理页一致） -->
-    <div class="mb-6 flex items-center justify-between">
-      <div>
-        <h1 class="page-title">个人中心</h1>
-        <p class="page-subtitle">管理个人信息、头像与登录密码</p>
-      </div>
+    <div class="mb-6">
+      <h1 class="page-title">个人中心</h1>
+      <p class="page-subtitle">管理个人资料与登录密码</p>
     </div>
 
-    <!-- 加载中 -->
     <div v-if="loading" class="card flex items-center gap-3 p-12 text-sm text-ink-secondary">
       <div class="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-500"></div>
       <span>加载中…</span>
     </div>
 
-    <div v-else-if="profile" class="grid grid-cols-1 gap-5 lg:grid-cols-3">
-      <!-- 左栏：账号概览 -->
-      <div class="card p-6">
-        <div class="flex flex-col items-center text-center">
-          <div class="relative">
-            <div
-              v-if="avatarDisplay"
-              class="h-20 w-20 overflow-hidden rounded-full shadow-card"
-            >
-              <img :src="avatarDisplay" :alt="profile.displayName" class="h-full w-full object-cover" />
+    <!-- 左 32% 名片 / 右 68% 表单 -->
+    <div v-else-if="profile" class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[32%_minmax(0,1fr)]">
+      <aside class="card flex flex-col items-center px-7 py-8">
+        <!-- 头像：点击更换，悬停显示相机提示；选完即保存 -->
+        <button
+          type="button"
+          class="group relative h-40 w-40 shrink-0 rounded-full outline-none ring-offset-2 transition focus-visible:ring-2 focus-visible:ring-primary-300 disabled:cursor-not-allowed"
+          :disabled="uploadingAvatar"
+          :title="uploadingAvatar ? '头像上传中…' : '点击更换头像'"
+          @click="pickAvatar"
+        >
+          <img
+            v-if="avatarUrl && !avatarBroken"
+            :src="avatarUrl"
+            :alt="profile.displayName"
+            class="h-full w-full rounded-full object-cover shadow-card ring-4 ring-white"
+            @error="avatarBroken = true"
+          />
+          <span
+            v-else
+            class="flex h-full w-full items-center justify-center rounded-full text-4xl font-medium text-white shadow-card ring-4 ring-white"
+            :style="{ backgroundColor: initialBg }"
+          >{{ initial }}</span>
+
+          <!-- 悬停遮罩：提示可点 -->
+          <span
+            class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5 rounded-full bg-ink/45 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+          >
+            <Camera :size="22" />
+            <span class="text-[11px]">点击更换头像</span>
+          </span>
+          <!-- 上传中：遮住遮罩，给出进度反馈 -->
+          <span
+            v-if="uploadingAvatar"
+            class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 rounded-full bg-ink/55 text-white"
+          >
+            <Loader2 :size="22" class="animate-spin" />
+            <span class="text-[11px]">上传中…</span>
+          </span>
+          <!-- 常驻相机角标：触屏没有 hover，也能看出这里能点 -->
+          <span
+            class="pointer-events-none absolute bottom-1 right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-surface-light text-ink-secondary shadow-sm transition group-hover:opacity-0"
+          >
+            <Camera :size="15" />
+          </span>
+        </button>
+        <input ref="avatarInput" type="file" :accept="AVATAR_ACCEPT" class="hidden" @change="onAvatarChange" />
+
+        <h2 class="mt-6 max-w-full truncate text-xl font-semibold text-ink" :title="profile.displayName">
+          {{ profile.displayName }}
+        </h2>
+        <p class="mt-1 text-sm text-ink-secondary">@{{ profile.username }}</p>
+        <span
+          class="tag-status mt-3"
+          :class="profile.enabled ? 'bg-success-light text-success' : 'bg-surface-hover text-ink-secondary'"
+        >
+          <span class="h-1.5 w-1.5 rounded-full" :class="profile.enabled ? 'bg-success' : 'bg-ink-placeholder'" />
+          {{ profile.enabled ? '正常' : '已禁用' }}
+        </span>
+
+        <!-- 只读资料 -->
+        <dl class="mt-8 w-full space-y-4 border-t border-line-lighter pt-6">
+          <div class="flex items-start gap-3">
+            <User :size="16" class="mt-0.5 shrink-0 text-ink-placeholder" />
+            <div class="min-w-0 flex-1">
+              <dt class="text-xs text-ink-secondary">用户名</dt>
+              <dd class="mt-0.5 truncate text-sm font-medium text-ink" :title="profile.username">{{ profile.username }}</dd>
             </div>
-            <div
-              v-else
-              class="flex h-20 w-20 items-center justify-center rounded-full bg-primary text-2xl font-medium text-white shadow-card"
-            >
-              {{ initial }}
-            </div>
-            <button
-              class="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-surface-light text-ink-secondary shadow-sm transition hover:text-primary"
-              title="更换头像"
-              :disabled="uploadingAvatar"
-              @click="triggerAvatarUpload"
-            >
-              <Camera :size="14" />
-            </button>
-            <input
-              ref="avatarInput"
-              type="file"
-              :accept="AVATAR_ACCEPT"
-              class="hidden"
-              @change="onAvatarChange"
-            />
           </div>
-          <div class="mt-4 text-base font-semibold text-ink">{{ profile.displayName }}</div>
-          <div class="mt-0.5 text-sm text-ink-secondary">@{{ profile.username }}</div>
-          <div class="mt-3">
-            <span
-              class="tag-status"
-              :class="profile.enabled ? 'bg-success-light text-success' : 'bg-surface-hover text-ink-secondary'"
-            >
-              <span class="h-1.5 w-1.5 rounded-full" :class="profile.enabled ? 'bg-success' : 'bg-ink-placeholder'" />
-              {{ profile.enabled ? '正常' : '已禁用' }}
+          <div class="flex items-start gap-3">
+            <AtSign :size="16" class="mt-0.5 shrink-0 text-ink-placeholder" />
+            <div class="min-w-0 flex-1">
+              <dt class="text-xs text-ink-secondary">邮箱</dt>
+              <dd class="mt-0.5 truncate text-sm font-medium text-ink" :title="profile.email || ''">{{ profile.email || '—' }}</dd>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <CalendarClock :size="16" class="mt-0.5 shrink-0 text-ink-placeholder" />
+            <div class="min-w-0 flex-1">
+              <dt class="text-xs text-ink-secondary">注册时间</dt>
+              <dd class="mt-0.5 text-sm font-medium text-ink">{{ fmtTime(profile.createdAt) }}</dd>
+            </div>
+          </div>
+        </dl>
+      </aside>
+
+      <div class="space-y-5">
+        <!-- 基本信息：只留显示名 + 邮箱 -->
+        <section class="card p-6">
+          <header class="mb-6 flex items-center gap-2.5">
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-500">
+              <UserRound :size="16" />
             </span>
-          </div>
-        </div>
-
-        <div class="mt-6 border-t border-line-lighter pt-4">
-          <div class="space-y-3 text-sm">
-            <div class="flex items-center justify-between">
-              <span class="text-ink-secondary">用户名</span>
-              <span class="font-medium text-ink">{{ profile.username }}</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-ink-secondary">邮箱</span>
-              <span class="font-medium text-ink">{{ profile.email || '—' }}</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="flex items-center gap-1 text-ink-secondary">
-                <Clock :size="13" /> 注册时间
-              </span>
-              <span class="font-medium text-ink">{{ fmtTime(profile.createdAt) }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 右栏：编辑表单 -->
-      <div class="space-y-5 lg:col-span-2">
-        <!-- 基本信息 -->
-        <div class="card p-6">
-          <div class="mb-5 flex items-center gap-2">
-            <User :size="18" class="text-primary-500" />
-            <h2 class="text-sm font-semibold text-ink">基本信息</h2>
-          </div>
-          <div class="space-y-4">
             <div>
-              <label class="label-base">显示名</label>
-              <input v-model="form.displayName" class="input-base" placeholder="显示名" />
+              <h2 class="text-sm font-semibold text-ink">基本信息</h2>
+              <p class="mt-0.5 text-xs text-ink-secondary">用于列表、通知与 @提及中展示</p>
+            </div>
+          </header>
+
+          <div class="grid gap-5 md:grid-cols-2">
+            <div>
+              <label class="label-base">显示名 <span class="text-danger">*</span></label>
+              <input v-model="form.displayName" class="input-base" maxlength="100" placeholder="请输入显示名" />
             </div>
             <div>
               <label class="label-base">邮箱</label>
-              <input v-model="form.email" type="email" class="input-base" placeholder="name@example.com" />
-            </div>
-            <div>
-              <label class="label-base">头像</label>
-              <div class="flex items-center gap-2">
-                <button
-                  type="button"
-                  class="btn-ghost"
-                  :disabled="uploadingAvatar"
-                  @click="triggerAvatarUpload"
-                >
-                  <ImagePlus :size="14" />
-                  <span>{{ uploadingAvatar ? '上传中…' : '上传图片' }}</span>
-                </button>
-                <button
-                  v-if="avatarDisplay"
-                  type="button"
-                  class="rounded px-2.5 py-1.5 text-xs text-ink-secondary transition hover:bg-surface-hover"
-                  @click="onClearAvatar"
-                >
-                  清除
-                </button>
-              </div>
-              <p class="mt-1.5 text-xs text-ink-secondary">
-                支持 jpg / png / gif / webp，不超过 5MB；选好后点下方「保存」生效
-              </p>
-            </div>
-            <div class="flex justify-end">
-              <button class="btn-primary" :disabled="savingProfile" @click="onSaveProfile">
-                <Save :size="15" />
-                <span>{{ savingProfile ? '保存中…' : '保存' }}</span>
-              </button>
+              <input v-model="form.email" type="email" class="input-base" maxlength="200" placeholder="name@example.com" />
             </div>
           </div>
-        </div>
 
-        <!-- 修改密码 -->
-        <div class="card p-6">
-          <div class="mb-5 flex items-center gap-2">
-            <ShieldCheck :size="18" class="text-primary-500" />
-            <h2 class="text-sm font-semibold text-ink">修改密码</h2>
+          <div class="mt-6 flex justify-end">
+            <button class="btn-primary" :disabled="savingProfile" @click="onSaveProfile">
+              <Save :size="15" />
+              <span>{{ savingProfile ? '保存中…' : '保存' }}</span>
+            </button>
           </div>
-          <div class="space-y-4">
+        </section>
+
+        <!-- 修改密码：结构与校验保持原样 -->
+        <section class="card p-6">
+          <header class="mb-6 flex items-center gap-2.5">
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-500">
+              <ShieldCheck :size="16" />
+            </span>
+            <div>
+              <h2 class="text-sm font-semibold text-ink">修改密码</h2>
+              <p class="mt-0.5 text-xs text-ink-secondary">修改成功后其它设备需重新登录</p>
+            </div>
+          </header>
+
+          <div class="max-w-md space-y-4">
             <div>
               <label class="label-base">原密码</label>
-              <input v-model="pwdForm.oldPassword" type="password" class="input-base" placeholder="请输入原密码" autocomplete="current-password" />
+              <input
+                v-model="pwdForm.oldPassword"
+                type="password"
+                class="input-base"
+                placeholder="请输入原密码"
+                autocomplete="current-password"
+              />
             </div>
             <div>
               <label class="label-base">新密码</label>
-              <input v-model="pwdForm.newPassword" type="password" class="input-base" :placeholder="`至少 ${PASSWORD_MIN_LENGTH} 位`" autocomplete="new-password" />
+              <input
+                v-model="pwdForm.newPassword"
+                type="password"
+                class="input-base"
+                :placeholder="`至少 ${PASSWORD_MIN_LENGTH} 位`"
+                autocomplete="new-password"
+              />
             </div>
             <div>
               <label class="label-base">确认新密码</label>
-              <input v-model="pwdForm.confirmPassword" type="password" class="input-base" placeholder="再次输入新密码" autocomplete="new-password" />
+              <input
+                v-model="pwdForm.confirmPassword"
+                type="password"
+                class="input-base"
+                placeholder="再次输入新密码"
+                autocomplete="new-password"
+              />
             </div>
-            <div class="flex justify-end">
+            <!-- 按钮与输入框同一右边界，避免在宽卡片里飘到最右侧 -->
+            <div class="flex justify-end pt-2">
               <button class="btn-primary" :disabled="savingPwd" @click="onChangePassword">
                 <Lock :size="15" />
                 <span>{{ savingPwd ? '提交中…' : '修改密码' }}</span>
               </button>
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   </div>

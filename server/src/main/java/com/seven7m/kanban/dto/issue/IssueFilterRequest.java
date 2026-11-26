@@ -2,7 +2,9 @@ package com.seven7m.kanban.dto.issue;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,6 +31,38 @@ public class IssueFilterRequest {
     private String severity;
     private UUID labelId;
     private String keyword;
+
+    /**
+     * 负责人过滤；为空表示不限。
+     * 与 {@code scope=ASSIGNED}（只看我负责的）并存：scope 是左侧导航的"我的视角"，
+     * 这里是"任选一名成员"，两者可叠加（例如"我负责的 且 负责人=张三"只会得到空集，属预期）。
+     */
+    private UUID assigneeId;
+
+    /** 创建者过滤；为空表示不限 */
+    private UUID reporterId;
+
+    /**
+     * 创建时间区间，按天且含首尾当天；为空表示不限。
+     * 加 @DateTimeFormat 是为了让「GET query 参数」也能绑定（导出接口用 @ModelAttribute 收筛选条件），
+     * JSON 请求体走 Jackson，两个通道都能解析 yyyy-MM-dd。
+     */
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate createdFrom;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate createdTo;
+
+    /** 更新时间区间，按天且含首尾当天；为空表示不限 */
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate updatedFrom;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate updatedTo;
+
+    /** 计划完成（due_date）区间，按天且含首尾当天；为空表示不限 */
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate dueFrom;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate dueTo;
 
     /** 工作项类型编码过滤（如 ["STORY","FEATURE"]），为空表示不过滤 */
     private List<String> issueTypeCodes;

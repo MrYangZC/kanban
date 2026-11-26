@@ -3,9 +3,9 @@ import { onMounted, ref, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   filterIssues, listIssueChildren, updateIssue, getBoardGrouped,
-  listProjectTags, listProjectMembers, listUsers
+  listProjectTags, listProjectMembers, listUsers, listProjectStatuses
 } from '@/api'
-import type { Issue, LabelVO, ProjectMember, UserOption } from '@/api/types'
+import type { Issue, LabelVO, ProjectMember, UserOption, IssueStatusVO, WorkItemCategory } from '@/api/types'
 import { TASK_TYPE_CODES, REQUIREMENT_TYPE_CODES, DEFECT_TYPE_CODES, categoryOfTypeCode } from '@/api/types'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
@@ -13,7 +13,8 @@ import SimpleListView from '@/components/SimpleListView.vue'
 import UserSelect from '@/components/common/UserSelect.vue'
 import TableEmpty from '@/components/common/TableEmpty.vue'
 import type { ViewTab } from '@/components/ViewTabs.vue'
-import { useBoardFilter } from '@/stores/boardFilter'
+import IssueFilterBar from '@/components/workitem/IssueFilterBar.vue'
+import { useIssueFilterState } from '@/composables/useIssueFilterState'
 import { ElMessage } from 'element-plus'
 import { Archive, BarChart3, Bug, FileText, Inbox, LayoutGrid, ListTodo, Table2, User, UserCheck } from 'lucide-vue-next'
 import { useProjectPermission } from '@/composables/useProjectPermission'
@@ -33,7 +34,11 @@ const tableData = ref<Issue[]>([])
 const allTags = ref<LabelVO[]>([])
 const members = ref<ProjectMember[]>([])
 const users = ref<UserOption[]>([])
-const filter = useBoardFilter(projectId.value)
+const statuses = ref<IssueStatusVO[]>([])
+// 关键词与左侧范围仍属页面自身状态；结构化条件统一走筛选条
+const keyword = ref('')
+const scope = ref('')
+const filter = useIssueFilterState(() => projectId.value, 'table')
 const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId.value)
 const canWrite = computed(() => hasPermission('issue:edit'))
 
@@ -73,19 +78,6 @@ const defaultTypeCode = computed(() => TYPE_CODE_MAP[typeKey.value]?.[0] || '')
 const viewTabs: ViewTab[] = [
   { key: 'board', label: '看板', icon: LayoutGrid },
   { key: 'table', label: '表格', icon: Table2 }
-]
-
-const PRIORITY_OPTIONS = [
-  { k: 'P0', label: '紧急' },
-  { k: 'P1', label: '高' },
-  { k: 'P2', label: '中' },
-  { k: 'P3', label: '低' }
-]
-const SEVERITY_OPTIONS = [
-  { k: 'S1', label: '致命' },
-  { k: 'S2', label: '严重' },
-  { k: 'S3', label: '一般' },
-  { k: 'S4', label: '轻微' }
 ]
 
 const navGroups = computed(() => [
@@ -128,6 +120,7 @@ async function loadMeta() {
   allTags.value = await listProjectTags(projectId.value).catch(() => [])
   members.value = await listProjectMembers(projectId.value).catch(() => [])
   users.value = await listUsers().catch(() => [])
+  statuses.value = await listProjectStatuses(projectId.value, categoryOfTypeCode(defaultTypeCode.value) as WorkItemCategory).catch(() => [])
   refreshPermission()
 }
 
@@ -143,14 +136,23 @@ async function load() {
   try {
     const res = await filterIssues({
       projectId: projectId.value,
-      scope: filter.scope || undefined,
-      keyword: filter.keyword || undefined,
+      scope: scope.value || undefined,
+      keyword: keyword.value || undefined,
       priority: filter.priority || undefined,
       severity: filter.severity || undefined,
       statusId: filter.statusId || undefined,
       statusCategory: statusCategoryFilter.value || undefined,
-      overdue: overdueFilter.value || undefined,
+      overdue: overdueFilter.value || filter.overdue || undefined,
       labelId: filter.labelId || undefined,
+      sprintId: filter.sprintId || undefined,
+      assigneeId: filter.assigneeId || undefined,
+      reporterId: filter.reporterId || undefined,
+      createdFrom: filter.createdFrom || undefined,
+      createdTo: filter.createdTo || undefined,
+      updatedFrom: filter.updatedFrom || undefined,
+      updatedTo: filter.updatedTo || undefined,
+      dueFrom: filter.dueFrom || undefined,
+      dueTo: filter.dueTo || undefined,
       issueTypeCodes: TYPE_CODE_MAP[typeKey.value]?.length ? TYPE_CODE_MAP[typeKey.value] : undefined,
       page: page.value,
       size: size.value,
@@ -232,7 +234,7 @@ function onSearch() {
   load()
 }
 function onScopeChange(v: string) {
-  filter.scope = v
+  scope.value = v
   page.value = 1
   load()
 }
@@ -257,13 +259,13 @@ onMounted(() => {
     :is-empty="!tableData.length"
     :empty-text="`暂无${itemLabel}`"
     :nav-groups="navGroups"
-    :scope="filter.scope"
+    :scope="scope"
     :view-tabs="viewTabs"
     view="table"
     v-model:page="page"
     v-model:size="size"
-    show-pagination
-    v-model:keyword="filter.keyword"
+    :show-pagination="!filter.groupBy"
+    v-model:keyword="keyword"
     @update:scope="onScopeChange"
     @update:view="onViewChange"
     @search="onSearch"
@@ -271,6 +273,21 @@ onMounted(() => {
     @create="onNewIssue"
     @back="back"
   >
+    <template #filters>
+      <!-- 与任务/需求/缺陷页共用同一个筛选条 -->
+      <IssueFilterBar
+        :model="filter"
+        :statuses="statuses"
+        :tags="allTags"
+        :sprints="[]"
+        :members="members"
+        :users="users"
+        :show-severity="typeKey === 'defect'"
+        :show-group="false"
+        :scheme-scope="`${projectId}:table-${typeKey}`"
+        @change="onSearch"
+      />
+    </template>
     <template #header-extra>
       <div v-if="activeFilterLabel" class="flex items-center gap-1.5">
         <span class="rounded-full bg-brand-light px-2.5 py-1 text-xs text-brand">筛选：{{ activeFilterLabel }}</span>
@@ -278,35 +295,6 @@ onMounted(() => {
       </div>
       <button class="btn-ghost" @click="toDashboard"><BarChart3 :size="15" /> 报表</button>
     </template>
-
-    <!-- 高级筛选：优先级 / 严重度(仅缺陷) / 标签，保留原筛选条能力 -->
-    <div class="glass-bar flex flex-wrap items-center gap-2 border-b px-4 py-2">
-      <select
-        v-model="filter.priority"
-        class="rounded-lg border border-surface-muted px-2 py-1.5 text-sm outline-none focus:border-brand"
-        @change="onSearch"
-      >
-        <option value="">优先级</option>
-        <option v-for="p in PRIORITY_OPTIONS" :key="p.k" :value="p.k">{{ p.label }}</option>
-      </select>
-      <select
-        v-if="typeKey === 'defect'"
-        v-model="filter.severity"
-        class="rounded-lg border border-surface-muted px-2 py-1.5 text-sm outline-none focus:border-brand"
-        @change="onSearch"
-      >
-        <option value="">严重度</option>
-        <option v-for="s in SEVERITY_OPTIONS" :key="s.k" :value="s.k">{{ s.label }}</option>
-      </select>
-      <select
-        v-model="filter.labelId"
-        class="rounded-lg border border-surface-muted px-2 py-1.5 text-sm outline-none focus:border-brand"
-        @change="onSearch"
-      >
-        <option value="">标签</option>
-        <option v-for="t in allTags" :key="t.id" :value="t.id">{{ t.name }}</option>
-      </select>
-    </div>
 
     <div class="p-4">
       <div class="glass-panel overflow-hidden">

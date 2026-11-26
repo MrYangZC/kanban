@@ -2,9 +2,9 @@
 import { onMounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import draggable from 'vuedraggable'
-import { getBoardGrouped, moveIssue, filterIssues, listProjectTags, listTransitions } from '@/api'
+import { getBoardGrouped, moveIssue, filterIssues, listProjectTags, listTransitions, listProjectStatuses, listProjectMembers, listSprints, listUsers } from '@/api'
 import { Archive, ArrowRightLeft, BarChart3, Bug, FileText, Inbox, LayoutGrid, ListTodo, Plus, Settings2, Table2, User, UserCheck } from 'lucide-vue-next'
-import type { BoardGroupView, Issue, GroupColumnView, LabelVO, WorkflowTransitionVO, WorkItemCategory } from '@/api/types'
+import type { BoardGroupView, Issue, GroupColumnView, LabelVO, WorkflowTransitionVO, WorkItemCategory, IssueStatusVO, SprintVO, UserOption } from '@/api/types'
 import { TASK_TYPE_CODES, REQUIREMENT_TYPE_CODES, DEFECT_TYPE_CODES } from '@/api/types'
 import IssueCard from '@/components/IssueCard.vue'
 import SimpleListView from '@/components/SimpleListView.vue'
@@ -12,7 +12,8 @@ import type { ViewTab } from '@/components/ViewTabs.vue'
 import IssueDetailDrawer from '@/components/IssueDetailDrawer.vue'
 import CreateIssueDialog from '@/components/CreateIssueDialog.vue'
 import WorkflowHandoffDialog from '@/components/board/WorkflowHandoffDialog.vue'
-import { useBoardFilter } from '@/stores/boardFilter'
+import IssueFilterBar from '@/components/workitem/IssueFilterBar.vue'
+import { useIssueFilterState } from '@/composables/useIssueFilterState'
 import { useWorkflowTransition } from '@/composables/useWorkflowTransition'
 import { useProjectPermission } from '@/composables/useProjectPermission'
 import { confirmHandoff, handoffLabel } from '@/utils/handoff'
@@ -70,24 +71,18 @@ const viewTabs: ViewTab[] = [
   { key: 'table', label: '表格', icon: Table2 }
 ]
 
-const PRIORITY_OPTIONS = [
-  { k: 'P0', label: '紧急' },
-  { k: 'P1', label: '高' },
-  { k: 'P2', label: '中' },
-  { k: 'P3', label: '低' }
-]
-const SEVERITY_OPTIONS = [
-  { k: 'S1', label: '致命' },
-  { k: 'S2', label: '严重' },
-  { k: 'S3', label: '一般' },
-  { k: 'S4', label: '轻微' }
-]
-
 const board = ref<BoardGroupView | null>(null)
 const boardName = ref('')
 const loading = ref(false)
 const allTags = ref<LabelVO[]>([])
-const filter = useBoardFilter(projectId.value)
+const statuses = ref<IssueStatusVO[]>([])
+const members = ref<{ userId: string; displayName: string }[]>([])
+const sprints = ref<SprintVO[]>([])
+const users = ref<UserOption[]>([])
+// 关键词与左侧范围仍属页面自身状态；结构化条件统一走筛选条（与任务/需求/缺陷页同一套）
+const keyword = ref('')
+const scope = ref('')
+const filter = useIssueFilterState(() => projectId.value, `board-${typeKey.value}`)
 const filteredIds = ref<Set<string>>(new Set())
 const { hasPermission, refresh: refreshPermission } = useProjectPermission(() => projectId.value)
 // 新建与拖拽是两种权限：前者 issue:create，后者属于编辑 issue:edit。
@@ -108,8 +103,12 @@ async function load() {
     board.value = boardRes
     boardName.value = TYPE_LABEL[typeKey.value] || boardRes.name || '任务看板'
     transitionMap.value = buildTransitionMap(transitions)
-    // 标签用于筛选下拉，失败降级为空（接口层已提示错误）
+    // 筛选辅助数据：单项失败只少一个筛选维度，不影响看板渲染（接口层已统一提示错误）
     allTags.value = await listProjectTags(projectId.value).catch(() => [])
+    statuses.value = await listProjectStatuses(projectId.value, boardCategory.value as WorkItemCategory).catch(() => [])
+    members.value = await listProjectMembers(projectId.value).catch(() => [])
+    sprints.value = await listSprints(projectId.value).catch(() => [])
+    users.value = await listUsers().catch(() => [])
     await applyFilter()
   } finally {
     loading.value = false
@@ -119,12 +118,22 @@ async function load() {
 async function applyFilter() {
   const issues = await filterIssues({
     projectId: projectId.value,
-    scope: filter.scope || undefined,
-    keyword: filter.keyword || undefined,
+    scope: scope.value || undefined,
+    keyword: keyword.value || undefined,
     priority: filter.priority || undefined,
     severity: filter.severity || undefined,
     statusId: filter.statusId || undefined,
     labelId: filter.labelId || undefined,
+    sprintId: filter.sprintId || undefined,
+    assigneeId: filter.assigneeId || undefined,
+    reporterId: filter.reporterId || undefined,
+    createdFrom: filter.createdFrom || undefined,
+    createdTo: filter.createdTo || undefined,
+    updatedFrom: filter.updatedFrom || undefined,
+    updatedTo: filter.updatedTo || undefined,
+    dueFrom: filter.dueFrom || undefined,
+    dueTo: filter.dueTo || undefined,
+    overdue: filter.overdue || undefined,
     issueTypeCodes: (TYPE_CODE_MAP[typeKey.value] || []).length ? TYPE_CODE_MAP[typeKey.value] : undefined,
     // 看板需要全量分组渲染，不能走默认分页（否则只看得到前 20 条）
     size: 1000
@@ -281,7 +290,7 @@ function onViewChange(v: string) {
   switchView(v as 'board' | 'table')
 }
 function onScopeChange(v: string) {
-  filter.scope = v
+  scope.value = v
   applyFilter()
 }
 
@@ -301,10 +310,10 @@ onMounted(() => {
     create-label="新建"
     :total="totalCount"
     :nav-groups="navGroups"
-    :scope="filter.scope"
+    :scope="scope"
     :view-tabs="viewTabs"
     view="board"
-    v-model:keyword="filter.keyword"
+    v-model:keyword="keyword"
     @update:scope="onScopeChange"
     @update:view="onViewChange"
     @search="applyFilter"
@@ -312,38 +321,24 @@ onMounted(() => {
     @create="() => onNewIssue()"
     @back="back"
   >
+    <template #filters>
+      <!-- 与任务/需求/缺陷页共用同一个筛选条：条件、chip、筛选方案一处维护 -->
+      <IssueFilterBar
+        :model="filter"
+        :statuses="statuses"
+        :tags="allTags"
+        :sprints="sprints"
+        :members="members"
+        :users="users"
+        :show-severity="typeKey === 'defect'"
+        :show-group="false"
+        :scheme-scope="`${projectId}:board-${typeKey}`"
+        @change="applyFilter"
+      />
+    </template>
     <template #header-extra>
       <button class="btn-ghost" @click="toDashboard"><BarChart3 :size="15" /> 报表</button>
     </template>
-
-    <!-- 高级筛选：优先级 / 严重度(仅缺陷) / 标签，保留原筛选条能力 -->
-    <div class="glass-bar flex flex-wrap items-center gap-2 border-b px-4 py-2">
-      <select
-        v-model="filter.priority"
-        class="rounded-lg border border-surface-muted px-2 py-1.5 text-sm outline-none focus:border-brand"
-        @change="applyFilter"
-      >
-        <option value="">优先级</option>
-        <option v-for="p in PRIORITY_OPTIONS" :key="p.k" :value="p.k">{{ p.label }}</option>
-      </select>
-      <select
-        v-if="typeKey === 'defect'"
-        v-model="filter.severity"
-        class="rounded-lg border border-surface-muted px-2 py-1.5 text-sm outline-none focus:border-brand"
-        @change="applyFilter"
-      >
-        <option value="">严重度</option>
-        <option v-for="s in SEVERITY_OPTIONS" :key="s.k" :value="s.k">{{ s.label }}</option>
-      </select>
-      <select
-        v-model="filter.labelId"
-        class="rounded-lg border border-surface-muted px-2 py-1.5 text-sm outline-none focus:border-brand"
-        @change="applyFilter"
-      >
-        <option value="">标签</option>
-        <option v-for="t in allTags" :key="t.id" :value="t.id">{{ t.name }}</option>
-      </select>
-    </div>
 
     <div class="flex flex-1 flex-col gap-4 p-4">
         <div v-for="g in renderGroups" :key="g.groupKey" class="glass-panel flex flex-1 flex-col rounded-xl p-3">
@@ -355,7 +350,7 @@ onMounted(() => {
             <div
               v-for="col in g.columns"
               :key="col.statusId"
-              class="kanban-col flex h-full w-[280px] shrink-0 flex-col rounded-xl transition-colors"
+              class="kanban-col flex h-full flex-col rounded-xl transition-colors"
               :class="{
                 'kanban-col-allow': dragOverCol?.statusId === col.statusId && dragOverCol?.allowed,
                 'kanban-col-deny': dragOverCol?.statusId === col.statusId && !dragOverCol?.allowed

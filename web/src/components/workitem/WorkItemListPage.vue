@@ -3,9 +3,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   filterIssues, listProjectStatuses, listProjectMembers,
-  getBoardGrouped, listTransitions, exportIssuesUrl, batchDeleteIssues
+  getBoardGrouped, listTransitions, exportIssuesCsv, batchDeleteIssues,
+  listProjectTags, listSprints, listUsers
 } from '@/api'
-import type { Issue, IssueTreeNode, IssueStatusVO, BoardGroupView, GroupColumnView, WorkflowTransitionVO, WorkItemCategory } from '@/api/types'
+import type { Issue, IssueTreeNode, IssueStatusVO, BoardGroupView, GroupColumnView, WorkflowTransitionVO, WorkItemCategory, LabelVO, SprintVO, UserOption } from '@/api/types'
 import type { LucideIcon } from 'lucide-vue-next'
 import { List, GitBranch, LayoutGrid, User, UserCheck, Inbox, Archive, Trash2 } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
@@ -22,6 +23,9 @@ import { useIssueFilterParams } from '@/composables/useIssueFilterParams'
 import { PRIORITY_COLOR, priorityColor as priorityColorOf, priorityLabel as priorityLabelOf } from '@/constants/issueDict'
 import WorkItemTreeTable from '@/components/workitem/WorkItemTreeTable.vue'
 import WorkItemStatsBar, { type WorkItemStat } from '@/components/workitem/WorkItemStatsBar.vue'
+import IssueFilterBar from '@/components/workitem/IssueFilterBar.vue'
+import { useIssueFilterState } from '@/composables/useIssueFilterState'
+import { groupIssues, createGroupResolver, flattenGroups, isGroupRow, groupRowSpan, GROUP_OPTIONS, type IssueGroupRow } from '@/utils/listGrouping'
 import StatusPill from '@/components/common/StatusPill.vue'
 import PriorityPill from '@/components/common/PriorityPill.vue'
 import UserCell from '@/components/common/UserCell.vue'
@@ -67,6 +71,12 @@ const total = ref(0)
 
 const statuses = ref<IssueStatusVO[]>([])
 const members = ref<{ userId: string; displayName: string }[]>([])
+/** 筛选条件（状态/优先级/标签/迭代/逾期）与列表分组维度：列表/树形/看板三视图共用一份 */
+const filter = useIssueFilterState(() => projectId.value, props.storageKey)
+const allTags = ref<LabelVO[]>([])
+const sprints = ref<SprintVO[]>([])
+/** 创建者候选项：报告人不一定是项目成员，所以用全局用户列表 */
+const users = ref<UserOption[]>([])
 const tableData = ref<Issue[]>([])
 const allIssues = ref<Issue[]>([])
 const board = ref<BoardGroupView | null>(null)
@@ -83,18 +93,60 @@ const canExport = computed(() => hasPermission('issue:export'))
 /** 批量删除入口的可见性：与后端 issue:delete 同一权限码 */
 const canDelete = computed(() => hasPermission('issue:delete'))
 
-function onExport() {
-  window.open(exportIssuesUrl(projectId.value, {
-    types: props.typeCodes,
-    scope: scope.value || undefined,
-    keyword: keyword.value.trim() || undefined
-  }), '_blank')
+/** 导出中标记：避免连点触发多次下载 */
+const exporting = ref(false)
+
+/**
+ * 导出当前筛选结果（CSV）。
+ *
+ * <p>条件与列表同源：直接复用 `filterParams()`，屏幕上是 137 条，导出的也就是这 137 条；
+ * 编辑/分页/排序这类只影响「怎么显示」的参数不会带过去。
+ */
+async function onExport() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const res = await exportIssuesCsv(
+      projectId.value,
+      filterParams({
+        statusCategory: statusCategoryFilter.value || undefined,
+        overdue: (overdueFilter.value || filter.overdue) || undefined
+      }),
+      props.typeCodes
+    )
+    if (res.truncated) {
+      ElMessage.warning(`命中 ${res.total} 条，单次最多导出 ${res.rows} 条；请缩小筛选范围后分批导出`)
+    } else {
+      ElMessage.success(`已导出 ${res.rows} 条`)
+    }
+  } catch (e: unknown) {
+    reportError(e, '导出失败')
+  } finally {
+    exporting.value = false
+  }
 }
 
 // 左侧各范围的条数：与视图无关，切到看板/树形后仍取自 filter 的 total
+// 计数套用当前关键词 + 筛选条条件（scope 自己遍历），这样左栏数字与列表口径一致
 const { counts: scopeCounts, refresh: refreshScopeCounts } = useScopeCounts(
   () => projectId.value,
-  () => props.typeCodes
+  () => props.typeCodes,
+  () => ({
+    keyword: keyword.value.trim() || undefined,
+    statusId: filter.statusId || undefined,
+    priority: filter.priority || undefined,
+    labelId: filter.labelId || undefined,
+    sprintId: filter.sprintId || undefined,
+    assigneeId: filter.assigneeId || undefined,
+    reporterId: filter.reporterId || undefined,
+    createdFrom: filter.createdFrom || undefined,
+    createdTo: filter.createdTo || undefined,
+    updatedFrom: filter.updatedFrom || undefined,
+    updatedTo: filter.updatedTo || undefined,
+    dueFrom: filter.dueFrom || undefined,
+    dueTo: filter.dueTo || undefined,
+    overdue: (overdueFilter.value || filter.overdue) || undefined
+  })
 )
 const scopeCount = (key: string) => scopeCounts.value[key] ?? 0
 
@@ -147,9 +199,20 @@ function setSelected(ids: string[], checked: boolean) {
 /** el-table 实例：清空选择要调用它的 clearSelection */
 const listTableRef = ref<{ clearSelection: () => void } | null>(null)
 
-/** 列表行样式：el-table 不提供选中行底色，这里按勾选集合补上 */
-function listRowClass({ row }: { row: Issue }) {
+/** 列表行样式：分组标题行单独标记；勾选行补底色（el-table 不提供选中态背景） */
+function listRowClass({ row }: { row: Issue | IssueGroupRow }) {
+  if (isGroupRow(row)) return 'wi-group-row'
   return isSelected(row.id) ? 'wi-row-selected' : ''
+}
+
+/** 组标题行不是数据，不能勾选、也不该响应「点行开详情」 */
+function isRowSelectable(row: unknown) {
+  return !isGroupRow(row)
+}
+
+function onRowOpen(row: unknown) {
+  if (isGroupRow(row)) return
+  detailDrawer.value?.open((row as Issue).id)
 }
 
 /**
@@ -157,8 +220,9 @@ function listRowClass({ row }: { row: Issue }) {
  * 列表页用它内置的 selection 列（表头自带全选/半选），树形页仍用自定义勾选列
  * 以保留"父节点半选"和父子联动。
  */
-function onSelectionChange(rows: Issue[]) {
-  selectedIds.value = new Set(rows.map((r) => r.id))
+function onSelectionChange(rows: Array<Issue | IssueGroupRow>) {
+  // 组标题伪行不是数据，不进勾选集合
+  selectedIds.value = new Set(rows.filter((r) => !isGroupRow(r)).map((r) => (r as Issue).id))
 }
 
 function clearSelection() {
@@ -245,28 +309,48 @@ async function loadStats() {
   }
 }
 
-/** 统计条：标签 + 彩色数字 + 图标，语义取自状态字典的 category */
+/**
+ * 统计条：全部 + 当前工作流的**每个状态节点**各自一条。
+ *
+ * <p>为什么不按 category（TODO/IN_PROGRESS/DONE）分三桶：三套工作流的终态口径不一样
+ * （任务的「已取消」、缺陷的「暂不修复/已关闭」都归在 category=DONE），按 category 汇总
+ * 会把「已取消」算进「已完成」，出现「待办 136 + 进行中 17 + 已完成 99 = 252，
+ * 但看板里明明还有 1 条已取消」这种对不上的账。按节点统计则天然对齐看板列，
+ * 任务 4 列、需求 6 列、缺陷 6 列各自成条，不需要页面各写一套固定标签。
+ */
 const statItems = computed<WorkItemStat[]>(() => {
-  // 看板的行数据在 renderGroups 里（按状态分列），不能用分页的 statsIssues，否则统计会是 0
+  // 看板的行数据在 renderGroups 里（按状态分列），不能用分页的 statsIssues，否则统计会是 0。
+  // 必须取 renderGroups 而不是 board.groups：后者是未套用筛选的全量，会让「已筛 137 条」
+  // 的看板顶上仍写着「全部任务 252」，两个数字互相打架。
   const source =
     view.value === 'board' && board.value
-      ? board.value.groups.flatMap((g) => g.columns.flatMap((c) => c.issues))
+      ? renderGroups.value.flatMap((g) => g.columns.flatMap((c) => c.issues))
       : view.value === 'tree'
         ? allIssues.value
         : statsIssues.value
-  const byCategory: Record<string, number> = {}
-  const categoryOf = (statusId: string) =>
-    statuses.value.find((s) => s.id === statusId)?.category || 'TODO'
-  for (const i of source) {
-    const c = categoryOf(i.statusId)
-    byCategory[c] = (byCategory[c] || 0) + 1
-  }
-  return [
-    { key: 'total', label: `全部${props.noun}`, value: source.length, color: 'var(--primary)' },
-    { key: 'todo', label: '待办', value: byCategory.TODO || 0, color: 'var(--ink-secondary)' },
-    { key: 'inProgress', label: '进行中', value: byCategory.IN_PROGRESS || 0, color: '#e6a23c' },
-    { key: 'done', label: '已完成', value: byCategory.DONE || 0, color: 'var(--success)' }
+
+  const byStatus = new Map<string, number>()
+  for (const i of source) byStatus.set(i.statusId, (byStatus.get(i.statusId) || 0) + 1)
+
+  const items: WorkItemStat[] = [
+    { key: 'total', label: `全部${props.noun}`, value: source.length, color: 'var(--primary)' }
   ]
+  for (const s of statuses.value) {
+    items.push({
+      key: s.id,
+      label: s.name,
+      value: byStatus.get(s.id) || 0,
+      color: s.color || 'var(--ink-secondary)'
+    })
+  }
+  // 字典外的状态（历史脏数据/工作流改过）也不能凭空消失，否则合计对不上「全部」
+  const known = new Set(statuses.value.map((s) => s.id))
+  let orphan = 0
+  for (const [statusId, n] of byStatus) if (!known.has(statusId)) orphan += n
+  if (orphan > 0) {
+    items.push({ key: 'unknown', label: '未匹配状态', value: orphan, color: 'var(--ink-secondary)' })
+  }
+  return items
 })
 
 /** 优先级文案：默认值 P2（中）在列表里不显示，避免整列同色块 */
@@ -313,6 +397,52 @@ const renderGroups = computed(() => {
   })
 })
 
+/**
+ * 列表分组的「组归属」解析：状态按工作流顺序、优先级按 P0→P3、迭代按迭代列表顺序，
+ * 负责人没有天然顺序，交给名称排序。
+ */
+function buildGroupResolver(groupBy: string) {
+  return createGroupResolver(groupBy, {
+    statusName: (id) => statusName(id),
+    statusOrder: (id) => {
+      const idx = statuses.value.findIndex((s) => s.id === id)
+      return idx < 0 ? 999 : idx
+    },
+    priorityLabel: (p) => priorityLabelOf(p),
+    memberName: (id) => memberName(id),
+    sprintName: (id) => sprints.value.find((s) => s.id === id)?.name || '未规划',
+    sprintOrder: (id) => {
+      const idx = sprints.value.findIndex((s) => s.id === id)
+      return idx < 0 ? 999 : idx
+    }
+  })
+}
+
+const listGroups = computed(() => {
+  if (!filter.groupBy) return []
+  return groupIssues(tableData.value, buildGroupResolver(filter.groupBy))
+})
+
+/** 列表分组维度在界面上的文案（卡片头用来说明「当前按什么分的」） */
+const groupLabel = computed(() => GROUP_OPTIONS.find((o) => o.value === filter.groupBy)?.label || '')
+
+/** el-table 的数据源：分组模式下插入组标题伪行，其余情况就是当页数据 */
+const listRows = computed<Array<Issue | IssueGroupRow>>(() =>
+  filter.groupBy ? flattenGroups(listGroups.value) : tableData.value
+)
+
+/** 组标题行要横跨的列数：与模板里各列的 v-if 保持一致，否则会漏一列空白 */
+const listColumnCount = computed(() => {
+  let n = 3 // 任务 / 编号 / 状态：三列恒定存在
+  if (canDelete.value) n += 1 // 勾选列
+  if (!hideSmColumns.value) n += 1 // 负责人
+  if (!hideMdColumns.value) n += 2 // 计划完成 / 更新于
+  return n
+})
+
+/** 勾选列要单独保留一格，否则组标题会把复选框一起合并掉 */
+const listSpanMethod = computed(() => groupRowSpan(listColumnCount.value, canDelete.value ? 1 : 0))
+
 function statusName(id: string) { return statusNameMap.value[id] || '—' }
 function statusColor(id: string) { return statuses.value.find((s) => s.id === id)?.color || 'var(--primary)' }
 function memberName(id: string | null) { return members.value.find((m) => m.userId === id)?.displayName || '—' }
@@ -321,6 +451,10 @@ async function loadMeta() {
   // 状态/成员为筛选辅助数据，失败降级为空（接口层已统一提示错误）
   try { statuses.value = await listProjectStatuses(projectId.value, props.boardCategory) } catch { /* 状态字典降级为空 */ }
   try { members.value = await listProjectMembers(projectId.value) } catch { /* 成员筛选降级为空 */ }
+  // 标签/迭代/用户同理：拿不到只是少几个筛选维度，不影响列表本身
+  try { allTags.value = await listProjectTags(projectId.value) } catch { /* 标签筛选降级为空 */ }
+  try { sprints.value = await listSprints(projectId.value) } catch { /* 迭代筛选降级为空 */ }
+  try { users.value = await listUsers() } catch { /* 创建者筛选降级为空 */ }
 }
 
 // 度量页点统计数字跳过来时带的筛选（?statusCategory / ?overdue），同步逻辑见 composable
@@ -341,20 +475,37 @@ const filterParams = useIssueFilterParams({
   scope: () => scope.value,
   keyword: () => keyword.value,
   statusCategory: () => statusCategoryFilter.value,
-  overdue: () => overdueFilter.value
+  // 筛选条上的条件（与度量页带来的 ?statusCategory/overdue 是两层，互不覆盖）
+  statusId: () => filter.statusId,
+  priority: () => filter.priority,
+  labelId: () => filter.labelId,
+  sprintId: () => filter.sprintId,
+  assigneeId: () => filter.assigneeId,
+  reporterId: () => filter.reporterId,
+  createdFrom: () => filter.createdFrom,
+  createdTo: () => filter.createdTo,
+  updatedFrom: () => filter.updatedFrom,
+  updatedTo: () => filter.updatedTo,
+  dueFrom: () => filter.dueFrom,
+  dueTo: () => filter.dueTo,
+  overdue: () => overdueFilter.value || filter.overdue
 })
 
 async function loadList() {
   loading.value = true
   try {
-    const res = await filterIssues(
-      filterParams({
-        page: page.value,
-        size: size.value,
-        sortField: sortField.value || undefined,
-        sortOrder: sortOrder.value || undefined
-      })
-    )
+    // 分组模式要按组统计「组内条数」，只能全量取（后端单次上限 1000）；
+    // 不分组时仍走服务端分页，避免为了一个视觉功能把大项目全量拉到前端。
+    const res = filter.groupBy
+      ? await filterIssues(filterParams({ page: 1, size: 1000 }))
+      : await filterIssues(
+        filterParams({
+          page: page.value,
+          size: size.value,
+          sortField: sortField.value || undefined,
+          sortOrder: sortOrder.value || undefined
+        })
+      )
     tableData.value = res.list
     total.value = res.total
   } catch {
@@ -428,7 +579,18 @@ function reloadAll() {
   loadStats()
 }
 
-function onSearch() { page.value = 1; load(); loadStats() }
+function onSearch() { page.value = 1; load(); loadStats(); refreshScopeCounts() }
+
+/**
+ * 筛选条/分组维度变化：条件变了必须回到第一页，
+ * 否则页码可能停在「新条件只有 1 页」之外，列表看起来是空的。
+ */
+function onFilterChange() {
+  page.value = 1
+  load()
+  loadStats()
+  refreshScopeCounts()
+}
 function onViewChange(v: string) {
   view.value = v as ViewMode
   localStorage.setItem(`kanban:${props.storageKey}:${projectId.value}`, v)
@@ -481,7 +643,7 @@ onMounted(() => {
     :view="view"
     v-model:page="page"
     v-model:size="size"
-    :show-pagination="view === 'list'"
+    :show-pagination="view === 'list' && !filter.groupBy"
     v-model:keyword="keyword"
     @update:view="onViewChange"
     @update:scope="onScopeChange"
@@ -490,6 +652,20 @@ onMounted(() => {
     @export="onExport"
     @create="openCreate"
   >
+    <template #filters>
+      <!-- 筛选条：状态/优先级/标签/迭代/逾期 + 列表分组，三视图共用同一份条件 -->
+      <IssueFilterBar
+        :model="filter"
+        :statuses="statuses"
+        :tags="allTags"
+        :sprints="sprints"
+        :members="members"
+        :users="users"
+        :show-group="view === 'list'"
+        :scheme-scope="`${projectId}:${storageKey}`"
+        @change="onFilterChange"
+      />
+    </template>
     <template #stats>
       <WorkItemStatsBar :items="statItems" />
     </template>
@@ -516,25 +692,41 @@ onMounted(() => {
               <Trash2 :size="13" /> {{ deleting ? '删除中…' : '删除选中' }}
             </button>
           </template>
-          <span v-else class="ml-auto text-xs text-ink-secondary">按更新时间倒序</span>
+          <span v-else class="ml-auto text-xs text-ink-secondary">
+            {{ filter.groupBy ? `${groupLabel} · 共 ${total} 条` : '按更新时间倒序' }}
+          </span>
         </div>
         <div class="wi-card-body wi-table">
           <!-- 表格交给 el-table：列宽可拖拽、表头 sticky、横向滚动、selection 列自带全选/半选 -->
           <el-table
             ref="listTableRef"
-            :data="tableData"
+            :data="listRows"
             row-key="id"
             height="100%"
             class="wi-el-table"
             :row-class-name="listRowClass"
-            @row-click="(row: Issue) => detailDrawer?.open(row.id)"
+            :span-method="listSpanMethod"
+            @row-click="onRowOpen"
             @selection-change="onSelectionChange"
             @sort-change="onSortChange"
           >
-            <el-table-column v-if="canDelete" type="selection" width="38" class-name="wi-td-select" label-class-name="wi-th-select" />
+            <el-table-column
+              v-if="canDelete"
+              type="selection"
+              width="38"
+              class-name="wi-td-select"
+              label-class-name="wi-th-select"
+              :selectable="isRowSelectable"
+            />
             <el-table-column label="任务" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">
-                <div class="flex items-center gap-2">
+                <!-- 分组标题行：整行 span 成一格，只在这里渲染组名与条数 -->
+                <div v-if="isGroupRow(row)" class="wi-group-title">
+                  <component :is="icon" :size="13" class="text-brand" />
+                  <span>{{ row.label }}</span>
+                  <span class="wi-group-count">{{ row.count }}</span>
+                </div>
+                <div v-else class="flex items-center gap-2">
                   <span
                     v-if="row.priority && row.priority !== 'P2'"
                     class="wi-prio"

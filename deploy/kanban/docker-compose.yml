@@ -1,0 +1,58 @@
+# kanban 看板后端（独立 compose 工程）
+#
+# 与 /home/ubuntu/sda/yushun/docker-compose.yml 的关系：
+#   - 不修改那份大 compose，这里单独一个工程（project name = kanban），只做后端一个容器；
+#   - 通过 external 网络 yushun_bridge 与 nginx / pgsql16-postgis 互通，不新建网络；
+#   - 9085 发布到宿主机，nginx 沿用现有写法经 172.17.0.1（docker0 网关）反向代理，
+#     这样后端没起来时 nginx 仍能正常启动（用容器名做 upstream 时 DNS 解析失败会让 nginx 起不来）。
+#
+# 常用命令（在 /home/ubuntu/sda/yushun/kanban 下）：
+#   docker compose up -d --build     # 首次/更新 jar 后重建
+#   docker compose logs -f           # 看日志
+#   docker compose restart           # 只重启
+#   docker compose down              # 停止并删除容器（上传目录在宿主机，不会丢）
+name: kanban
+
+services:
+  kanban-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kanban/kanban-server:1.0.0
+    container_name: kanban-server
+    restart: always
+    environment:
+      TZ: Asia/Shanghai
+      # 数据库：复用 yushun_bridge 网络内的 pgsql16-postgis 容器（宿主机侧映射为 5433）
+      # 同一网络内优先走容器名 + 容器内端口 5432，不依赖宿主机端口映射
+      DB_HOST: pgsql16-postgis
+      DB_PORT: "5432"
+      DB_USERNAME: postgres
+      DB_PASSWORD: X@bN!7n9m1
+      # 附件目录（容器内路径，挂载到宿主机 ./uploads）
+      KANBAN_UPLOAD_DIR: /app/uploads
+      KANBAN_UPLOAD_MAX_PER_ISSUE: "50"
+      # 对外前缀对齐 nginx 的 /kanban-api（见 nginx.conf 对应段落）：
+      #   后端返回的头像/附件地址 -> /kanban-api/uploads/xxx
+      #   附件读取用的 KB_FILE Cookie 的 Path -> /kanban-api/uploads（浏览器渲染 <img> 无法带请求头，
+      #   只能靠这个 HttpOnly Cookie 放行；Path 必须与浏览器实际请求的前缀一致）
+      KANBAN_UPLOAD_PUBLIC_PREFIX: /kanban-api
+      # JWT 签名密钥（HS256，≥32 字节）。值放在同目录 .env 里，不进仓库；
+      # 未配置时 compose 直接报错退出，避免带着仓库内的开发默认密钥上线
+      KANBAN_JWT_SECRET: ${KANBAN_JWT_SECRET:?请在 .env 配置 KANBAN_JWT_SECRET（至少 32 字节）}
+    ports:
+      # 供 nginx 经 172.17.0.1:9085 反代；如需只允许本机访问可改成 "127.0.0.1:9085:9085"
+      - "9085:9085"
+    volumes:
+      - ./uploads:/app/uploads
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    networks:
+      - yushun_bridge
+
+networks:
+  yushun_bridge:
+    external: true

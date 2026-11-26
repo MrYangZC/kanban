@@ -30,6 +30,20 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port: 5173,
       allowedHosts: true,
+      watch: {
+        // Windows 上包管理器（npm/pnpm）会先在 web/ 下建 ".package.json.<pid>.<uuid>.tmpdir"
+        // 再原子替换 package.json；文件监视器扫到这个被占用的临时文件会抛 EBUSY，
+        // 而 vite 对 watcher 的 error 事件没有兜底，整个 dev server 会直接退出
+        // （已实际发生一次：日志结尾是 EBUSY ... package.json.tmp）。
+        // 这些目录本来就不该被监视，排除掉即可。
+        ignored: [
+          '**/.package.json.*.tmpdir/**',
+          '**/*.tmpdir/**',
+          '**/playwright-report/**',
+          '**/test-results/**',
+          '**/dist/**'
+        ]
+      },
       proxy: {
         // 生产由 nginx 把 /kanban-api/ 摘掉再转给后端 /api/；开发环境用同一规则，
         // 否则前端请求 /kanban-api 会 404（本地没有那层 nginx）

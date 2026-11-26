@@ -39,11 +39,9 @@ Skill.iml
 /测试报告/
 *.yaml
 
-# Playwright 测试产物（HTML 报告与原始 trace/视频不入库，用例与报告文档保留）
+# 历史 Playwright 报告归档目录（e2e 已从项目移除，仅保留旧的报告归档目录忽略规则）
 /测试/test-results/
 /测试/playwright-report/
-/web/test-results/
-/web/playwright-report/
 /.ai-tmp/
 target
 *.log

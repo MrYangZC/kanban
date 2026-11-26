@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { filterIssues } from '@/api'
+import type { IssueFilterPayload } from '@/api/types'
 import { useIssueFilterParams } from '@/composables/useIssueFilterParams'
 
 /**
@@ -19,8 +20,16 @@ export function isScopeKey(value: string): value is ScopeKey {
  * 范围导航计数的唯一来源：逐个 scope 取 filter 接口的 total（size=1 只取计数）。
  * 缺陷/任务/需求页共用，避免出现「硬编码 0」和「看板视图不更新计数」两类偏差——
  * 计数与当前视图无关，切到看板/树形后依然准确。
+ *
+ * @param extra 除 scope 之外的当前筛选条件（关键词/状态/优先级…）。
+ *   带上它，左侧计数就与列表口径一致：否则用户筛到 137 条，左栏还写着 252，
+ *   看起来像筛选没生效。计数仍然逐 scope 各自统计，只是都套用同一组条件。
  */
-export function useScopeCounts(projectId: () => string, typeCodes: () => string[]) {
+export function useScopeCounts(
+  projectId: () => string,
+  typeCodes: () => string[],
+  extra: () => Partial<IssueFilterPayload> = () => ({})
+) {
   const counts = ref<Record<string, number>>({})
   // 与列表页共用同一套筛选字段，避免"计数口径"和"列表口径"各写一份
   const buildFilterParams = useIssueFilterParams({ projectId, typeCodes })
@@ -33,7 +42,7 @@ export function useScopeCounts(projectId: () => string, typeCodes: () => string[
       SCOPE_KEYS.map(async (key) => {
         try {
           const res = await filterIssues(
-            buildFilterParams({ scope: key || undefined, page: 1, size: 1 })
+            buildFilterParams({ scope: key || undefined, page: 1, size: 1, ...extra() })
           )
           return [key, res.total] as const
         } catch {

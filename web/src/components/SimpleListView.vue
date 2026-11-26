@@ -113,6 +113,9 @@ function onSizeChange(v: number) {
       </div>
     </header>
 
+    <!-- 筛选条：由页面注入（条件 + 分组维度）。不传则不渲染，既有页面零改动 -->
+    <slot name="filters" />
+
     <div class="flex flex-1 overflow-hidden">
       <!-- 左侧范围导航：仅工作项类页面需要 -->
       <ScopeNav

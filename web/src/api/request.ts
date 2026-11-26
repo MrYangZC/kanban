@@ -75,6 +75,8 @@ function redirectToLogin(): void {
 http.interceptors.response.use(
   // 拦截层不关心业务数据类型，具体类型由 req<T> 在调用点还原
   (resp: AxiosResponse<R<unknown>>) => {
+    // 二进制响应（CSV 导出）不是 R<T> 信封：原样交给调用方（否则会被当成"请求失败"）
+    if (resp.config.responseType === 'blob') return resp
     const body = resp.data
     if (body && body.code === 200) {
       return resp

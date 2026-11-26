@@ -42,6 +42,19 @@ export interface IssueFilterPayload {
   severity?: string
   labelId?: string
   keyword?: string
+  /** 负责人过滤（UUID）；与 scope=ASSIGNED（只看我负责的）并存，是"任选一名成员" */
+  assigneeId?: string
+  /** 创建者过滤（UUID） */
+  reporterId?: string
+  /** 创建时间区间（yyyy-MM-dd，两端都含当天） */
+  createdFrom?: string
+  createdTo?: string
+  /** 更新时间区间（yyyy-MM-dd，两端都含当天） */
+  updatedFrom?: string
+  updatedTo?: string
+  /** 计划完成（due_date）区间（yyyy-MM-dd，两端都含当天） */
+  dueFrom?: string
+  dueTo?: string
   /** 状态类别过滤：TODO / IN_PROGRESS / DONE（度量页点统计数字跳转时用） */
   statusCategory?: string
   /** 只看逾期（未完成且已过截止日） */

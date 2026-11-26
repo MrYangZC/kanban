@@ -39,21 +39,30 @@ public class IssueExportService {
     private final IssueStatusMapper issueStatusMapper;
     private final ProjectMapper projectMapper;
 
-    /** 导出结果：文件名 + UTF-8(带 BOM) 的 CSV 字节 + 是否被截断 */
-    public record ExportFile(String filename, byte[] content, boolean truncated, long total) {
+    /** 导出结果：文件名 + UTF-8(带 BOM) 的 CSV 字节 + 是否被截断 + 总命中数 + 本次实际行数 */
+    public record ExportFile(String filename, byte[] content, boolean truncated, long total, int rows) {
     }
 
     /**
+     * 导出当前筛选结果。
+     *
+     * <p>筛选条件整包复用列表用的 {@link IssueFilterRequest}（scope / 关键词 / 状态 / 优先级 /
+     * 严重度 / 标签 / 迭代 / 负责人 / 创建者 / 三个时间区间 / 逾期），
+     * 只由这里覆盖「项目、类型码、排序、分页/上限」这四类导出专属参数。
+     * 这样「列表里看到的」与「导出的」用的是同一套 where 条件，不会出现两套口径。
+     *
      * @param types 类型编码，逗号分隔；为空表示不按类型过滤（导出全部工作项）
+     * @param filter 列表页当前的筛选条件（可为 null，等价于不筛）
      */
-    public ExportFile export(UUID projectId, String types, String scope, String keyword) {
-        IssueFilterRequest req = new IssueFilterRequest();
+    public ExportFile export(UUID projectId, String types, IssueFilterRequest filter) {
+        IssueFilterRequest req = filter == null ? new IssueFilterRequest() : filter;
+        // 项目以路径参数为准：不允许通过 query 里的 projectId 越权到别的项目
         req.setProjectId(projectId);
-        req.setScope(scope);
-        req.setKeyword(keyword);
         List<String> codes = splitCodes(types);
         if (!codes.isEmpty()) {
             req.setIssueTypeCodes(codes);
+        } else {
+            req.setIssueTypeCodes(null);
         }
         req.setSortField("issueKey");
         req.setSortOrder("asc");
@@ -96,7 +105,7 @@ public class IssueExportService {
             csv.append(csv("【已截断】共 " + total + " 条，本次仅导出前 " + rows.size()
                     + " 条；请缩小筛选范围后分批导出")).append("\r\n");
         }
-        return new ExportFile(filename, csv.toString().getBytes(StandardCharsets.UTF_8), truncated, total);
+        return new ExportFile(filename, csv.toString().getBytes(StandardCharsets.UTF_8), truncated, total, rows.size());
     }
 
     /** 一次性批量取状态名（CSV 里展示中文状态，而不是 REQ_TODO 这种 code） */
