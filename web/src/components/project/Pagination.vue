@@ -16,13 +16,6 @@ const emit = defineEmits<{
 
 const pageSizeOptions = [10, 20, 25, 50]
 
-const rangeStart = computed(() =>
-  props.total === 0 ? 0 : (props.currentPage - 1) * props.pageSize + 1
-)
-const rangeEnd = computed(() =>
-  Math.min(props.currentPage * props.pageSize, props.total)
-)
-
 const pages = computed<(number | '...')[]>(() => {
   const total = props.totalPages
   const cur = props.currentPage
@@ -54,9 +47,6 @@ function onPageSize(e: Event) {
   <div class="flex flex-wrap items-center justify-between gap-4 px-1 py-1.5 text-sm">
     <div class="flex items-center gap-4 text-ink-secondary">
       <span>共 <span class="font-semibold text-ink">{{ total }}</span> 条</span>
-      <span v-if="total > 0" class="hidden sm:inline">
-        第 {{ rangeStart }}-{{ rangeEnd }} 条
-      </span>
       <div class="flex items-center gap-1.5">
         <span class="hidden sm:inline">每页</span>
         <select
