@@ -43,6 +43,10 @@ public class CreateIssueRequest {
 
     private UUID assigneeId;
     private UUID verifierId;
+    /** 父工作项：支持直接建子任务（此前只能靠 Excel 导入设置层级） */
+    private UUID parentId;
+    /** 实际完成时间：不传则按状态自动取当前时间（导入历史数据时需要显式指定） */
+    private LocalDate doneAt;
     private LocalDate dueDate;
 
     @Pattern(regexp = "^S[1-4]$", message = "严重度仅支持 S1~S4")

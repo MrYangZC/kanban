@@ -26,6 +26,10 @@ public class UpdateIssueRequest {
     private UUID issueTypeId;
     private UUID assigneeId;
     private UUID verifierId;
+    /** 调整父工作项（传 null 表示不改，置空请用 clearFields） */
+    private UUID parentId;
+    /** 实际完成时间：不传则按状态自动取当前时间（导入历史数据时需要显式指定） */
+    private LocalDate doneAt;
     private UUID sprintId;
     private LocalDate dueDate;
 

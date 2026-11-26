@@ -134,6 +134,8 @@ export interface Issue {
   parentId: string | null
   createdAt: string
   updatedAt: string
+  /** 实际完成时间（进入「已完成」类别时落值） */
+  doneAt?: string | null
 }
 
 /**

@@ -275,6 +275,10 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
 
         T issue = newEntityInstance();
         BeanUtils.copyProperties(req, issue);
+        // 父级校验：只允许挂本表（同类别）同项目的工作项，且不能成环
+        if (req.getParentId() != null) {
+            WorkItemParentGuard.requireValid(null, req.getParentId(), req.getProjectId(), mapper()::selectById);
+        }
         issue.setIssueTypeId(issueTypeId);
         issue.setId(UUID.randomUUID());
         issue.setIssueNumber(nextIssueNumber());
@@ -285,7 +289,12 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
         }
         issue.setArchived(req.getArchived() == null ? false : req.getArchived());
         // 直接以"已完成"状态建单时也要落 done_at，否则周期统计会漏掉这类数据
-        issue.setDoneAt(isDoneCategory(status) ? LocalDateTime.now() : null);
+        // 显式传入的完成时间优先：导入历史数据时不能把"已完成"全部记成导入那一刻
+        if (req.getDoneAt() != null) {
+            issue.setDoneAt(req.getDoneAt().atStartOfDay());
+        } else {
+            issue.setDoneAt(isDoneCategory(status) ? LocalDateTime.now() : null);
+        }
         // 追加到目标状态列末尾：必须取列内现有最大键，否则所有新卡片 sort_key 相同；
         // 走 computeSortKey 是为了在经过几十次追加、键变长时自动触发列内重排
         issue.setSortKey(computeSortKey(req.getProjectId(), req.getStatusId(), null, null));
@@ -432,6 +441,12 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
         if (req.getIssueTypeId() != null) uw.set("issue_type_id", req.getIssueTypeId());
         if (req.getAssigneeId() != null) uw.set("assignee_id", req.getAssigneeId());
         if (req.getVerifierId() != null) uw.set("verifier_id", req.getVerifierId());
+        if (req.getParentId() != null) {
+            WorkItemParentGuard.requireValid(
+                    issue.getId(), req.getParentId(), issue.getProjectId(), mapper()::selectById);
+            uw.set("parent_id", req.getParentId());
+        }
+        if (req.getDoneAt() != null) uw.set("done_at", req.getDoneAt().atStartOfDay());
         if (req.getSprintId() != null) uw.set("sprint_id", req.getSprintId());
         if (req.getDueDate() != null) uw.set("due_date", req.getDueDate());
         if (req.getArchived() != null) uw.set("archived", req.getArchived());
@@ -457,6 +472,8 @@ public abstract class BaseWorkItemService<T extends AbstractWorkItem> {
             switch (field) {
                 case "assigneeId" -> uw.set("assignee_id", null);
                 case "verifierId" -> uw.set("verifier_id", null);
+            case "parentId" -> uw.set("parent_id", null);
+            case "doneAt" -> uw.set("done_at", null);
                 case "sprintId" -> uw.set("sprint_id", null);
                 case "dueDate" -> uw.set("due_date", null);
                 case "planStart" -> { if (issue instanceof Bug) uw.set("plan_start", null); }

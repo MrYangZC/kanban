@@ -40,6 +40,8 @@ public class IssueVO {
     private LocalDate dueDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    /** 实际完成时间：状态进入「已完成」类别时落值，导入历史数据时可显式指定 */
+    private LocalDateTime doneAt;
 
     // 缺陷详情页（云效风格）扩展字段
     private UUID verifierId;
