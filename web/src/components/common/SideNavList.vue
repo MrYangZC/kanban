@@ -37,7 +37,8 @@ const props = withDefaults(
 const emit = defineEmits<{ (e: 'select', key: string): void }>()
 
 const navClass = computed(() =>
-  props.collapsed ? 'flex-1 space-y-1 overflow-y-auto px-2 py-3' : 'flex-1 space-y-1 overflow-y-auto px-3 py-3'
+  // 展开态留 16px 内缩：菜单项不贴侧栏边缘，块状高亮的圆角才不会被切边
+  props.collapsed ? 'flex-1 space-y-1 overflow-y-auto px-2 py-3' : 'flex-1 space-y-1 overflow-y-auto px-4 py-3'
 )
 </script>
 
