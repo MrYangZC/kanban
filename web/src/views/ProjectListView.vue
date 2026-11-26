@@ -21,7 +21,7 @@ import { required, maxLen } from '@/utils/formRules'
 
 const router = useRouter()
 const store = useProjectCategoryStore()
-const { projects, total, totalPages, currentPage, pageSize, loading, error, viewMode, selectedCategory, categories } = storeToRefs(store)
+const { projects, total, currentPage, pageSize, loading, error, viewMode, selectedCategory, categories } = storeToRefs(store)
 
 const sidebarOpen = ref(false)
 /** 桌面端侧栏折叠（与项目内导航同一套交互：展开 256px / 收起 56px），移动端仍走抽屉 */
@@ -352,7 +352,6 @@ onMounted(async () => {
       >
         <Pagination
           :current-page="currentPage"
-          :total-pages="totalPages"
           :total="total"
           :page-size="pageSize"
           @update:page="store.setPage"
