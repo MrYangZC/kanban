@@ -14,7 +14,7 @@ import EmptyState from '@/components/project/EmptyState.vue'
 import ErrorRetry from '@/components/project/ErrorRetry.vue'
 import Pagination from '@/components/project/Pagination.vue'
 import ProjectMemberDialog from '@/components/ProjectMemberDialog.vue'
-import { Plus, Menu, Sparkles } from 'lucide-vue-next'
+import { Plus, Menu, Sparkles, FolderKanban } from 'lucide-vue-next'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { reportError } from '@/utils/error'
 import { required, maxLen } from '@/utils/formRules'
@@ -273,15 +273,24 @@ onMounted(async () => {
             @delete="onDelete"
           />
         </div>
-        <ProjectTableList
-          v-else
-          :projects="projects"
-          @open-board="openBoard"
-          @open-members="openMembers"
-          @add-member="openAddMember"
-          @open-edit="openEdit"
-          @delete="onDelete"
-        />
+        <!-- 列表视图：与任务/需求/缺陷页同一套卡片外壳（.wi-card + 卡片头），
+             否则表格直接铺在页面背景上，比其它页的列表"少一层"，看起来是另一种产品 -->
+        <div v-else class="wi-card glass-panel animate-fade-in-up">
+          <div class="wi-card-head">
+            <FolderKanban :size="16" class="text-brand" />
+            <span class="wi-card-title">{{ currentCategoryLabel }}</span>
+            <span class="count-pill">{{ total }}</span>
+            <span class="ml-auto text-xs text-ink-secondary">按创建时间倒序</span>
+          </div>
+          <ProjectTableList
+            :projects="projects"
+            @open-board="openBoard"
+            @open-members="openMembers"
+            @add-member="openAddMember"
+            @open-edit="openEdit"
+            @delete="onDelete"
+          />
+        </div>
 
 
         <el-dialog v-model="createDialogVisible" title="新建项目" width="460px">

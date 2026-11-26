@@ -4,6 +4,10 @@
  *
  * <p>原先由 ProjectTableRow.vue 渲染 `<tr>`，但 el-table 只接受列定义、无法插入行组件，
  * 所以把行内逻辑（收藏/归档/进入任务页/状态徽标）并入本组件，删除该子组件。
+ *
+ * <p>整行可点进入项目（与卡片视图一致）：el-table 的 row-click 是行级事件，
+ * 行内所有可交互元素（收藏/编辑/成员/任务/归档/删除/进入）都必须 `.stop`，
+ * 否则点按钮会顺带跳转一次。
  */
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -55,6 +59,11 @@ async function onFavorite(raw: unknown) {
   }
 }
 
+/** 整行点击：与卡片视图的「点卡片进项目」对齐，空白处不用再去找「进入」按钮 */
+function onRowClick(raw: unknown) {
+  emit('openBoard', asProject(raw))
+}
+
 /** 与卡片视图一致：点「任务」直接进该项目的任务页 */
 function goTasks(raw: unknown) {
   router.push(`/projects/${asProject(raw).id}/tasks`)
@@ -84,7 +93,7 @@ async function onArchive(raw: unknown) {
 
 <template>
   <div class="wi-table animate-fade-in-up">
-    <el-table :data="projects" row-key="id" class="wi-el-table" empty-text="暂无项目">
+    <el-table :data="projects" row-key="id" class="wi-el-table" empty-text="暂无项目" @row-click="onRowClick">
       <el-table-column label="项目 Key" width="120">
         <template #default="{ row }">
           <div class="flex items-center gap-2">
@@ -99,11 +108,11 @@ async function onArchive(raw: unknown) {
         <template #default="{ row }">
           <span
             class="cursor-pointer font-medium text-ink transition-colors hover:text-primary-600"
-            @click="emit('openBoard', asProject(row))"
+            @click.stop="emit('openBoard', asProject(row))"
           >{{ row.name }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="状态" width="120">
+      <el-table-column label="状态" width="110">
         <template #default="{ row }">
           <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" :class="statusOf(row).cls">
             <span class="h-1.5 w-1.5 rounded-full" :class="statusOf(row).dot"></span>
@@ -113,7 +122,9 @@ async function onArchive(raw: unknown) {
       </el-table-column>
       <el-table-column label="描述" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">
-          <span class="text-sm text-ink-secondary">{{ row.description || '暂无描述' }}</span>
+          <!-- 没有描述时用弱化的短横线：整列重复"暂无描述"会把留白变成噪音 -->
+          <span v-if="row.description" class="text-sm text-ink-secondary">{{ row.description }}</span>
+          <span v-else class="text-sm text-ink-placeholder">—</span>
         </template>
       </el-table-column>
       <el-table-column label="成员" width="90" align="center">
