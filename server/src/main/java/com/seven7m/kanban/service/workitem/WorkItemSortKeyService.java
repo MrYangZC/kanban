@@ -1,7 +1,10 @@
 package com.seven7m.kanban.service.workitem;
 
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.seven7m.kanban.common.constant.WorkItemColumns;
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.util.SortKeyUtils;
 import com.seven7m.kanban.entity.workitem.AbstractWorkItem;
@@ -15,7 +18,7 @@ import java.util.UUID;
 /**
  * 看板列内排序键（fractional index）的维护逻辑。
  *
- * <p>从 {@code BaseWorkItemService} 抽出来的原因：这段代码只关心"目标列里的相邻卡片 + sort_key"，
+ * <p>从 {@code AbstractWorkItemService} 抽出来的原因：这段代码只关心"目标列里的相邻卡片 + sort_key"，
  * 与工作项的字段、权限、活动记录完全无关，却和 40 多个业务方法挤在同一个 1200 行的类里，
  * 想单独验证"键过长会重排""相邻卡片必须同列"只能启动整个 Service。
  *
@@ -77,7 +80,7 @@ public class WorkItemSortKeyService {
             T b = mapper.selectById(beforeId);
             T a = mapper.selectById(afterId);
             if (b == null || a == null) {
-                throw new ServiceException(400, "相邻卡片不存在");
+                throw new ServiceException(ErrorCode.NEIGHBOR_NOT_FOUND);
             }
             ensureSameStatusColumn(statusId, b, a);
             return SortKeyUtils.between(b.getSortKey(), a.getSortKey());
@@ -85,7 +88,7 @@ public class WorkItemSortKeyService {
         if (beforeId != null) {
             T b = mapper.selectById(beforeId);
             if (b == null) {
-                throw new ServiceException(400, "相邻卡片不存在");
+                throw new ServiceException(ErrorCode.NEIGHBOR_NOT_FOUND);
             }
             ensureSameStatusColumn(statusId, b);
             return SortKeyUtils.between(b.getSortKey(), null);
@@ -93,7 +96,7 @@ public class WorkItemSortKeyService {
         if (afterId != null) {
             T a = mapper.selectById(afterId);
             if (a == null) {
-                throw new ServiceException(400, "相邻卡片不存在");
+                throw new ServiceException(ErrorCode.NEIGHBOR_NOT_FOUND);
             }
             ensureSameStatusColumn(statusId, a);
             return SortKeyUtils.between(null, a.getSortKey());
@@ -104,11 +107,12 @@ public class WorkItemSortKeyService {
 
     /** 目标状态列内当前最大的 sort_key，用于把工作项追加到列尾；空列返回 null */
     private <T extends AbstractWorkItem> String tailSortKey(BaseMapper<T> mapper, UUID projectId, UUID statusId) {
-        T tail = mapper.selectOne(Wrappers.<T>query()
-                .eq("project_id", projectId)
-                .eq("status_id", statusId)
-                .orderByDesc("sort_key")
-                .last("LIMIT 1"));
+        // 取列表再取第一条：在 QueryWrapper 上拼 LIMIT 片段属于把 SQL 写回服务层
+        T tail = mapper.selectList(Wrappers.<T>query()
+                        .eq(WorkItemColumns.PROJECT_ID, projectId)
+                        .eq(WorkItemColumns.STATUS_ID, statusId)
+                        .orderByDesc(WorkItemColumns.SORT_KEY))
+                .stream().findFirst().orElse(null);
         return tail == null ? null : tail.getSortKey();
     }
 
@@ -118,9 +122,9 @@ public class WorkItemSortKeyService {
      */
     private <T extends AbstractWorkItem> int rebalanceColumn(BaseMapper<T> mapper, SortKeyRequest request) {
         List<T> column = mapper.selectList(Wrappers.<T>query()
-                .eq("project_id", request.projectId())
-                .eq("status_id", request.statusId())
-                .orderByAsc("sort_key"));
+                .eq(WorkItemColumns.PROJECT_ID, request.projectId())
+                .eq(WorkItemColumns.STATUS_ID, request.statusId())
+                .orderByAsc(WorkItemColumns.SORT_KEY));
         if (column.isEmpty()) {
             return 0;
         }
@@ -132,7 +136,9 @@ public class WorkItemSortKeyService {
             if (key.equals(row.getSortKey())) {
                 continue;
             }
-            mapper.update(null, Wrappers.<T>update().eq("id", row.getId()).set("sort_key", key));
+            UpdateWrapper<T> update = Wrappers.update();
+            update.eq(WorkItemColumns.ID, row.getId()).set(WorkItemColumns.SORT_KEY, key);
+            mapper.update(null, update);
             updated++;
         }
         return updated;
@@ -141,7 +147,7 @@ public class WorkItemSortKeyService {
     private void ensureSameStatusColumn(UUID statusId, AbstractWorkItem... neighbors) {
         for (AbstractWorkItem n : neighbors) {
             if (!Objects.equals(statusId, n.getStatusId())) {
-                throw new ServiceException(400, "相邻卡片不属于目标状态列");
+                throw new ServiceException(ErrorCode.NEIGHBOR_WRONG_COLUMN);
             }
         }
     }

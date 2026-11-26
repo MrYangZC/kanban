@@ -1,6 +1,7 @@
 package com.seven7m.kanban.service.workitem;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.seven7m.kanban.common.constant.WorkItemColumns;
 import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.dto.issue.IssueVO;
 
@@ -10,7 +11,7 @@ import java.util.function.Function;
 /**
  * 工作项排序规则的**唯一事实源**：同一份声明同时给出 SQL 排序片段与内存 {@link Comparator}。
  *
- * <p>背景：单表查询走 SQL（{@code BaseWorkItemService#applySort}），跨表合并（"全部工作项"视图）
+ * <p>背景：单表查询走 SQL（{@code AbstractWorkItemService#listByFilter}），跨表合并（"全部工作项"视图）
  * 走内存排序（{@code WorkItemRouter#comparatorFor}）。此前两套实现各写一遍，注释里只能靠一句
  * "需与 SQL 保持一致"来约束，实际已经漂移：
  * <ul>
@@ -20,6 +21,19 @@ import java.util.function.Function;
  * 现在改一个字段只需改这里一处，两边自动一致。
  */
 public final class WorkItemSort {
+
+    /** 升序/降序参数取值：前端 query 里的 sortOrder，服务层不再到处写 "asc"/"desc" 字面量 */
+    public static final String ASC = "asc";
+    public static final String DESC = "desc";
+
+    /**
+     * 编号的自然序排序表达式。
+     *
+     * <p>{@code issue_number} 是 varchar，直接按字典序排会出现 "1000" 排在 "999" 前面；
+     * 先比长度再比字典序等价于数字自然序。这是本类唯一允许出现的 SQL 片段——
+     * 它属于排序规则的一部分（与内存 Comparator 成对维护），不是业务 where 条件。
+     */
+    private static final String ISSUE_NUMBER_LENGTH = "LENGTH(" + WorkItemColumns.ISSUE_NUMBER + ")";
 
     private WorkItemSort() {
     }
@@ -52,32 +66,32 @@ public final class WorkItemSort {
      *                 其他类别按"状态 + sort_key"兜底（与内存排序的规则一致）
      */
     public static void applySql(QueryWrapper<?> q, String sortField, String sortOrder, ItemCategory category) {
-        boolean asc = !"desc".equalsIgnoreCase(sortOrder);
+        boolean asc = !DESC.equalsIgnoreCase(sortOrder);
         switch (Field.of(sortField)) {
             case ISSUE_KEY -> {
                 // issue_number 是 varchar：先比长度再比字典序，等价于数字自然序（避免 "1000" 排在 "999" 前）
                 if (asc) {
-                    q.orderByAsc("LENGTH(issue_number)").orderByAsc("issue_number");
+                    q.orderByAsc(ISSUE_NUMBER_LENGTH).orderByAsc(WorkItemColumns.ISSUE_NUMBER);
                 } else {
-                    q.orderByDesc("LENGTH(issue_number)").orderByDesc("issue_number");
+                    q.orderByDesc(ISSUE_NUMBER_LENGTH).orderByDesc(WorkItemColumns.ISSUE_NUMBER);
                 }
             }
-            case UPDATED_AT -> order(q, "updated_at", asc);
-            case CREATED_AT -> order(q, "created_at", asc);
-            case PRIORITY -> order(q, "priority", asc);
+            case UPDATED_AT -> order(q, WorkItemColumns.UPDATED_AT, asc);
+            case CREATED_AT -> order(q, WorkItemColumns.CREATED_AT, asc);
+            case PRIORITY -> order(q, WorkItemColumns.PRIORITY, asc);
             case SEVERITY -> {
                 if (category == ItemCategory.BUG) {
-                    order(q, "severity", asc);
+                    order(q, WorkItemColumns.SEVERITY, asc);
                 } else {
                     defaultOrder(q);
                 }
             }
-            case STATUS_ID -> order(q, "status_id", asc);
-            case SORT_KEY -> order(q, "sort_key", asc);
+            case STATUS_ID -> order(q, WorkItemColumns.STATUS_ID, asc);
+            case SORT_KEY -> order(q, WorkItemColumns.SORT_KEY, asc);
             case DEFAULT -> defaultOrder(q);
         }
         // 稳定兜底：排序值相同的行必须有确定顺序，否则分页在两次查询之间会抖动
-        q.orderByAsc("id");
+        q.orderByAsc(WorkItemColumns.ID);
     }
 
     /** 内存排序（升序）。调用方需要降序时用 {@code comparator.reversed()}，与 Postgres 的 NULLS 语义一致 */

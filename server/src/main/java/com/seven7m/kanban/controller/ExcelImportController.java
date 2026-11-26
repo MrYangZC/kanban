@@ -2,6 +2,7 @@ package com.seven7m.kanban.controller;
 
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.R;
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.service.dev.ExcelImportService;
@@ -40,7 +41,7 @@ public class ExcelImportController {
     @PostMapping("/import-excel")
     public R<ExcelImportService.ExcelImportResult> importExcel() {
         if (excelPath == null || excelPath.isBlank()) {
-            throw new ServiceException(400, "未配置 kanban.dev.excel-path，无法执行导入");
+            throw new ServiceException(ErrorCode.DEV_EXCEL_NOT_CONFIGURED);
         }
         // 以管理员身份执行，满足项目 OWNER / createdBy / 成员校验
         UserContext.set(ADMIN_ID, "admin");

@@ -1,5 +1,6 @@
 package com.seven7m.kanban.service.workitem;
 
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.entity.workitem.AbstractWorkItem;
 
@@ -41,27 +42,27 @@ public final class WorkItemParentGuard {
         }
         T parent = loader.apply(parentId);
         if (parent == null) {
-            throw new ServiceException(400, "父工作项不存在，或不属于当前工作项类型");
+            throw new ServiceException(ErrorCode.PARENT_NOT_FOUND);
         }
         if (projectId != null && !projectId.equals(parent.getProjectId())) {
-            throw new ServiceException(400, "父工作项不属于本项目");
+            throw new ServiceException(ErrorCode.PARENT_CROSS_PROJECT);
         }
         if (selfId == null) {
             return;
         }
         if (selfId.equals(parentId)) {
-            throw new ServiceException(400, "不能把工作项挂到自己下面");
+            throw new ServiceException(ErrorCode.PARENT_IS_SELF);
         }
         UUID cursor = parent.getParentId();
         int guard = 0;
         while (cursor != null) {
             if (cursor.equals(selfId)) {
-                throw new ServiceException(400, "不能把工作项移动到它自己的子工作项下");
+                throw new ServiceException(ErrorCode.PARENT_IS_DESCENDANT);
             }
             T next = loader.apply(cursor);
             cursor = next == null ? null : next.getParentId();
             if (++guard > MAX_DEPTH) {
-                throw new ServiceException(400, "工作项层级异常（可能存在环）");
+                throw new ServiceException(ErrorCode.PARENT_CYCLE);
             }
         }
     }

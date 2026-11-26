@@ -1,5 +1,7 @@
 package com.seven7m.kanban.controller;
 
+import com.seven7m.kanban.common.upload.UploadProperties;
+import jakarta.servlet.http.Cookie;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.domain.R;
@@ -39,7 +41,7 @@ public class UserController {
     private final UserService userService;
     /** 会话登记表：登录时登记，登出/被踢时移除，供"禁用即下线"使用 */
     private final JwtService jwtService;
-    private final com.seven7m.kanban.common.upload.UploadProperties uploadProperties;
+    private final UploadProperties uploadProperties;
 
     @PostMapping("/login")
     public R<LoginVO> login(@Valid @RequestBody LoginRequest req, HttpServletRequest request,
@@ -59,7 +61,7 @@ public class UserController {
      * 它的存在只为让 {@code <img src>} 能通过鉴权，不参与业务接口的身份判定。
      */
     private void writeFileCookie(HttpServletRequest request, HttpServletResponse response, JwtService.Issued issued) {
-        jakarta.servlet.http.Cookie cookie = new jakarta.servlet.http.Cookie(
+        Cookie cookie = new Cookie(
                 JwtAuthenticationFilter.FILE_COOKIE, issued.token());
         cookie.setHttpOnly(true);
         cookie.setPath(uploadProperties.publicPrefix() + JwtAuthenticationFilter.FILE_COOKIE_PATH);
@@ -76,7 +78,7 @@ public class UserController {
     @PostMapping("/logout")
     public R<Void> logout(HttpServletRequest request, HttpServletResponse response) {
         // 顺手清掉文件 Cookie（token 本身无法撤销，见下方说明）
-        jakarta.servlet.http.Cookie cookie = new jakarta.servlet.http.Cookie(
+        Cookie cookie = new Cookie(
                 JwtAuthenticationFilter.FILE_COOKIE, "");
         cookie.setHttpOnly(true);
         cookie.setPath(uploadProperties.publicPrefix() + JwtAuthenticationFilter.FILE_COOKIE_PATH);

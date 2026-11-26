@@ -1,205 +1,41 @@
 package com.seven7m.kanban.service.board;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.seven7m.kanban.common.enums.ItemCategory;
-import com.seven7m.kanban.dto.board.BoardColumnView;
 import com.seven7m.kanban.dto.board.BoardGroupView;
 import com.seven7m.kanban.dto.board.BoardView;
-import com.seven7m.kanban.dto.board.GroupColumnView;
-import com.seven7m.kanban.dto.issue.IssueVO;
-import com.seven7m.kanban.dto.workflow.WorkflowColumnVO;
-import com.seven7m.kanban.entity.board.Board;
-import com.seven7m.kanban.entity.board.BoardColumn;
-import com.seven7m.kanban.entity.issuestatus.IssueStatus;
-import com.seven7m.kanban.mapper.board.BoardColumnMapper;
-import com.seven7m.kanban.mapper.board.BoardMapper;
-import com.seven7m.kanban.service.workflow.WorkflowService;
-import com.seven7m.kanban.service.workitem.BugService;
-import com.seven7m.kanban.service.workitem.RequirementService;
-import com.seven7m.kanban.service.workitem.TaskService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
- * 看板：按类别（缺陷/需求/任务）分区隔离取数，返回结构兼容前端 BoardGroupView 契约。
+ * 看板查询服务：按类别（任务/需求/缺陷）装配列与卡片，或按指定维度分组。
  *
- * 列来源为「该类别工作流的节点」（V31 起任务/需求/缺陷各有一套状态），
- * 不再直接取全局 issue_status——否则任务看板会列出缺陷的「已修复/暂不修复」。
+ * <p>这里只做「读」，装配口径全部收敛在实现里；实现见
+ * {@code com.seven7m.kanban.service.board.impl.BoardServiceImpl}。
+ *
+ * <p>不继承 {@code IService}：看板是多表聚合视图（board / board_column / workflow_status /
+ * 三张工作项表），没有单一实体与单一 Mapper 的 CRUD，硬套 ServiceImpl 只会把
+ * 「按类别路由」这层语义藏进继承链里。
  */
-@Service
-@RequiredArgsConstructor
-public class BoardService {
+public interface BoardService {
 
-    private final BoardMapper boardMapper;
-    private final BoardColumnMapper boardColumnMapper;
-    private final WorkflowService workflowService;
-    private final TaskService taskService;
-    private final RequirementService requirementService;
-    private final BugService bugService;
+    /** 状态列看板：列为该类别工作流节点，卡片按 statusId 归列（WIP 限制取 board_column） */
+    BoardView getBoard(UUID projectId, ItemCategory category);
+
+    /** 状态列看板，类别缺省为任务 */
+    BoardView getBoard(UUID projectId);
 
     /**
-     * 按类别（缺陷/需求/任务）分区取看板数据，杜绝跨类别混入。
+     * 分组看板：groupBy = STATUS / ASSIGNEE / PRIORITY / SPRINT（空或未知按 STATUS）。
+     * 列与交接配置一次取齐，不随分组数增长重复查询。
      */
-    private List<IssueVO> selectForBoard(UUID projectId, ItemCategory category) {
-        return switch (category) {
-            case TASK -> taskService.selectByProjectForBoard(projectId);
-            case REQUIREMENT -> requirementService.selectByProjectForBoard(projectId);
-            case BUG -> bugService.selectByProjectForBoard(projectId);
-        };
-    }
+    BoardGroupView getBoard(UUID projectId, String groupBy, ItemCategory category);
 
-    /** 列状态：该类别工作流模板的节点，已按模板内顺序排好 */
-    private List<IssueStatus> statusesOf(UUID projectId, ItemCategory category) {
-        return workflowService.statusesOf(projectId, category);
-    }
+    /** 分组看板，类别缺省为任务 */
+    BoardGroupView getBoard(UUID projectId, String groupBy);
 
-    /** 无 board 记录时回退的看板名 */
-    private String boardNameOf(Board board) {
-        return board == null || !StringUtils.hasText(board.getName()) ? "任务看板" : board.getName();
-    }
-
-    private String boardName(UUID projectId) {
-        Board board = boardMapper.selectOne(
-                new QueryWrapper<Board>().eq("project_id", projectId).last("LIMIT 1"));
-        return boardNameOf(board);
-    }
-
-    private List<GroupColumnView> toColumns(List<WorkflowColumnVO> columns, List<IssueVO> issues) {
-        return columns.stream().map(col -> {
-            GroupColumnView gc = new GroupColumnView();
-            gc.setStatusId(col.statusId());
-            gc.setName(col.name());
-            gc.setCategory(col.category());
-            gc.setColor(col.color());
-            gc.setSortOrder(col.sortOrder());
-            if (col.handoffType() != null) gc.setHandoffType(col.handoffType());
-            gc.setHandoffUserId(col.handoffUserId());
-            gc.setHandoffUserName(col.handoffUserName());
-            gc.setHandoffNote(col.handoffNote());
-            gc.setTargetSprintId(col.targetSprintId());
-            gc.setTargetSprintName(col.targetSprintName());
-            gc.setTargetLabelId(col.targetLabelId());
-            gc.setTargetLabelName(col.targetLabelName());
-            gc.setIssues(issues.stream()
-                    .filter(i -> i.getStatusId() != null && i.getStatusId().equals(col.statusId()))
-                    .sorted(Comparator.comparing(i -> i.getSortKey() == null ? "" : i.getSortKey()))
-                    .collect(Collectors.toList()));
-            return gc;
-        }).collect(Collectors.toList());
-    }
-
-    private String groupKeyOf(IssueVO it, String groupBy) {
-        return switch (groupBy.toUpperCase()) {
-            case "ASSIGNEE" -> it.getAssigneeName() == null ? "未指派" : it.getAssigneeName();
-            case "PRIORITY" -> it.getPriority() == null ? "P2" : it.getPriority();
-            case "SPRINT" -> it.getSprintId() == null ? "未规划" : it.getSprintId().toString();
-            default -> "全部";
-        };
-    }
-
-    public BoardView getBoard(UUID projectId, ItemCategory category) {
-        List<IssueVO> issues = selectForBoard(projectId, category);
-        List<IssueStatus> statuses = statusesOf(projectId, category);
-
-        Board board = boardMapper.selectOne(
-                new QueryWrapper<Board>().eq("project_id", projectId).last("LIMIT 1"));
-        List<BoardColumn> columns = board == null ? List.of()
-                : boardColumnMapper.selectList(
-                        new QueryWrapper<BoardColumn>().eq("board_id", board.getId()).orderByAsc("sort_order"));
-        // board_column 只对缺陷流建过列，这里按 status_id 匹配取 WIP 限制，缺失时留空
-        Map<UUID, BoardColumn> columnByStatus = columns.stream()
-                .collect(Collectors.toMap(BoardColumn::getStatusId, Function.identity(), (a, b) -> a));
-
-        List<BoardColumnView> columnViews = new ArrayList<>();
-        for (IssueStatus st : statuses) {
-            BoardColumn col = columnByStatus.get(st.getId());
-            BoardColumnView cv = new BoardColumnView();
-            cv.setId(col == null ? null : col.getId());
-            cv.setStatusId(st.getId());
-            cv.setName(st.getName());
-            cv.setCategory(st.getCategory());
-            cv.setColor(st.getColor());
-            cv.setSortOrder(st.getSortOrder());
-            cv.setWipLimit(col == null ? null : col.getWipLimit());
-            UUID colStatus = st.getId();
-            cv.setIssues(issues.stream()
-                    .filter(i -> i.getStatusId() != null && i.getStatusId().equals(colStatus))
-                    .sorted(Comparator.comparing(i -> i.getSortKey() == null ? "" : i.getSortKey()))
-                    .collect(Collectors.toList()));
-            columnViews.add(cv);
-        }
-
-        BoardView view = new BoardView();
-        view.setId(board == null ? null : board.getId());
-        view.setProjectId(projectId);
-        // 复用上面已查出的 board，避免为取名再查一次
-        view.setName(boardNameOf(board));
-        view.setColumns(columnViews);
-        return view;
-    }
-
-    public BoardView getBoard(UUID projectId) {
-        return getBoard(projectId, ItemCategory.TASK);
-    }
-
-    public BoardGroupView getBoard(UUID projectId, String groupBy, ItemCategory category) {
-        List<IssueVO> issues = selectForBoard(projectId, category);
-        // 列与交接配置一次取齐：workflow_status 节点 + project_handoff + 相关用户各一次查询，
-        // 不随列数增长
-        List<WorkflowColumnVO> columns = workflowService.columnsOf(projectId, category);
-
-        BoardGroupView view = new BoardGroupView();
-        view.setName(boardName(projectId));
-        view.setGroupBy(groupBy == null || groupBy.isBlank() ? "STATUS" : groupBy.toUpperCase());
-
-        if (groupBy == null || groupBy.isBlank() || "STATUS".equalsIgnoreCase(groupBy)) {
-            BoardGroupView.GroupItem all = new BoardGroupView.GroupItem();
-            all.setGroupKey("ALL");
-            all.setGroupName("全部");
-            all.setIssueCount(issues.size());
-            all.setColumns(toColumns(columns, issues));
-            view.getGroups().add(all);
-            return view;
-        }
-
-        Map<String, List<IssueVO>> grouped = issues.stream()
-                .collect(Collectors.groupingBy(i -> groupKeyOf(i, groupBy), LinkedHashMap::new, Collectors.toList()));
-        for (Map.Entry<String, List<IssueVO>> e : grouped.entrySet()) {
-            BoardGroupView.GroupItem item = new BoardGroupView.GroupItem();
-            item.setGroupKey(e.getKey());
-            item.setGroupName(e.getKey());
-            item.setIssueCount(e.getValue().size());
-            item.setColumns(toColumns(columns, e.getValue()));
-            view.getGroups().add(item);
-        }
-        return view;
-    }
-
-    public BoardGroupView getBoard(UUID projectId, String groupBy) {
-        return getBoard(projectId, groupBy, ItemCategory.TASK);
-    }
-
-    public ItemCategory resolveCategory(String categoryStr) {
-        return resolveCategory(categoryStr, ItemCategory.TASK);
-    }
+    /** 类别字符串解析，非法/缺省时回退到任务类别 */
+    ItemCategory resolveCategory(String categoryStr);
 
     /** 类别字符串解析，非法/缺省时回退到指定默认类别 */
-    public ItemCategory resolveCategory(String categoryStr, ItemCategory fallback) {
-        if (!StringUtils.hasText(categoryStr)) return fallback;
-        try {
-            return ItemCategory.valueOf(categoryStr.trim().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return fallback;
-        }
-    }
+    ItemCategory resolveCategory(String categoryStr, ItemCategory fallback);
 }

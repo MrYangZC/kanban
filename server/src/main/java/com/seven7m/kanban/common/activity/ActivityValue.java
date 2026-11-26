@@ -8,7 +8,7 @@ import java.util.UUID;
 /**
  * `issue_activity.old_value / new_value` 里机器值的编解码**唯一实现**。
  *
- * <p>这套结构此前是"隐式协议"：写入方（{@code BaseWorkItemService}）手拼 JSON 字符串，
+ * <p>这套结构此前是"隐式协议"：写入方（{@code AbstractWorkItemService}）手拼 JSON 字符串，
  * 读取方（{@code ActivityTextResolver}）手写解析。两边各写一遍意味着改结构要改两处，
  * 且拼串没有类型安全（转义写错、字段名拼错都只能等线上看到乱码才发现）。
  *

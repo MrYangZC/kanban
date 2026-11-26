@@ -1,5 +1,6 @@
 package com.seven7m.kanban.common.util;
 
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 
 import java.util.UUID;
@@ -40,7 +41,7 @@ public final class Uuids {
     public static UUID parseOrThrow(String raw, String fieldName) {
         UUID id = parseOrNull(raw);
         if (id == null) {
-            throw new ServiceException(400, fieldName + " 格式非法: " + raw);
+            throw new ServiceException(ErrorCode.UUID_INVALID, fieldName, raw);
         }
         return id;
     }

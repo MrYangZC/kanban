@@ -1,5 +1,6 @@
 package com.seven7m.kanban.service.support;
 
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.entity.project.Project;
 import com.seven7m.kanban.entity.project.ProjectStatus;
@@ -29,7 +30,7 @@ public class ProjectWriteGuard {
         }
         Project project = projectMapper.selectById(projectId);
         if (project != null && ProjectStatus.ARCHIVED == ProjectStatus.of(project.getStatus())) {
-            throw new ServiceException(400, "项目已归档，请先取消归档后再修改");
+            throw new ServiceException(ErrorCode.PROJECT_ARCHIVED_READONLY);
         }
     }
 }

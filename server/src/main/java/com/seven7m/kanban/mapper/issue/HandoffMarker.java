@@ -13,7 +13,7 @@ import java.util.UUID;
 @Data
 public class HandoffMarker {
 
-    /** 交接动态的动作码：与 {@code BaseWorkItemService} 写入值保持一致 */
+    /** 交接动态的动作码：与 {@code AbstractWorkItemService} 写入值保持一致 */
     public static final String ACTION_ASSIGNEE_CHANGED = "ASSIGNEE_CHANGED";
 
     private UUID id;

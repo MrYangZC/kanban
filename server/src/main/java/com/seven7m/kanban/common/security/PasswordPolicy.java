@@ -1,5 +1,6 @@
 package com.seven7m.kanban.common.security;
 
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 
 import java.nio.charset.StandardCharsets;
@@ -48,31 +49,31 @@ public final class PasswordPolicy {
      */
     public static void validate(String username, String password) {
         if (password == null || password.isBlank()) {
-            throw new ServiceException(400, "密码不能为空");
+            throw new ServiceException(ErrorCode.PASSWORD_EMPTY);
         }
         if (password.length() < MIN_LENGTH) {
-            throw new ServiceException(400, "密码长度不能少于 " + MIN_LENGTH + " 位");
+            throw new ServiceException(ErrorCode.PASSWORD_TOO_SHORT, MIN_LENGTH);
         }
         if (password.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES) {
-            throw new ServiceException(400, "密码过长（超过 " + MAX_BYTES + " 字节的部分不会被校验，请缩短）");
+            throw new ServiceException(ErrorCode.PASSWORD_TOO_LONG, MAX_BYTES);
         }
         String lower = password.toLowerCase(Locale.ROOT);
         // 弱口令判定放在字符种类之前：qwertyuiop / 1234567890 这类密码同时违反两条规则，
         // 提示"过于常见"比"必须包含字母和数字"对用户更有指导性
         if (WEAK_PASSWORDS.contains(lower)) {
-            throw new ServiceException(400, "密码过于常见，请更换");
+            throw new ServiceException(ErrorCode.PASSWORD_TOO_COMMON);
         }
         boolean hasLetter = password.chars().anyMatch(Character::isLetter);
         boolean hasDigit = password.chars().anyMatch(Character::isDigit);
         if (!hasLetter || !hasDigit) {
-            throw new ServiceException(400, "密码必须同时包含字母和数字");
+            throw new ServiceException(ErrorCode.PASSWORD_NEEDS_LETTER_AND_DIGIT);
         }
         if (username != null && username.trim().length() >= 3
                 && lower.contains(username.trim().toLowerCase(Locale.ROOT))) {
-            throw new ServiceException(400, "密码不能包含用户名");
+            throw new ServiceException(ErrorCode.PASSWORD_CONTAINS_USERNAME);
         }
         if (hasRunOfSameChar(password, 3)) {
-            throw new ServiceException(400, "密码不能包含 3 个及以上连续相同字符");
+            throw new ServiceException(ErrorCode.PASSWORD_TOO_REPETITIVE);
         }
     }
 

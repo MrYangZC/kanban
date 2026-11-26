@@ -1,6 +1,7 @@
 package com.seven7m.kanban.service.project;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.seven7m.kanban.common.enums.ItemCategory;
 import com.seven7m.kanban.entity.board.Board;
 import com.seven7m.kanban.entity.board.BoardColumn;
 import com.seven7m.kanban.entity.project.Project;
@@ -33,6 +34,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ProjectInitializer {
 
+    /** 新项目自动创建的看板名称与类型：与前端看板列表的展示口径一致 */
+    private static final String DEFAULT_BOARD_NAME = "默认看板";
+    private static final String BOARD_TYPE_KANBAN = "KANBAN";
+
     private final WorkflowMapper workflowMapper;
     private final WorkflowStatusMapper workflowStatusMapper;
     private final BoardMapper boardMapper;
@@ -43,11 +48,11 @@ public class ProjectInitializer {
     public void initDefaults(UUID projectId, UUID operator) {
         // V31 起每类工作项各有一条默认模板（TASK/REQUIREMENT/BUG）；
         // project.workflow_id 仍指向缺陷流（默认看板列按它建），其它类别由 WorkflowService 按类别解析
-        Workflow defaultWf = workflowMapper.selectOne(Wrappers.<Workflow>lambdaQuery()
-                .eq(Workflow::getDefaultFlag, true)
-                .eq(Workflow::getAppliesTo, "BUG")
-                .orderByAsc(Workflow::getId)
-                .last("LIMIT 1"));
+        Workflow defaultWf = workflowMapper.selectList(Wrappers.<Workflow>lambdaQuery()
+                        .eq(Workflow::getDefaultFlag, true)
+                        .eq(Workflow::getAppliesTo, ItemCategory.BUG.name())
+                        .orderByAsc(Workflow::getId))
+                .stream().findFirst().orElse(null);
 
         // 1. 绑定项目 -> 默认工作流模板
         projectMapper.update(null, Wrappers.<Project>lambdaUpdate()
@@ -70,8 +75,8 @@ public class ProjectInitializer {
         Board board = new Board();
         board.setId(UUID.randomUUID());
         board.setProjectId(projectId);
-        board.setName("默认看板");
-        board.setBoardType("KANBAN");
+        board.setName(DEFAULT_BOARD_NAME);
+        board.setBoardType(BOARD_TYPE_KANBAN);
         board.setCreatedBy(operator);
         board.setCreatedAt(LocalDateTime.now());
         board.setUpdatedAt(LocalDateTime.now());

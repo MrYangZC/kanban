@@ -1,57 +1,28 @@
 package com.seven7m.kanban.service.project;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.seven7m.kanban.common.exception.ServiceException;
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.seven7m.kanban.entity.project.ProjectFavorite;
-import com.seven7m.kanban.mapper.project.ProjectFavoriteMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
  * 项目收藏服务。
  * 收藏前置校验：用户为项目成员（非成员抛 403），未重复收藏（已收藏抛 400）。
  * 取消收藏校验：须存在收藏记录（未收藏抛 404）。
+ *
+ * <p>继承 {@link IService} 复用 MyBatis-Plus 的通用能力（保存、条件删除、计数），
+ * 三个领域方法仍在此声明。
+ *
+ * <p>实现见 {@code com.seven7m.kanban.service.project.impl.ProjectFavoriteServiceImpl}。
  */
-@Service
-@RequiredArgsConstructor
-public class ProjectFavoriteService {
+public interface ProjectFavoriteService extends IService<ProjectFavorite> {
 
-    private final ProjectFavoriteMapper projectFavoriteMapper;
-    private final ProjectService projectService;
+    /** 收藏项目：须为项目成员且尚未收藏 */
+    void favorite(UUID projectId, UUID userId);
 
-    @Transactional
-    public void favorite(UUID projectId, UUID userId) {
-        if (!projectService.isMember(projectId, userId)) {
-            throw new ServiceException(403, "无权限");
-        }
-        if (isFavorited(projectId, userId)) {
-            throw new ServiceException(400, "已收藏");
-        }
-        ProjectFavorite fav = new ProjectFavorite();
-        fav.setId(UUID.randomUUID());
-        fav.setProjectId(projectId);
-        fav.setUserId(userId);
-        fav.setCreatedAt(LocalDateTime.now());
-        projectFavoriteMapper.insert(fav);
-    }
+    /** 取消收藏：须存在收藏记录 */
+    void unfavorite(UUID projectId, UUID userId);
 
-    @Transactional
-    public void unfavorite(UUID projectId, UUID userId) {
-        if (!isFavorited(projectId, userId)) {
-            throw new ServiceException(404, "未收藏该项目");
-        }
-        projectFavoriteMapper.delete(Wrappers.<ProjectFavorite>lambdaQuery()
-                .eq(ProjectFavorite::getProjectId, projectId)
-                .eq(ProjectFavorite::getUserId, userId));
-    }
-
-    public boolean isFavorited(UUID projectId, UUID userId) {
-        return projectFavoriteMapper.selectCount(Wrappers.<ProjectFavorite>lambdaQuery()
-                .eq(ProjectFavorite::getProjectId, projectId)
-                .eq(ProjectFavorite::getUserId, userId)) > 0;
-    }
+    /** 是否已收藏该项目 */
+    boolean isFavorited(UUID projectId, UUID userId);
 }

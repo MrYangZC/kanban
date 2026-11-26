@@ -1,5 +1,6 @@
 package com.seven7m.kanban.common.upload;
 
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 
 import java.util.Locale;
@@ -28,7 +29,7 @@ public final class ImageFileUtil {
             ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
         }
         if (!ALLOWED_EXT.contains(ext)) {
-            throw new ServiceException(400, "仅支持 jpg/jpeg/png/gif/webp 图片格式");
+            throw new ServiceException(ErrorCode.UPLOAD_IMAGE_TYPE_UNSUPPORTED);
         }
         return ext;
     }

@@ -3,15 +3,16 @@ package com.seven7m.kanban.service.workitem;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.seven7m.kanban.common.domain.PageResult;
 import com.seven7m.kanban.common.enums.ItemCategory;
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.IssueLocationPort;
+import com.seven7m.kanban.dto.issue.BatchDeleteResult;
 import com.seven7m.kanban.dto.issue.CreateIssueRequest;
 import com.seven7m.kanban.dto.issue.IssueFilterRequest;
 import com.seven7m.kanban.dto.issue.IssueVO;
 import com.seven7m.kanban.dto.issue.MoveIssueRequest;
 import com.seven7m.kanban.dto.issue.UpdateIssueRequest;
 import com.seven7m.kanban.entity.issue.IssueType;
-import com.seven7m.kanban.entity.workitem.AbstractWorkItem;
 import com.seven7m.kanban.entity.workitem.Bug;
 import com.seven7m.kanban.entity.workitem.Requirement;
 import com.seven7m.kanban.entity.workitem.Task;
@@ -22,19 +23,21 @@ import com.seven7m.kanban.mapper.workitem.TaskMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
  * 工作项路由 Facade：根据工作项 id 或过滤条件中的类别，把请求分发到
- * TaskService / RequirementService / BugService，对外保持原有 IssueService 的调用契约。
+ * {@link TaskService} / {@link RequirementService} / {@link BugService}，
+ * 对外保持原有 IssueService 的调用契约。
  * 类别定位逻辑保证"任务只会落到 task 表，缺陷只会落到 bug 表"，从路由层杜绝跨表混数据。
  */
 @Slf4j
@@ -51,7 +54,7 @@ public class WorkItemRouter implements IssueLocationPort {
     private final IssueTypeMapper issueTypeMapper;
 
     /** 定位某 id 所属类别对应的 Service；不存在返回 null */
-    private BaseWorkItemService<? extends AbstractWorkItem> locateOrNull(UUID id) {
+    private WorkItemService locateOrNull(UUID id) {
         if (taskMapper.selectById(id) != null) return taskService;
         if (requirementMapper.selectById(id) != null) return requirementService;
         if (bugMapper.selectById(id) != null) return bugService;
@@ -59,9 +62,9 @@ public class WorkItemRouter implements IssueLocationPort {
     }
 
     /** 定位某 id 所属类别对应的 Service；不存在抛 404 */
-    private BaseWorkItemService<? extends AbstractWorkItem> locate(UUID id) {
-        BaseWorkItemService<? extends AbstractWorkItem> svc = locateOrNull(id);
-        if (svc == null) throw new com.seven7m.kanban.common.exception.ServiceException(404, "工作项不存在");
+    private WorkItemService locate(UUID id) {
+        WorkItemService svc = locateOrNull(id);
+        if (svc == null) throw new ServiceException(ErrorCode.ISSUE_NOT_FOUND);
         return svc;
     }
 
@@ -71,7 +74,7 @@ public class WorkItemRouter implements IssueLocationPort {
 
     /** 轻量查询：仅主表 id/projectId/issueNumber/title，不存在返回 null（供关联展示/权限解析） */
     public IssueVO getBriefById(UUID id) {
-        BaseWorkItemService<? extends AbstractWorkItem> svc = locateOrNull(id);
+        WorkItemService svc = locateOrNull(id);
         return svc == null ? null : svc.getBriefById(id);
     }
 
@@ -80,7 +83,7 @@ public class WorkItemRouter implements IssueLocationPort {
         // 只传 issueTypeId 时先反查类型编码，避免落表与非 TASK 类型不一致
         if ((code == null || code.isBlank()) && req.getIssueTypeId() != null) {
             IssueType type = issueTypeMapper.selectById(req.getIssueTypeId());
-            if (type == null) throw new com.seven7m.kanban.common.exception.ServiceException(400, "工作项类型不存在");
+            if (type == null) throw new ServiceException(ErrorCode.WORK_ITEM_TYPE_NOT_FOUND, req.getIssueTypeId());
             code = type.getCode();
         }
         return routeByTypeCode(code).create(req);
@@ -104,7 +107,7 @@ public class WorkItemRouter implements IssueLocationPort {
     }
 
     public PageResult<IssueVO> listByFilter(IssueFilterRequest req) {
-        List<BaseWorkItemService<? extends AbstractWorkItem>> services = resolveServices(req.getIssueTypeCodes());
+        List<WorkItemService> services = resolveServices(req.getIssueTypeCodes());
         if (services.size() == 1) {
             return services.get(0).listByFilter(req);
         }
@@ -147,7 +150,7 @@ public class WorkItemRouter implements IssueLocationPort {
     public String categoryNameOrThrow(UUID issueId) {
         ItemCategory category = categoryOf(issueId);
         if (category == null) {
-            throw new ServiceException(404, "工作项不存在");
+            throw new ServiceException(ErrorCode.ISSUE_NOT_FOUND);
         }
         return category.name();
     }
@@ -179,7 +182,7 @@ public class WorkItemRouter implements IssueLocationPort {
     }
 
     /** 删除项目时清理该项目下的全部工作项（任务/需求/缺陷），含子表级联清理 */
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public void deleteByProject(UUID projectId) {
         // 批量删除：逐条 delete 会按 N+1 展开，大项目极慢
         taskService.deleteAllByProject(projectId);
@@ -204,8 +207,8 @@ public class WorkItemRouter implements IssueLocationPort {
      * 不加整体事务：一批里某条失败不应该把已成功的删除回滚，
      * 否则用户点一次删除、实际结果与提示都是错的。
      */
-    public com.seven7m.kanban.dto.issue.BatchDeleteResult batchDelete(UUID projectId, List<UUID> ids) {
-        com.seven7m.kanban.dto.issue.BatchDeleteResult result = new com.seven7m.kanban.dto.issue.BatchDeleteResult();
+    public BatchDeleteResult batchDelete(UUID projectId, List<UUID> ids) {
+        BatchDeleteResult result = new BatchDeleteResult();
         // 去重但保持顺序
         Set<UUID> unique = new LinkedHashSet<>(ids);
 
@@ -226,7 +229,7 @@ public class WorkItemRouter implements IssueLocationPort {
         }
 
         // 2. 按类别分组：task/requirement/bug 是不同物理表，父子关系也只存在于同表内
-        Map<BaseWorkItemService<? extends AbstractWorkItem>, List<UUID>> byService = new LinkedHashMap<>();
+        Map<WorkItemService, List<UUID>> byService = new LinkedHashMap<>();
         for (UUID id : deletable) {
             try {
                 byService.computeIfAbsent(locate(id), k -> new ArrayList<>()).add(id);
@@ -237,8 +240,8 @@ public class WorkItemRouter implements IssueLocationPort {
 
         // 3. 先上提未被选中的子任务，再删除选中项（顺序不能反：先删会丢父链接）
         Set<UUID> deleteSet = new LinkedHashSet<>(deletable);
-        for (Map.Entry<BaseWorkItemService<? extends AbstractWorkItem>, List<UUID>> entry : byService.entrySet()) {
-            BaseWorkItemService<? extends AbstractWorkItem> service = entry.getKey();
+        for (Map.Entry<WorkItemService, List<UUID>> entry : byService.entrySet()) {
+            WorkItemService service = entry.getKey();
             try {
                 result.addPromoted(service.promoteOrphanChildren(deleteSet));
             } catch (Exception e) {
@@ -260,7 +263,7 @@ public class WorkItemRouter implements IssueLocationPort {
         return result;
     }
 
-    private int getSafePromoted(com.seven7m.kanban.dto.issue.BatchDeleteResult result) {
+    private int getSafePromoted(BatchDeleteResult result) {
         return result.getPromoted();
     }
 
@@ -268,19 +271,19 @@ public class WorkItemRouter implements IssueLocationPort {
      * 类型码 → 物理表类别；null 表示未知编码。
      * 未注册编码不再静默落到任务表（曾导致类型与物理表不一致），由调用方返回 400。
      */
-    public static com.seven7m.kanban.common.enums.ItemCategory categoryOfCode(String code) {
+    public static ItemCategory categoryOfCode(String code) {
         if (code == null || code.isBlank()) return null;
         return switch (code.trim().toUpperCase()) {
-            case "TASK", "IMPROVEMENT" -> com.seven7m.kanban.common.enums.ItemCategory.TASK; // V27：改进类归入任务表
-            case "STORY", "FEATURE", "REQUIREMENT" -> com.seven7m.kanban.common.enums.ItemCategory.REQUIREMENT;
+            case "TASK", "IMPROVEMENT" -> ItemCategory.TASK; // V27：改进类归入任务表
+            case "STORY", "FEATURE", "REQUIREMENT" -> ItemCategory.REQUIREMENT;
             case "BUG", "FUNC_DEFECT", "PERF_DEFECT", "SEC_DEFECT", "COMPAT_DEFECT", "UI_DEFECT" ->
-                    com.seven7m.kanban.common.enums.ItemCategory.BUG;
+                    ItemCategory.BUG;
             default -> null;
         };
     }
 
     /** 某类别下已注册的具体类型码（不含 REQUIREMENT 这类类别别名），用于把别名解析到真实类型 */
-    public static List<String> codesOf(com.seven7m.kanban.common.enums.ItemCategory category) {
+    public static List<String> codesOf(ItemCategory category) {
         return switch (category) {
             case TASK -> List.of("TASK", "IMPROVEMENT");
             case REQUIREMENT -> List.of("STORY", "FEATURE");
@@ -289,11 +292,11 @@ public class WorkItemRouter implements IssueLocationPort {
     }
 
     /** 根据 typeCode（如 TASK/BUG）路由到对应 Service；未注册编码直接 400 */
-    private BaseWorkItemService<? extends AbstractWorkItem> routeByTypeCode(String code) {
+    private WorkItemService routeByTypeCode(String code) {
         if (code == null || code.isBlank()) return taskService;
-        com.seven7m.kanban.common.enums.ItemCategory category = categoryOfCode(code);
+        ItemCategory category = categoryOfCode(code);
         if (category == null) {
-            throw new com.seven7m.kanban.common.exception.ServiceException(400, "未知的工作项类型: " + code);
+            throw new ServiceException(ErrorCode.WORK_ITEM_TYPE_UNKNOWN, code);
         }
         return switch (category) {
             case TASK -> taskService;
@@ -307,11 +310,11 @@ public class WorkItemRouter implements IssueLocationPort {
      * codes 为空/未指定表示"全部"，返回三张表；否则按每个 code 路由后去重，
      * 保证像 ["TASK","BUG"] 这类跨类别条件不会只查第一张表而漏数据。
      */
-    private List<BaseWorkItemService<? extends AbstractWorkItem>> resolveServices(List<String> codes) {
+    private List<WorkItemService> resolveServices(List<String> codes) {
         if (codes == null || codes.isEmpty()) {
             return List.of(taskService, requirementService, bugService);
         }
-        Set<BaseWorkItemService<? extends AbstractWorkItem>> services = new LinkedHashSet<>();
+        Set<WorkItemService> services = new LinkedHashSet<>();
         for (String code : codes) {
             if (code != null && !code.isBlank()) {
                 services.add(routeByTypeCode(code));
@@ -327,7 +330,7 @@ public class WorkItemRouter implements IssueLocationPort {
      * 汇总后在内存排序并分页。单表场景不会走到这里，仍走 SQL 层分页。
      */
     private PageResult<IssueVO> mergeListByFilter(
-            List<BaseWorkItemService<? extends AbstractWorkItem>> services, IssueFilterRequest req) {
+            List<WorkItemService> services, IssueFilterRequest req) {
 
         int page = req.getPage() == null || req.getPage() < 1 ? 1 : req.getPage();
         int size = req.getSize() == null || req.getSize() < 1 ? 20 : req.getSize();
@@ -338,7 +341,7 @@ public class WorkItemRouter implements IssueLocationPort {
         List<IssueVO> merged = new ArrayList<>();
         long total = 0;
         IssueFilterRequest probe = copyForMerge(req, fetchSize);
-        for (BaseWorkItemService<? extends AbstractWorkItem> svc : services) {
+        for (WorkItemService svc : services) {
             PageResult<IssueVO> r = svc.listByFilter(probe);
             if (r == null) {
                 continue;

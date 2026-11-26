@@ -1,6 +1,7 @@
 package com.seven7m.kanban.service.issue.reference;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.entity.issue.tag.ProjectLabel;
 import com.seven7m.kanban.entity.sprint.Sprint;
@@ -36,7 +37,7 @@ public class IssueReferenceGuard {
         }
         Sprint sprint = sprintMapper.selectById(sprintId);
         if (sprint == null || !projectId.equals(sprint.getProjectId())) {
-            throw new ServiceException(400, "迭代不存在或不属于该项目");
+            throw new ServiceException(ErrorCode.SPRINT_IN_OTHER_PROJECT);
         }
     }
 
@@ -53,7 +54,7 @@ public class IssueReferenceGuard {
                 .eq(ProjectLabel::getProjectId, projectId)
                 .in(ProjectLabel::getLabelId, labelIds));
         if (exists == null || exists < distinct) {
-            throw new ServiceException(400, "标签不在本项目的标签库中");
+            throw new ServiceException(ErrorCode.LABEL_NOT_IN_PROJECT_LIBRARY);
         }
     }
 }

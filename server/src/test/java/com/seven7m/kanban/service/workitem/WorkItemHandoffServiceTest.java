@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -84,7 +85,7 @@ class WorkItemHandoffServiceTest {
     @Test
     @DisplayName("没有交接记录时拒绝撤销")
     void rejectsWhenNoHandoff() {
-        lenient().when(issueActivityMapper.selectOne(any())).thenReturn(null);
+        lenient().when(issueActivityMapper.selectList(any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.planRevoke(ctx(TO_USER, null)))
                 .isInstanceOf(ServiceException.class)
@@ -96,7 +97,7 @@ class WorkItemHandoffServiceTest {
     void rejectsWhenLastActionIsRevoke() {
         IssueActivity revoke = handoffActivity(WorkItemHandoffService.ACTION_HANDOFF_REVOKED,
                 FROM_USER, TO_USER, null, null);
-        lenient().when(issueActivityMapper.selectOne(any())).thenReturn(revoke);
+        lenient().when(issueActivityMapper.selectList(any())).thenReturn(List.of(revoke));
 
         assertThatThrownBy(() -> service.planRevoke(ctx(TO_USER, null)))
                 .isInstanceOf(ServiceException.class)
@@ -108,7 +109,7 @@ class WorkItemHandoffServiceTest {
     void rejectsWhenAssigneeChangedAgain() {
         IssueActivity act = handoffActivity(WorkItemHandoffService.ACTION_ASSIGNEE_CHANGED,
                 FROM_USER, TO_USER, null, null);
-        lenient().when(issueActivityMapper.selectOne(any())).thenReturn(act);
+        lenient().when(issueActivityMapper.selectList(any())).thenReturn(List.of(act));
 
         UUID someoneElse = UUID.randomUUID();
         assertThatThrownBy(() -> service.planRevoke(ctx(someoneElse, null)))
@@ -121,7 +122,7 @@ class WorkItemHandoffServiceTest {
     void restoresSprintWhenUnchangedSinceHandoff() {
         IssueActivity act = handoffActivity(WorkItemHandoffService.ACTION_ASSIGNEE_CHANGED,
                 FROM_USER, TO_USER, SPRINT_OLD, SPRINT_NEW);
-        lenient().when(issueActivityMapper.selectOne(any())).thenReturn(act);
+        lenient().when(issueActivityMapper.selectList(any())).thenReturn(List.of(act));
 
         WorkItemHandoffService.RevokePlan plan = service.planRevoke(ctx(TO_USER, SPRINT_NEW));
 
@@ -136,7 +137,7 @@ class WorkItemHandoffServiceTest {
     void keepsSprintWhenChangedBySomeoneElse() {
         IssueActivity act = handoffActivity(WorkItemHandoffService.ACTION_ASSIGNEE_CHANGED,
                 FROM_USER, TO_USER, SPRINT_OLD, SPRINT_NEW);
-        lenient().when(issueActivityMapper.selectOne(any())).thenReturn(act);
+        lenient().when(issueActivityMapper.selectList(any())).thenReturn(List.of(act));
 
         WorkItemHandoffService.RevokePlan plan = service.planRevoke(ctx(TO_USER, UUID.randomUUID()));
 
@@ -149,7 +150,7 @@ class WorkItemHandoffServiceTest {
     void clearsSprintWhenThereWasNoneBefore() {
         IssueActivity act = handoffActivity(WorkItemHandoffService.ACTION_ASSIGNEE_CHANGED,
                 FROM_USER, TO_USER, null, SPRINT_NEW);
-        lenient().when(issueActivityMapper.selectOne(any())).thenReturn(act);
+        lenient().when(issueActivityMapper.selectList(any())).thenReturn(List.of(act));
 
         WorkItemHandoffService.RevokePlan plan = service.planRevoke(ctx(TO_USER, SPRINT_NEW));
 

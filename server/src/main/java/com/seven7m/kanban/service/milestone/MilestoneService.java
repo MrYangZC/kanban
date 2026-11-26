@@ -1,122 +1,33 @@
 package com.seven7m.kanban.service.milestone;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.seven7m.kanban.common.exception.ServiceException;
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.seven7m.kanban.dto.milestone.CreateMilestoneRequest;
 import com.seven7m.kanban.dto.milestone.MilestoneVO;
 import com.seven7m.kanban.dto.milestone.UpdateMilestoneRequest;
 import com.seven7m.kanban.entity.milestone.Milestone;
-import com.seven7m.kanban.mapper.milestone.MilestoneMapper;
-import com.seven7m.kanban.entity.user.SysUser;
-import com.seven7m.kanban.mapper.user.SysUserMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
-@Service
-@RequiredArgsConstructor
-public class MilestoneService {
+/**
+ * 里程碑(Milestone)服务：项目级里程碑的 CRUD。
+ *
+ * <p>继承 {@link IService} 复用 MyBatis-Plus 的单表通用能力（按 id 取、保存、删除、按条件取列表）；
+ * 创建人展示名需要跨表查用户，仍走注入的 {@code SysUserMapper}，且列表场景批量查一次避免 N+1。
+ *
+ * <p>实现见 {@link com.seven7m.kanban.service.milestone.impl.MilestoneServiceImpl}。
+ */
+public interface MilestoneService extends IService<Milestone> {
 
-    private final MilestoneMapper milestoneMapper;
-    private final SysUserMapper userMapper;
+    /** 项目下的里程碑列表（按截止日期升序，创建人批量查出） */
+    List<MilestoneVO> list(UUID projectId);
 
-    public List<MilestoneVO> list(UUID projectId) {
-        List<Milestone> milestones = milestoneMapper.selectList(Wrappers.<Milestone>lambdaQuery()
-                        .eq(Milestone::getProjectId, projectId)
-                        .orderByAsc(Milestone::getDueDate));
-        Set<UUID> creatorIds = milestones.stream()
-                .map(Milestone::getCreatedBy)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<UUID, SysUser> userMap = creatorIds.isEmpty() ? Map.of() :
-                userMapper.selectBatchIds(creatorIds).stream()
-                        .collect(Collectors.toMap(SysUser::getId, Function.identity()));
-        return milestones.stream().map(m -> toVO(m, userMap)).collect(Collectors.toList());
-    }
+    /** 新建里程碑：初始状态 OPEN、完成度 0 */
+    MilestoneVO create(UUID projectId, CreateMilestoneRequest req);
 
-    @Transactional
-    public MilestoneVO create(UUID projectId, CreateMilestoneRequest req) {
-        Milestone m = new Milestone();
-        m.setId(UUID.randomUUID());
-        m.setProjectId(projectId);
-        m.setName(req.getName());
-        m.setDescription(req.getDescription());
-        m.setDueDate(req.getDueDate());
-        m.setStatus("OPEN");
-        m.setProgress(0);
-        milestoneMapper.insert(m);
-        return toVO(m);
-    }
+    /** 更新里程碑：请求里的 null 表示"不修改" */
+    MilestoneVO update(UUID projectId, UUID id, UpdateMilestoneRequest req);
 
-    @Transactional
-    public MilestoneVO update(UUID projectId, UUID id, UpdateMilestoneRequest req) {
-        Milestone m = milestoneMapper.selectById(id);
-        if (m == null || !m.getProjectId().equals(projectId)) {
-            throw new ServiceException(404, "里程碑不存在");
-        }
-        if (req.getName() != null) m.setName(req.getName());
-        if (req.getDescription() != null) m.setDescription(req.getDescription());
-        if (req.getDueDate() != null) m.setDueDate(req.getDueDate());
-        if (req.getStatus() != null) m.setStatus(req.getStatus());
-        if (req.getProgress() != null) m.setProgress(req.getProgress());
-        milestoneMapper.updateById(m);
-        return toVO(m);
-    }
-
-    @Transactional
-    public void delete(UUID projectId, UUID id) {
-        Milestone m = milestoneMapper.selectById(id);
-        if (m == null || !m.getProjectId().equals(projectId)) {
-            throw new ServiceException(404, "里程碑不存在");
-        }
-        milestoneMapper.deleteById(id);
-    }
-
-    private MilestoneVO toVO(Milestone m, Map<UUID, SysUser> userMap) {
-        MilestoneVO vo = new MilestoneVO();
-        vo.setId(m.getId());
-        vo.setProjectId(m.getProjectId());
-        vo.setName(m.getName());
-        vo.setDescription(m.getDescription());
-        vo.setDueDate(m.getDueDate());
-        vo.setStatus(m.getStatus());
-        vo.setProgress(m.getProgress());
-        vo.setCreatedAt(m.getCreatedAt() != null ? m.getCreatedAt().toString() : null);
-        vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().toString() : null);
-        if (m.getCreatedBy() != null) {
-            SysUser u = userMap.get(m.getCreatedBy());
-            if (u != null) {
-                vo.setCreatorName(u.getDisplayName());
-            }
-        }
-        return vo;
-    }
-
-    private MilestoneVO toVO(Milestone m) {
-        MilestoneVO vo = new MilestoneVO();
-        vo.setId(m.getId());
-        vo.setProjectId(m.getProjectId());
-        vo.setName(m.getName());
-        vo.setDescription(m.getDescription());
-        vo.setDueDate(m.getDueDate());
-        vo.setStatus(m.getStatus());
-        vo.setProgress(m.getProgress());
-        vo.setCreatedAt(m.getCreatedAt() != null ? m.getCreatedAt().toString() : null);
-        vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().toString() : null);
-        if (m.getCreatedBy() != null) {
-            SysUser u = userMapper.selectById(m.getCreatedBy());
-            if (u != null) {
-                vo.setCreatorName(u.getDisplayName());
-            }
-        }
-        return vo;
-    }
+    /** 删除里程碑 */
+    void delete(UUID projectId, UUID id);
 }

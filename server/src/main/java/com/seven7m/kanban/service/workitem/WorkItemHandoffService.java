@@ -2,7 +2,9 @@ package com.seven7m.kanban.service.workitem;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.seven7m.kanban.common.activity.ActivityValue;
+import com.seven7m.kanban.common.constant.ActivityActions;
 import com.seven7m.kanban.common.enums.ItemCategory;
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.common.util.Uuids;
@@ -28,7 +30,7 @@ import java.util.UUID;
 /**
  * 工作项交接（handoff）的解析与副作用。
  *
- * <p>从 {@code BaseWorkItemService} 抽出来的一块：交接只依赖「项目的列配置 + 负责人 + 迭代 + 标签」，
+ * <p>从 {@code AbstractWorkItemService} 抽出来的一块：交接只依赖「项目的列配置 + 负责人 + 迭代 + 标签」，
  * 与具体是哪张表（task/requirement/bug）无关，因此只需要一个 {@link Context} 值对象就能工作，
  * 不再需要泛型实体。
  *
@@ -47,13 +49,13 @@ import java.util.UUID;
 public class WorkItemHandoffService {
 
     /** 交接动态：负责人由 A 变为 B */
-    public static final String ACTION_ASSIGNEE_CHANGED = "ASSIGNEE_CHANGED";
+    public static final String ACTION_ASSIGNEE_CHANGED = ActivityActions.ASSIGNEE_CHANGED;
     /** 撤销交接：负责人由 B 退回 A（与上面区分，避免撤销本身又成为可撤销项） */
-    public static final String ACTION_HANDOFF_REVOKED = "HANDOFF_REVOKED";
+    public static final String ACTION_HANDOFF_REVOKED = ActivityActions.HANDOFF_REVOKED;
     /** 交接落点：工作项被放进某个迭代（单列「迭代」是工作项的强属性，换掉要留痕） */
-    public static final String ACTION_SPRINT_CHANGED = "SPRINT_CHANGED";
+    public static final String ACTION_SPRINT_CHANGED = ActivityActions.SPRINT_CHANGED;
     /** 交接落点：工作项被补上某个标签（只在真正新增时记一条，已经有就静默） */
-    public static final String ACTION_LABEL_ADDED = "LABEL_ADDED";
+    public static final String ACTION_LABEL_ADDED = ActivityActions.LABEL_ADDED;
 
     private final WorkflowService workflowService;
     private final ProjectMapper projectMapper;
@@ -187,19 +189,21 @@ public class WorkItemHandoffService {
      * </ol>
      */
     public RevokePlan planRevoke(Context ctx) {
-        IssueActivity last = issueActivityMapper.selectOne(Wrappers.<IssueActivity>lambdaQuery()
-                .eq(IssueActivity::getIssueId, ctx.issueId())
-                .eq(IssueActivity::getCategory, ctx.category().name())
-                .in(IssueActivity::getAction, ACTION_ASSIGNEE_CHANGED, ACTION_HANDOFF_REVOKED)
-                .orderByDesc(IssueActivity::getCreatedAt)
-                .last("LIMIT 1"));
+        // 取最近一条交接/撤销动态。不用 selectOne + last("LIMIT 1")：在条件构造器上
+        // 拼 SQL 片段属于越层写法，取列表再取第一条等价
+        IssueActivity last = issueActivityMapper.selectList(Wrappers.<IssueActivity>lambdaQuery()
+                        .eq(IssueActivity::getIssueId, ctx.issueId())
+                        .eq(IssueActivity::getCategory, ctx.category().name())
+                        .in(IssueActivity::getAction, ACTION_ASSIGNEE_CHANGED, ACTION_HANDOFF_REVOKED)
+                        .orderByDesc(IssueActivity::getCreatedAt))
+                .stream().findFirst().orElse(null);
         if (last == null || !ACTION_ASSIGNEE_CHANGED.equals(last.getAction())) {
-            throw new ServiceException(400, "没有可撤销的交接");
+            throw new ServiceException(ErrorCode.HANDOFF_NOTHING_TO_REVOKE);
         }
         UUID handedTo = ActivityValue.userId(last.getNewValue());
         UUID handedFrom = ActivityValue.userId(last.getOldValue());
         if (handedTo == null || !handedTo.equals(ctx.assigneeId())) {
-            throw new ServiceException(400, "负责人已被再次变更，无法撤销这次交接");
+            throw new ServiceException(ErrorCode.HANDOFF_ASSIGNEE_CHANGED);
         }
 
         // 迭代落点一起退回。标签不退：标签是可累加的，撤销这一刻它可能已经被别人手工加过，

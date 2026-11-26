@@ -1,6 +1,7 @@
 package com.seven7m.kanban.common.upload;
 
 import com.seven7m.kanban.common.domain.R;
+import com.seven7m.kanban.common.exception.ErrorCode;
 import com.seven7m.kanban.common.exception.ServiceException;
 import com.seven7m.kanban.common.security.UserContext;
 import com.seven7m.kanban.common.util.Uuids;
@@ -36,16 +37,16 @@ public class FileUploadController {
     public R<UploadImageVO> uploadImage(@RequestParam("file") MultipartFile file,
                                         @RequestParam(required = false) String projectId) throws Exception {
         if (file.isEmpty()) {
-            throw new ServiceException(400, "上传文件不能为空");
+            throw new ServiceException(ErrorCode.UPLOAD_EMPTY);
         }
         if (file.getSize() > ImageFileUtil.maxFileSize()) {
-            throw new ServiceException(400, "图片大小不能超过 5MB");
+            throw new ServiceException(ErrorCode.UPLOAD_IMAGE_TOO_LARGE);
         }
         String ext = ImageFileUtil.resolveExtension(file.getOriginalFilename());
         byte[] data = file.getBytes();
         // 文件头（magic bytes）内容校验，防止伪装扩展名上传任意文件
         if (!ImageFileUtil.matchesMagicBytes(data, ext)) {
-            throw new ServiceException(400, "文件内容与扩展名不符，已拒绝上传");
+            throw new ServiceException(ErrorCode.UPLOAD_CONTENT_MISMATCH);
         }
 
         Path dir = uploadProperties.root();
@@ -55,7 +56,7 @@ public class FileUploadController {
 
         UUID uploaderId = UserContext.getUserId();
         if (uploaderId == null) {
-            throw new ServiceException(401, "未登录，无法上传文件");
+            throw new ServiceException(ErrorCode.UPLOAD_UNAUTHENTICATED);
         }
         UploadFile record = new UploadFile();
         record.setId(UUID.randomUUID());

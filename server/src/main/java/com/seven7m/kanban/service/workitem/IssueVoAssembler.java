@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 /**
  * 工作项 VO 装配（工作项实体 → 前端 {@link IssueVO}）。
  *
- * <p>从 1200 行的 {@code BaseWorkItemService} 里移出来的原因：这段逻辑只做"批量预取 + 字段映射"，
+ * <p>从 1200 行的 {@code AbstractWorkItemService} 里移出来的原因：这段逻辑只做"批量预取 + 字段映射"，
  * 不涉及权限、状态机或事务，却占了基类里很大一块。抽出来后可以单独验证
  * "类型/状态/人员/标签/评论数/参与人/抄送"是否都装配到位。
  *
