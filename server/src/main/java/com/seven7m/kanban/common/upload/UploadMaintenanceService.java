@@ -39,13 +39,14 @@ public class UploadMaintenanceService {
     private final UploadProperties uploadProperties;
     private final IssueAttachmentMapper attachmentMapper;
     private final UploadFileMapper uploadFileMapper;
+    private final UploadReferenceResolver referenceResolver;
 
     /**
      * @param dryRun  只统计不删除（默认，避免误删）
      * @param minAge  只清理早于该时长的文件
      */
     public CleanupResult cleanupOrphans(boolean dryRun, Duration minAge) {
-        Set<String> referenced = referencedFilenames();
+        Set<String> referenced = referenceResolver.referencedFilenames();
         Path root = uploadProperties.root();
         if (!Files.isDirectory(root)) {
             return new CleanupResult(0, referenced.size(), 0, 0, List.of(), List.of(), dryRun);
@@ -96,27 +97,6 @@ public class UploadMaintenanceService {
                 List.of(), dryRun);
     }
 
-    /** 附件与通用上传登记的"仍被引用"的文件名集合 */
-    private Set<String> referencedFilenames() {
-        Set<String> referenced = new HashSet<>();
-        for (Object key : attachmentMapper.selectObjs(
-                Wrappers.<IssueAttachment>query().select("storage_key"))) {
-            if (key != null) {
-                String storageKey = key.toString();
-                // storage_key 协议为 uploads/<filename>；存量 local/ 前缀不对应真实文件，忽略
-                if (storageKey.startsWith(UploadProperties.STORAGE_KEY_PREFIX)) {
-                    referenced.add(storageKey.substring(UploadProperties.STORAGE_KEY_PREFIX.length()));
-                }
-            }
-        }
-        for (Object name : uploadFileMapper.selectObjs(
-                Wrappers.<UploadFile>query().select("filename"))) {
-            if (name != null) {
-                referenced.add(name.toString());
-            }
-        }
-        return referenced;
-    }
 
     /** 清理结果；dryRun=true 时 deleted 恒为 0 */
     public record CleanupResult(int scannedFiles,

@@ -38,8 +38,10 @@ class UploadMaintenanceServiceTest {
         // attachment 里登记了一个仍在使用的文件
         when(attachmentMapper.selectObjs(any())).thenReturn(objs("uploads/keep.png"));
         when(uploadFileMapper.selectObjs(any())).thenReturn(objs());
+        UploadReferenceResolver resolver = new UploadReferenceResolver(
+                attachmentMapper, uploadFileMapper, mock(org.springframework.jdbc.core.JdbcTemplate.class));
         service = new UploadMaintenanceService(
-                new UploadProperties(tempDir.toString(), 50, ""), attachmentMapper, uploadFileMapper);
+                new UploadProperties(tempDir.toString(), 50, ""), attachmentMapper, uploadFileMapper, resolver);
     }
 
     private static List<Object> objs(String... values) {

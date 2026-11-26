@@ -23,7 +23,7 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
-        <springdoc.version>2.6.0</springdoc.version>
+        <springdoc.version>2.8.16</springdoc.version>
         <jjwt.version>0.11.5</jjwt.version>
         <!--
           surefire 的 argLine 走属性而不是插件里写死：JaCoCo 的 prepare-agent 往同名属性里

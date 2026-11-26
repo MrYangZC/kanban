@@ -35,14 +35,28 @@ public class JwtService {
     private final long expireSeconds;
     private final String issuer;
 
+    /** application.yml 里的内置默认密钥；任何非本地环境都不允许实际使用它 */
+    private static final String DEV_DEFAULT_SECRET = "kanban-dev-only-secret-change-in-production-32b";
+
     public JwtService(@Value("${kanban.jwt.secret}") String secret,
                       @Value("${kanban.jwt.expire-minutes:120}") long expireMinutes,
-                      @Value("${kanban.jwt.issuer:kanban}") String issuer) {
+                      @Value("${kanban.jwt.issuer:kanban}") String issuer,
+                      @Value("${spring.profiles.active:}") String activeProfiles) {
         // HS256 要求密钥不少于 256 位（32 字节），过短会在启动期直接拒绝，避免弱签名
         byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
         if (bytes.length < 32) {
             throw new IllegalStateException(
                     "kanban.jwt.secret 至少需要 32 字节（当前 " + bytes.length + "），请用 KANBAN_JWT_SECRET 配置");
+        }
+        // 部署时漏配 KANBAN_JWT_SECRET 会静默回落到仓库里的默认值——那等于把签名密钥公开，
+        // 任何人都能伪造任意用户的 token。除了 local/dev 之外一律启动失败，宁可不启动。
+        boolean localLike = java.util.Arrays.stream(activeProfiles.split(","))
+                .map(String::trim)
+                .anyMatch(p -> p.equals("local") || p.equals("dev"));
+        if (DEV_DEFAULT_SECRET.equals(secret) && !localLike) {
+            throw new IllegalStateException(
+                    "使用了内置的开发默认 JWT 密钥，但当前环境不是 local/dev（profiles=" + activeProfiles
+                            + "）。请通过环境变量 KANBAN_JWT_SECRET 配置至少 32 字节的随机密钥。");
         }
         this.key = Keys.hmacShaKeyFor(bytes);
         this.expireSeconds = expireMinutes * 60;

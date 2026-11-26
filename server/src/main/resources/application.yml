@@ -74,8 +74,14 @@ mybatis-plus:
       id-type: assign_uuid
   mapper-locations: classpath*:mapper/**/*.xml
 
+# 接口文档默认关闭：它会把全部接口与数据模型暴露给任何能访问站点的人，而安全链里
+# /swagger-ui/** 与 /v3/api-docs/** 是免登录的。需要时用环境变量
+# SPRINGDOC_API_DOCS_ENABLED=true / SPRINGDOC_SWAGGER_UI_ENABLED=true 打开，
+# 本地开发见 application-local.yml。
 springdoc:
   swagger-ui:
+    enabled: false
     path: /swagger-ui.html
   api-docs:
+    enabled: false
     path: /v3/api-docs

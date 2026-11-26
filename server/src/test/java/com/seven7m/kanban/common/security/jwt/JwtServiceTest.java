@@ -14,6 +14,7 @@ import java.util.Date;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -29,7 +30,7 @@ class JwtServiceTest {
     private static final String OTHER_SECRET = "fedcba9876543210fedcba9876543210";
 
     private JwtService service(long expireMinutes) {
-        return new JwtService(SECRET, expireMinutes, "kanban");
+        return new JwtService(SECRET, expireMinutes, "kanban", "local");
     }
 
     @Test
@@ -110,8 +111,23 @@ class JwtServiceTest {
     @Test
     @DisplayName("密钥短于 32 字节时启动即失败，不允许弱密钥上线")
     void shortSecretRejected() {
-        assertThatThrownBy(() -> new JwtService("too-short", 60, "kanban"))
+        assertThatThrownBy(() -> new JwtService("too-short", 60, "kanban", "local"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("32");
+    }
+
+    @Test
+    @DisplayName("非 local/dev 环境使用内置默认密钥时启动失败（防漏配环境变量）")
+    void devDefaultSecretRejectedInProd() {
+        String devDefault = "kanban-dev-only-secret-change-in-production-32b";
+        assertThatThrownBy(() -> new JwtService(devDefault, 60, "kanban", "prod"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("KANBAN_JWT_SECRET");
+
+        // local / dev 下允许使用默认值，方便本地启动
+        assertThatCode(() -> new JwtService(devDefault, 60, "kanban", "local"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> new JwtService(devDefault, 60, "kanban", "dev"))
+                .doesNotThrowAnyException();
     }
 }
